@@ -10,7 +10,7 @@ Si ya tienes Python 3 y el entorno virtual `simulaqron_env` correctamente instal
 
 ```bash
 python app.py
-
+```
 
 
 Falta agregarle que pueda poner el parametro de werner(ya implementado en el html)
