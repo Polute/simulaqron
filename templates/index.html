@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Simulación Cuántica</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            padding: 2em;
+        }
+        .container-flex {
+            display: flex;
+            gap: 2em;
+            justify-content: center;
+            align-items: flex-start;
+            max-width: 1270px;
+            margin: auto;
+        }
+        .columna-izquierda, .columna-derecha, .columna-centro{
+            background-color: white;
+            padding: 2em;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .columna-izquierda {
+            flex: 0.6;
+        }
+        .columna-centro {
+            flex: 1.4;
+        }
+        .columna-derecha {
+            flex: 1.5;
+        }
+
+        h1, h2 {
+            color: #333;
+        }
+        .resultado, .estado, .contador {
+            font-size: 1.2em;
+            margin-top: 1em;
+            padding: 1em;
+            border-left: 5px solid;
+        }
+        .resultado { background-color: #e8f5e9; border-color: #4caf50; }
+        .estado { background-color: #e3f2fd; border-color: #2196f3; }
+        .contador { background-color: #fff3e0; border-color: #ff9800; }
+        .boton {
+            display: inline-block;
+            margin-top: 1em;
+            padding: 0.8em 1.5em;
+            background-color: #2196f3;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .boton:hover { background-color: #1976d2; }
+        #loading {
+            display: none;
+            margin-top: 1em;
+            font-style: italic;
+            color: #555;
+        }
+        #cuenta {
+            font-size: 1em;
+            margin-top: 0.5em;
+            color: #777;
+        }
+        table {
+            margin-top: 1em;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            padding: 0.6em;
+            border: 1px solid #ccc;
+            text-align: center;
+        }
+        th { background-color: #eeeeee; }
+    </style>
+</head>
+<body>
+    <div class="container-flex">
+        <!-- Columna izquierda: parámetros físicos -->
+        <div class="columna-izquierda">
+            <h2>Parámetros físicos</h2>
+
+            <label for="dist_ab">Distancia Alice ↔ Bob (km):</label>
+            <input type="number" id="dist_ab" value="50" min="1"><br><br>
+
+            <label for="dist_ac">Distancia Alice ↔ Charlie (km):</label>
+            <input type="number" id="dist_ac" value="100" min="1"><br><br>
+
+            <label for="dist_cb">Distancia Charlie ↔ Bob (km):</label>
+            <input type="number" id="dist_cb" value="50" min="1"><br><br>
+
+        </div>
+            <div style="margin-top: 1em;" id="parametro-werner">
+            <label for="parametro_p">Parámetro p del estado de Werner (0.0 – 1.0):</label>
+            <input type="number" id="parametro_p" name="parametro_p" min="0" max="1" step="0.01" value="0.8">
+        </div>
+
+        <!-- Columna central: simulación -->
+        <div class="columna-centro">
+            <h1>Simulación Cuántica</h1>
+            <p>Este experimento simula el envío de <strong>2 qubits EPR</strong> desde Alice a Bob, con opción de entrelazamiento puro o con ruido (estado de Werner usando un nodo Repeater).</p>
+
+            <div class="resultado" id="resultado">
+                <strong>Resultado de la medición en Bob:</strong><br>
+                {{ resultado }}
+            </div>
+
+            <div class="estado" id="estado">
+                <strong>Estado:</strong> Esperando simulación...
+            </div>
+
+            <div class="contador" id="contador">
+                <strong>Simulaciones realizadas:</strong> {{ contador }}
+            </div>
+
+            <div id="loading">Ejecutando simulación... por favor espera.</div>
+            <div id="cuenta"></div>
+
+            <div style="margin-top: 1em;">
+                <label for="modo">Modo de envío:</label>
+                <select id="modo">
+                    <option value="puro">Entrelazamiento puro (Alice → Bob)</option>
+                    <option value="werner">Estado de Werner (Alice → Repeater → Bob)</option>
+                    <option value="swap">Entanglement Swap (Alice → Charlie ←→ Bob)</option>
+                </select>
+            </div>
+            <div style="margin-top: 1em;">
+                <label for="num_qubits">Número de qubits:</label>
+                <input type="number" id="num_qubits" name="num_qubits" min="1" max="10" value="2">
+            </div>
+
+            <button class="boton" onclick="iniciarSimulacion()">Iniciar Simulación</button>
+            <button class="boton" onclick="iniciarBucle()">Iniciar Bucle</button>
+            <button class="boton" onclick="detenerBucle()">Detener Bucle</button>
+        </div>
+
+        <!-- Columna derecha: historial -->
+        <div class="columna-derecha">
+            <h2>Historial de Resultados</h2>
+            <table id="tabla-resultados">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Resultado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Se llenará dinámicamente -->
+                </tbody>
+            </table>
+            <button class="boton" onclick="limpiarHistorial()">Limpiar historial</button>
+        </div>
+    </div>
+
+
+    <script>
+        let cuentaIntervalo;
+        let segundos = 4;
+
+        function iniciarSimulacion() {
+            const modo = document.getElementById("modo").value;
+            const num_qubits = document.getElementById("num_qubits").value;
+            console.log("Iniciando simulación única");
+
+            const dist_ab = document.getElementById("dist_ab").value;
+            const dist_ac = document.getElementById("dist_ac").value;
+            const dist_cb = document.getElementById("dist_cb").value;
+
+            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("resultado").innerHTML =
+                        "<strong>Resultado de la medición en Bob:</strong><br>" + data.resultado;
+                    document.getElementById("estado").innerHTML =
+                        "<strong>Estado:</strong> Información enviada correctamente desde Alice a Bob.";
+                    document.getElementById("contador").innerHTML =
+                        "<strong>Simulaciones realizadas:</strong> " + data.contador;
+                    actualizarTabla(data.historial);
+                    document.getElementById("loading").style.display = "none";
+                    document.getElementById("cuenta").innerText = "";
+                });
+        }
+
+        function iniciarBucle() {
+        
+            const modo = document.getElementById("modo").value;
+            const num_qubits = document.getElementById("num_qubits").value;
+            console.log("Comienza bucle de simulación");
+
+            document.getElementById("loading").style.display = "block";
+            const dist_ab = document.getElementById("dist_ab").value;
+            const dist_ac = document.getElementById("dist_ac").value;
+            const dist_cb = document.getElementById("dist_cb").value;
+
+            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}`)
+                .then(response => response.json())
+                .then(data => {
+                    mostrarResultado(data);
+
+                    // Activar contador para siguientes simulaciones
+                    segundos = 4;
+                    actualizarCuenta();
+
+                    cuentaIntervalo = setInterval(() => {
+                        if (segundos > 0) {
+                            segundos--;
+                            actualizarCuenta();
+                        } else {
+                            // Detener contador visual y mostrar solo "Ejecutando..."
+                            document.getElementById("cuenta").innerText = "";
+                            document.getElementById("loading").style.display = "block";
+
+                            // Lanzar siguiente simulación
+                            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}`)
+                                .then(response => response.json())
+                                .then(data => {
+                                    mostrarResultado(data);
+                                    //Si el resultado contiene "ERROR", detener el bucle
+                                    if (data.resultado.includes("ERROR")) {
+                                        detenerBucle();
+                                        document.getElementById("estado").innerHTML =
+                                            "<strong>Estado:</strong> Error detectado. Detenido el bucle. Limpia el historial.";
+                                        return;
+                                    }
+                                    segundos = 4;
+                                    actualizarCuenta();
+                                });
+                        }
+                    }, 1000);
+                });
+        }
+
+        function mostrarResultado(data) {
+            document.getElementById("resultado").innerHTML =
+                "<strong>Resultado de la medición en Bob:</strong><br>" + data.resultado;
+            document.getElementById("estado").innerHTML =
+                "<strong>Estado:</strong> Información enviada correctamente desde Alice a Bob.";
+            document.getElementById("contador").innerHTML =
+                "<strong>Simulaciones realizadas:</strong> " + data.contador;
+            actualizarTabla(data.historial);
+            document.getElementById("loading").style.display = "none";
+        }
+
+        function actualizarCuenta() {
+            if (segundos > 0) {
+                document.getElementById("cuenta").innerText =
+                    "Próxima simulación en: " + segundos + " segundos";
+            } else {
+                document.getElementById("cuenta").innerText = "";
+            }
+        }
+
+
+
+
+        function detenerBucle() {
+            console.log("Termina bucle de simulación");
+            clearInterval(cuentaIntervalo);
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("cuenta").innerText = "";
+        }
+
+        function actualizarCuenta() {
+            document.getElementById("cuenta").innerText =
+                "Próxima simulación en: " + segundos + " segundos";
+        }
+
+        function actualizarTabla(historial) {
+            const tbody = document.querySelector("#tabla-resultados tbody");
+            tbody.innerHTML = "";
+            historial.forEach(linea => {
+                const fila = document.createElement("tr");
+                const partes = linea.split(":");
+                fila.innerHTML = `<td>${partes[0].trim()}</td><td>${partes[1].trim()}</td>`;
+                tbody.appendChild(fila);
+            });
+        }
+        function limpiarHistorial() {
+            fetch("/limpiar_historial")
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("resultado").innerHTML =
+                        "<strong>Resultado de la medición en Bob:</strong><br>Historial borrado.";
+                    document.getElementById("estado").innerHTML =
+                        "<strong>Estado:</strong> Historial limpiado correctamente.";
+                    document.getElementById("contador").innerHTML =
+                        "<strong>Simulaciones realizadas:</strong> 0";
+                    actualizarTabla([]);
+                });
+        }
+        let modoAnterior = document.getElementById("modo").value;
+
+        document.getElementById("modo").addEventListener("change", () => {
+            const nuevoModo = document.getElementById("modo").value;
+            if (nuevoModo !== modoAnterior) {
+                fetch("/limpiar_qubits")
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === "ok") {
+                            document.getElementById("estado").innerHTML =
+                                "<strong>Estado:</strong> Qubits limpiados al cambiar de modo.";
+                            console.log("Qubits limpiados correctamente.");
+                        } else {
+                            document.getElementById("estado").innerHTML =
+                                "<strong>Estado:</strong> Error al limpiar qubits.";
+                            console.warn("Error al limpiar qubits.");
+                        }
+                        modoAnterior = nuevoModo;
+                    });
+            }
+        });
+
+    </script>
+</body>
+</html>
