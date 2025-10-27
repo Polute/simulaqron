@@ -15,3 +15,7 @@ python app.py
 
 Falta agregarle que pueda poner el parametro de werner(ya implementado en el html)
 Y varios tipos de tiempos relacionados con las operaciones cuánticas.
+
+Puedes probar varios tipos de envios de qubits(puros, con parametro de werner y con entrelazamiento)
+
+Falta mucho retoque.
