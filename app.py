@@ -2,6 +2,8 @@ import os
 import subprocess
 import time
 from flask import Flask, render_template, jsonify, request
+import random
+
 
 app = Flask(__name__)
 contador = 0
@@ -55,6 +57,8 @@ def limpiar_qubits():
 @app.route("/simular")
 def simular():
     global contador, simulacion_en_curso
+    pgen = float(request.args.get("pgen", 0.8))
+    pswap = float(request.args.get("pswap", 0.9))
 
     if simulacion_en_curso:
         print("[SERVIDOR] Simulación en curso. Ignorando nueva petición.")
@@ -66,16 +70,17 @@ def simular():
 
     simulacion_en_curso = True
     inicio_real = time.time()
+    pgen = float(request.args.get("pgen", 0.8))
+    pswap = float(request.args.get("pswap", 0.9))
     modo = request.args.get("modo", "puro")
     num_qubits = int(request.args.get("num_qubits", 2))
-    p = 1.0 if modo == "puro" else 0.8
 
     # Distancias físicas recibidas desde el HTML
     dist_ab = float(request.args.get("dist_ab", 50))  # Alice ↔ Bob
     dist_ac = float(request.args.get("dist_ac", 100)) # Alice ↔ Charlie
     dist_cb = float(request.args.get("dist_cb", 50))  # Charlie ↔ Bob
 
-    print(f"[WEB] Iniciando simulación en modo: {modo} (p={p}, qubits={num_qubits})")
+    print(f"[WEB] Iniciando simulación en modo: {modo} (p={pgen}, qubits={num_qubits})")
     print(f"[WEB] Distancias: AB={dist_ab} km, AC={dist_ac} km, CB={dist_cb} km")
 
     try:
@@ -89,24 +94,51 @@ def simular():
         else:
             tiempo_estimado = 0
         # Operaciones de simulación
-        if modo in ["werner", "swap"]:
-            subprocess.run(["python3", "bob.py", modo, str(p), str(num_qubits)])
-            time.sleep(retardo(dist_cb))  # Charlie → Bob
+        if modo in ["puro", "werner", "swap"]:
+            if modo == "puro":
+                subprocess.run(["python3", "alice.py", modo, str(1.0), str(num_qubits)])
+                time.sleep(retardo(dist_ab))  # Alice → Bob
 
-            if modo == "werner":
-                subprocess.run(["python3", "repeater.py", str(num_qubits)])
+                w_out = 1.0
+                subprocess.run(["python3", "bob.py", modo, str(w_out), str(num_qubits)])
+
+            elif modo == "werner":
+                subprocess.run(["python3", "alice.py", modo, str(pgen), str(num_qubits)])
                 time.sleep(retardo(dist_ac))  # Alice → Repeater
+
+                subprocess.run(["python3", "repeater.py", str(num_qubits)])
+                time.sleep(retardo(dist_cb))  # Charlie → Bob
+
+                # Leer fidelidad generada por Alice
+                try:
+                    with open("fidelidad_alice.txt", "r") as f:
+                        w_in = float(f.read().strip())
+                except:
+                    w_in = 0.0
+
+                subprocess.run(["python3", "bob.py", modo, str(w_in), str(num_qubits)])
+                w_out = w_in  # En este modo, fidelidad se conserva
+
             elif modo == "swap":
-                subprocess.run(["python3", "repeater_swap.py", str(num_qubits)])
+                subprocess.run(["python3", "alice.py", modo, str(pgen), str(num_qubits)])
                 time.sleep(retardo(dist_ac))  # Alice → Charlie
 
-            subprocess.run(["python3", "alice.py", modo, str(p), str(num_qubits)])
-            time.sleep(retardo(dist_ac))  # Alice → Charlie (cuántico)
-        else:  # modo == "puro"
-            subprocess.run(["python3", "bob.py", modo, str(p), str(num_qubits)])
-            subprocess.run(["python3", "alice.py", modo, str(p), str(num_qubits)])
-            time.sleep(retardo(dist_ab))  # Alice → Bob
+                subprocess.run(["python3", "repeater_swap.py", str(num_qubits), str(pswap)])
+                time.sleep(retardo(dist_cb))  # Charlie → Bob
 
+                # Leer fidelidad generada por Alice
+                try:
+                    with open("fidelidad_alice.txt", "r") as f:
+                        w_in = float(f.read().strip())
+                except:
+                    w_in = 0.0
+
+                subprocess.run(["python3", "bob.py", modo, str(w_in), str(num_qubits)])
+                w_out = w_in  # Bob calculará el producto con su propio w
+
+        else:
+            w_out = 0.0  # Modo desconocido
+            
         fin_real = time.time()
         tiempo_real = fin_real - inicio_real
         try:
