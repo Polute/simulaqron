@@ -2,7 +2,7 @@
 
 ## ⚡ Ejecución rápida (con entorno ya configurado)
 
-Si ya tienes Python 3 y el entorno virtual `simulaqron_env` correctamente instalado y activado, puedes ejecutar el simulador directamente descargando el archivo ZIP con los archivos esenciales:
+Si ya tienes Python 3.10.x y el entorno virtual `simulaqron_env` correctamente instalado y activado, puedes ejecutar el simulador directamente descargando el archivo ZIP con los archivos esenciales:
 
 1. Descarga el archivo `simulador.zip` desde la rama `main` del repositorio
 2. Extrae el contenido en tu entorno de trabajo
@@ -13,9 +13,6 @@ python app.py
 ```
 
 
-Falta agregarle que pueda poner el parametro de werner(ya implementado en el html)
-Y varios tipos de tiempos relacionados con las operaciones cuánticas.
+Para configurar el entorno de desarrollo, siga las intrucciones del pdf.
 
-Puedes probar varios tipos de envios de qubits(puros, con parametro de werner y con entrelazamiento)
-
-Falta mucho retoque.
+Falta agregar lógica del pgen y pswap a cada nodo, agregar nuevos nodos, actualizaciones de pantalla...

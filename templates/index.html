@@ -95,8 +95,12 @@
             <label for="dist_cb">Distancia Charlie ↔ Bob (km):</label>
             <input type="number" id="dist_cb" value="50" min="1"><br><br>
             
-            <label for="parametro_p">Parámetro p del estado de Werner (0.0 – 1.0):</label>
-            <input type="number" id="parametro_p" name="parametro_p" min="0" max="1" step="0.01" value="0.8">
+            <label for="pgen">pgen (0.0 - 1.0):</label>
+            <input type="number" id="pgen" name="pgen" min="0" max="1" step="0.01" value="0.8"><br><br>
+
+            <label for="pswap">pswap (0.0 - 1.0):</label>
+            <input type="number" id="pswap" name="pswap" min="0" max="1" step="0.01" value="0.9"><br><br>
+
         </div>
 
         <!-- Columna central: simulación -->
@@ -136,6 +140,52 @@
             <button class="boton" onclick="iniciarSimulacion()">Iniciar Simulación</button>
             <button class="boton" onclick="iniciarBucle()">Iniciar Bucle</button>
             <button class="boton" onclick="detenerBucle()">Detener Bucle</button>
+            
+            <h2>Mapa de Nodos Cuánticos</h2>
+            <button class="boton" onclick="toggleMapa()">Mostrar/Ocultar Mapa</button>
+
+            <div id="mapa-nodos" style="display:none; margin-top:1em; border:1px solid #ccc; overflow:hidden;">
+            <div style="margin-bottom:1em;">
+                <label>Alice pgen:</label>
+                <input type="number" id="alice-pgen" min="0" max="1" step="0.01" value="0.8">
+                <label>Charlie pgen:</label>
+                <input type="number" id="charlie-pgen" min="0" max="1" step="0.01" value="0.8">
+                <label>Charlie pswap:</label>
+                <input type="number" id="charlie-pswap" min="0" max="1" step="0.01" value="0.9">
+            </div>
+
+            <svg id="svg-mapa" width="600" height="300" viewBox="0 0 600 300">
+                <g id="mapa-grupo">
+                <!-- Líneas -->
+                <line id="line-ac" x1="120" y1="60" x2="280" y2="60" stroke="#999" stroke-width="2" />
+                <line id="line-cb" x1="320" y1="60" x2="480" y2="60" stroke="#999" stroke-width="2" />
+                <line id="line-ab" x1="120" y1="60" x2="480" y2="60" stroke="#999" stroke-width="2" style="display:none;" />
+
+                <!-- Nodo Alice -->
+                <g id="nodo-alice" transform="translate(100,60)" class="draggable">
+                    <circle r="20" fill="#4caf50" />
+                    <text y="35" text-anchor="middle">Alice</text>
+                    <text y="55" text-anchor="middle" id="info-alice">pgen = 0.8</text>
+                </g>
+
+                <!-- Nodo Charlie -->
+                <g id="nodo-charlie" transform="translate(300,60)" class="draggable">
+                    <circle r="20" fill="#2196f3" />
+                    <text y="35" text-anchor="middle">Charlie</text>
+                    <text y="55" text-anchor="middle" id="info-charlie">pgen = 0.8, pswap = 0.9</text>
+                </g>
+
+                <!-- Nodo Bob -->
+                <g id="nodo-bob" transform="translate(500,60)" class="draggable">
+                    <circle r="20" fill="#ff9800" />
+                    <text y="35" text-anchor="middle">Bob</text>
+                    <text y="55" text-anchor="middle" id="info-bob">w_out = ...</text>
+                </g>
+                </g>
+            </svg>
+            </div>
+
+
         </div>
 
         <!-- Columna derecha: historial -->
@@ -169,8 +219,10 @@
             const dist_ab = document.getElementById("dist_ab").value;
             const dist_ac = document.getElementById("dist_ac").value;
             const dist_cb = document.getElementById("dist_cb").value;
+            const pgen = document.getElementById("pgen").value;
+            const pswap = document.getElementById("pswap").value;
 
-            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}`)
+            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}&pgen=${pgen}&pswap=${pswap}`)
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById("resultado").innerHTML =
@@ -196,7 +248,7 @@
             const dist_ac = document.getElementById("dist_ac").value;
             const dist_cb = document.getElementById("dist_cb").value;
 
-            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}`)
+            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}&pgen=${pgen}&pswap=${pswap}`)
                 .then(response => response.json())
                 .then(data => {
                     mostrarResultado(data);
@@ -215,7 +267,7 @@
                             document.getElementById("loading").style.display = "block";
 
                             // Lanzar siguiente simulación
-                            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}`)
+                            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}&pgen=${pgen}&pswap=${pswap}`)
                                 .then(response => response.json())
                                 .then(data => {
                                     mostrarResultado(data);
@@ -264,11 +316,6 @@
             document.getElementById("cuenta").innerText = "";
         }
 
-        function actualizarCuenta() {
-            document.getElementById("cuenta").innerText =
-                "Próxima simulación en: " + segundos + " segundos";
-        }
-
         function actualizarTabla(historial) {
             const tbody = document.querySelector("#tabla-resultados tbody");
             tbody.innerHTML = "";
@@ -313,6 +360,77 @@
                     });
             }
         });
+        function toggleMapa() {
+            const mapa = document.getElementById("mapa-nodos");
+            mapa.style.display = mapa.style.display === "none" ? "block" : "none";
+        }
+
+        const panzoomInstance = panzoom(document.getElementById("svg-mapa"), {
+        maxZoom: 3,
+        minZoom: 0.5,
+        zoomSpeed: 0.065
+        });
+
+        document.querySelectorAll(".draggable").forEach(nodo => {
+        let isDragging = false;
+        let offset = { x: 0, y: 0 };
+
+        nodo.addEventListener("mousedown", e => {
+            isDragging = true;
+            const transform = nodo.getAttribute("transform").match(/translate\(([^,]+),([^)]+)\)/);
+            offset.x = e.clientX - parseFloat(transform[1]);
+            offset.y = e.clientY - parseFloat(transform[2]);
+        });
+
+        window.addEventListener("mousemove", e => {
+            if (!isDragging) return;
+            const x = e.clientX - offset.x;
+            const y = e.clientY - offset.y;
+            nodo.setAttribute("transform", `translate(${x},${y})`);
+            actualizarLineas();
+        });
+
+        window.addEventListener("mouseup", () => isDragging = false);
+        });
+
+        function actualizarLineas() {
+        const pos = id => {
+            const t = document.getElementById(id).getAttribute("transform").match(/translate\(([^,]+),([^)]+)\)/);
+            return { x: parseFloat(t[1]), y: parseFloat(t[2]) };
+        };
+        const a = pos("nodo-alice");
+        const c = pos("nodo-charlie");
+        const b = pos("nodo-bob");
+
+        document.getElementById("line-ac").setAttribute("x1", a.x + 20);
+        document.getElementById("line-ac").setAttribute("y1", a.y);
+        document.getElementById("line-ac").setAttribute("x2", c.x - 20);
+        document.getElementById("line-ac").setAttribute("y2", c.y);
+
+        document.getElementById("line-cb").setAttribute("x1", c.x + 20);
+        document.getElementById("line-cb").setAttribute("y1", c.y);
+        document.getElementById("line-cb").setAttribute("x2", b.x - 20);
+        document.getElementById("line-cb").setAttribute("y2", b.y);
+
+        document.getElementById("line-ab").setAttribute("x1", a.x + 20);
+        document.getElementById("line-ab").setAttribute("y1", a.y);
+        document.getElementById("line-ab").setAttribute("x2", b.x - 20);
+        document.getElementById("line-ab").setAttribute("y2", b.y);
+        }
+
+        function actualizarParametrosNodos() {
+            const alicePgen = document.getElementById("alice-pgen").value;
+            const charliePgen = document.getElementById("charlie-pgen").value;
+            const charliePswap = document.getElementById("charlie-pswap").value;
+
+            document.getElementById("info-alice").textContent = `pgen = ${alicePgen}`;
+            document.getElementById("info-charlie").textContent = `pgen = ${charliePgen}, pswap = ${charliePswap}`;
+        }
+
+        ["alice-pgen", "charlie-pgen", "charlie-pswap"].forEach(id => {
+            document.getElementById(id).addEventListener("input", actualizarParametrosNodos);
+        });
+
 
     </script>
 </body>
