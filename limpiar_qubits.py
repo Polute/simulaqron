@@ -13,4 +13,3 @@ def limpiar_nodo(nombre):
 if __name__ == "__main__":
     for nombre in ["Alice", "Bob", "Charlie"]:
         limpiar_nodo(nombre)
-        time.sleep(0.5)

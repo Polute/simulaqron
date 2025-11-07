@@ -11,20 +11,28 @@
         }
         .container-flex {
             display: flex;
-            gap: 2em;
-            justify-content: center;
+            gap: 1em;
+            justify-content: space-between;
             align-items: flex-start;
-            max-width: 1270px;
-            margin: auto;
+            width: 100%;
+            max-width: none;
         }
-        .columna-izquierda, .columna-derecha, .columna-centro{
+
+        .columna-izquierda,
+        .columna-centro,
+        .columna-derecha {
+            flex: 1;
+            min-width: 0;
             background-color: white;
-            padding: 2em;
+            padding: 1.5em;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
+
         .columna-izquierda {
-            flex: 0.6;
+            flex: 1.2;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         .columna-centro {
             flex: 1.4;
@@ -32,7 +40,6 @@
         .columna-derecha {
             flex: 1.5;
         }
-
         h1, h2 {
             color: #333;
         }
@@ -62,6 +69,10 @@
             font-style: italic;
             color: #555;
         }
+        .boton.activo {
+            background-color: #1976d2;
+        }
+
         #cuenta {
             font-size: 1em;
             margin-top: 0.5em;
@@ -78,30 +89,97 @@
             text-align: center;
         }
         th { background-color: #eeeeee; }
+        .param-input,
+        .name-input {
+            position: absolute;
+            display: none;
+            z-index: 10;
+        }
+        .label {
+            font-size: 12px;
+            text-anchor: middle;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        .node {
+            cursor: pointer;
+        }
+        .link {
+            stroke: red;
+            stroke-width: 2px;
+        }
+        #canvas {
+            width: 100%;
+            height: 400px;
+            border: 1px solid #ccc;
+            background-color: #f0f0f0;
+            cursor: grab;
+        }
+        #tabla-nodos, #tabla-aristas {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1em;
+            font-size: 0.9em;
+        }
+        #tabla-nodos th, #tabla-nodos td,
+        #tabla-aristas th, #tabla-aristas td {
+            border: 1px solid #ccc;
+            padding: 0.4em;
+            text-align: center;
+        }
+        #tabla-nodos input, #tabla-aristas input {
+            width: 90%;
+            padding: 0.2em;
+            font-size: 0.9em;
+        }
     </style>
 </head>
+
 <body>
     <div class="container-flex">
         <!-- Columna izquierda: parámetros físicos -->
         <div class="columna-izquierda">
-            <h2>Parámetros físicos</h2>
+            <h2>Editor de Mapa Cuántico</h2>
 
-            <label for="dist_ab">Distancia Alice ↔ Bob (km):</label>
-            <input type="number" id="dist_ab" value="50" min="1"><br><br>
+            <div class="controles">
+                <button id="modoNodo" class="boton">🖌️ Crear Nodos</button>
+                <button id="modoArista" class="boton">🔗 Crear Aristas</button>
+                <label>pgen:</label>
+                <input type="number" id="pgen" min="0" max="1" step="0.01" value="0.8">
+                <button id="zoomIn" class="boton">➕</button>
+                <button id="zoomOut" class="boton">➖</button>
+                <button id="resetView" class="boton">📍</button>
+            </div>
 
-            <label for="dist_ac">Distancia Alice ↔ Charlie (km):</label>
-            <input type="number" id="dist_ac" value="100" min="1"><br><br>
+            <input type="number" id="paramInput" class="param-input" />
+            <input type="text" id="nameInput" class="name-input" />
 
-            <label for="dist_cb">Distancia Charlie ↔ Bob (km):</label>
-            <input type="number" id="dist_cb" value="50" min="1"><br><br>
-            
-            <label for="pgen">pgen (0.0 - 1.0):</label>
-            <input type="number" id="pgen" name="pgen" min="0" max="1" step="0.01" value="0.8"><br><br>
+            <svg id="canvas"></svg>
 
+            <h3>Parámetros físicos</h3>
             <label for="pswap">pswap (0.0 - 1.0):</label>
             <input type="number" id="pswap" name="pswap" min="0" max="1" step="0.01" value="0.9"><br><br>
 
+            <h3>Nodos</h3>
+            <table id="tabla-nodos">
+                <thead>
+                    <tr><th>ID</th><th>Nombre</th><th>pgen</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+            <h3>Aristas</h3>
+            <table id="tabla-aristas">
+                <thead>
+                    <tr><th>Origen</th><th>Destino</th><th>Distancia (km)</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
         </div>
+
 
         <!-- Columna central: simulación -->
         <div class="columna-centro">
@@ -140,52 +218,7 @@
             <button class="boton" onclick="iniciarSimulacion()">Iniciar Simulación</button>
             <button class="boton" onclick="iniciarBucle()">Iniciar Bucle</button>
             <button class="boton" onclick="detenerBucle()">Detener Bucle</button>
-            
-            <h2>Mapa de Nodos Cuánticos</h2>
-            <button class="boton" onclick="toggleMapa()">Mostrar/Ocultar Mapa</button>
-
-            <div id="mapa-nodos" style="display:none; margin-top:1em; border:1px solid #ccc; overflow:hidden;">
-            <div style="margin-bottom:1em;">
-                <label>Alice pgen:</label>
-                <input type="number" id="alice-pgen" min="0" max="1" step="0.01" value="0.8">
-                <label>Charlie pgen:</label>
-                <input type="number" id="charlie-pgen" min="0" max="1" step="0.01" value="0.8">
-                <label>Charlie pswap:</label>
-                <input type="number" id="charlie-pswap" min="0" max="1" step="0.01" value="0.9">
-            </div>
-
-            <svg id="svg-mapa" width="600" height="300" viewBox="0 0 600 300">
-                <g id="mapa-grupo">
-                <!-- Líneas -->
-                <line id="line-ac" x1="120" y1="60" x2="280" y2="60" stroke="#999" stroke-width="2" />
-                <line id="line-cb" x1="320" y1="60" x2="480" y2="60" stroke="#999" stroke-width="2" />
-                <line id="line-ab" x1="120" y1="60" x2="480" y2="60" stroke="#999" stroke-width="2" style="display:none;" />
-
-                <!-- Nodo Alice -->
-                <g id="nodo-alice" transform="translate(100,60)" class="draggable">
-                    <circle r="20" fill="#4caf50" />
-                    <text y="35" text-anchor="middle">Alice</text>
-                    <text y="55" text-anchor="middle" id="info-alice">pgen = 0.8</text>
-                </g>
-
-                <!-- Nodo Charlie -->
-                <g id="nodo-charlie" transform="translate(300,60)" class="draggable">
-                    <circle r="20" fill="#2196f3" />
-                    <text y="35" text-anchor="middle">Charlie</text>
-                    <text y="55" text-anchor="middle" id="info-charlie">pgen = 0.8, pswap = 0.9</text>
-                </g>
-
-                <!-- Nodo Bob -->
-                <g id="nodo-bob" transform="translate(500,60)" class="draggable">
-                    <circle r="20" fill="#ff9800" />
-                    <text y="35" text-anchor="middle">Bob</text>
-                    <text y="55" text-anchor="middle" id="info-bob">w_out = ...</text>
-                </g>
-                </g>
-            </svg>
-            </div>
-
-
+        
         </div>
 
         <!-- Columna derecha: historial -->
@@ -208,17 +241,327 @@
 
 
     <script>
+        nodes = [
+            { id: "Alice", name: "Alice", x: 100, y: 100, param: 0.8 },
+            { id: "Bob", name: "Bob", x: 300, y: 100, param: 0.7 },
+            { id: "Charlie", name: "Charlie", x: 200, y: 250, param: 0.9 }
+        ];
+
+        links = [
+            { id: "dist_ab", source: nodes[0], target: nodes[1], length: 200, distanciaKm: 50 },
+            { id: "dist_ac", source: nodes[0], target: nodes[2], length: 220, distanciaKm: 100 },
+            { id: "dist_cb", source: nodes[2], target: nodes[1], length: 180, distanciaKm: 50 }
+        ];
+
+
+        //-----------------------------------------MAPA-----------------------------------------------
+        window.onload = function () {
+            const svg = document.getElementById("canvas");
+            const paramInput = document.getElementById("paramInput");
+            const nameInput = document.getElementById("nameInput");
+            const pgenInput = document.getElementById("pgen");
+            const modoNodoBtn = document.getElementById("modoNodo");
+            const modoAristaBtn = document.getElementById("modoArista");
+            const zoomInBtn = document.getElementById("zoomIn");
+            const zoomOutBtn = document.getElementById("zoomOut");
+            const resetViewBtn = document.getElementById("resetView");
+
+            let modoNodo = false;
+            let modoArista = false;
+            let selectedNode = null, draggingNode = null, linkStart = null;
+            let transform = { x: 0, y: 0, k: 1 };
+            let draggingMap = false;
+            let dragStart = { x: 0, y: 0 };
+
+            // Llama al renderizado
+            draw();
+
+
+            modoNodoBtn.onclick = () => {
+                modoNodo = !modoNodo;
+                modoArista = false;
+                modoNodoBtn.classList.toggle("activo", modoNodo);
+                modoAristaBtn.classList.remove("activo");
+            };
+
+            modoAristaBtn.onclick = () => {
+                modoArista = !modoArista;
+                modoNodo = false;
+                modoAristaBtn.classList.toggle("activo", modoArista);
+                modoNodoBtn.classList.remove("activo");
+            };
+
+            zoomInBtn.onclick = () => {
+                transform.k *= 1.1;
+                draw();
+            };
+
+            zoomOutBtn.onclick = () => {
+                transform.k *= 0.9;
+                draw();
+            };
+
+            resetViewBtn.onclick = () => {
+                transform = { x: 0, y: 0, k: 1 };
+                draw();
+            };
+
+            function createNode(x, y) {
+                const node = {
+                    id: "Nodo_" + Date.now(),
+                    name: "Nodo_" + Date.now(),
+                    x, y,
+                    param: parseFloat(pgenInput.value)
+                };
+                nodes.push(node);
+                draw();
+        }
+
+        function createLink(source, target) {
+            // Verificar si ya existe una arista entre estos dos nodos
+            const existe = links.some(link =>
+                (link.source === source && link.target === target) ||
+                (link.source === target && link.target === source)
+            );
+
+            if (existe) return; // No crear duplicado
+
+            const distanciaKm = 50;
+            const length = Math.hypot(target.x - source.x, target.y - source.y);
+            links.push({ source, target, length, distanciaKm });
+            draw();
+        }
+
+
+        function draw() {
+            svg.innerHTML = "";
+            const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            g.setAttribute("transform", `translate(${transform.x},${transform.y}) scale(${transform.k})`);
+            svg.appendChild(g);
+
+            links.forEach(link => {
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", link.source.x);
+                line.setAttribute("y1", link.source.y);
+                line.setAttribute("x2", link.target.x);
+                line.setAttribute("y2", link.target.y);
+                line.setAttribute("class", "link");
+                line.addEventListener("dblclick", () => {
+                    const nueva = prompt("Distancia en km:", link.distanciaKm);
+                    if (nueva !== null) {
+                        link.distanciaKm = parseFloat(nueva);
+                        draw();
+                    }
+                });
+                g.appendChild(line);
+            });
+
+            nodes.forEach(node => {
+                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                circle.setAttribute("cx", node.x);
+                circle.setAttribute("cy", node.y);
+                circle.setAttribute("r", 20);
+                circle.setAttribute("class", "node");
+                circle.addEventListener("mousedown", e => {
+                if (modoArista) {
+                    if (linkStart && linkStart !== node) {
+                        createLink(linkStart, node);
+                        linkStart = null;
+                    } else {
+                        linkStart = node;
+                    }
+                } else {
+                    draggingNode = node;
+                }
+            });
+
+                g.appendChild(circle);
+
+                const nameLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                nameLabel.setAttribute("x", node.x);
+                nameLabel.setAttribute("y", node.y + 35);
+                nameLabel.setAttribute("class", "label");
+                nameLabel.textContent = node.name;
+                nameLabel.addEventListener("dblclick", e => {
+                    selectedNode = node;
+                    nameInput.style.left = `${e.pageX}px`;
+                    nameInput.style.top = `${e.pageY}px`;
+                    nameInput.value = node.name;
+                    nameInput.style.display = "block";
+                    nameInput.focus();
+                });
+                g.appendChild(nameLabel);
+
+                const paramLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                paramLabel.setAttribute("x", node.x);
+                paramLabel.setAttribute("y", node.y + 50);
+                paramLabel.setAttribute("class", "label");
+                paramLabel.textContent = "pgen = " + node.param;
+                paramLabel.addEventListener("dblclick", e => {
+                    selectedNode = node;
+                    paramInput.style.left = `${e.pageX}px`;
+                    paramInput.style.top = `${e.pageY}px`;
+                    paramInput.value = node.param;
+                    paramInput.style.display = "block";
+                    paramInput.focus();
+                });
+                g.appendChild(paramLabel);
+            });
+
+            actualizarTablaNodos();
+            actualizarTablaAristas();
+        }
+
+        svg.addEventListener("click", e => {
+            if (!modoNodo) return;
+            const pt = getMousePosition(e);
+            createNode(pt.x, pt.y);
+        });
+
+        svg.addEventListener("mousedown", e => {
+            if (!modoNodo && !modoArista) {
+                draggingMap = true;
+                dragStart = { x: e.clientX, y: e.clientY };
+            }
+        });
+
+        svg.addEventListener("mousemove", e => {
+            if (draggingNode) {
+                const pt = getMousePosition(e);
+                draggingNode.x = pt.x;
+                draggingNode.y = pt.y;
+                draw();
+            } else if (draggingMap) {
+                const dx = e.clientX - dragStart.x;
+                const dy = e.clientY - dragStart.y;
+                transform.x += dx;
+                transform.y += dy;
+                dragStart = { x: e.clientX, y: e.clientY };
+                draw();
+            }
+        });
+
+        svg.addEventListener("mouseup", () => {
+            draggingNode = null;
+            draggingMap = false;
+        });
+
+        svg.addEventListener("mouseleave", () => {
+            draggingNode = null;
+            draggingMap = false;
+        });
+
+        paramInput.addEventListener("change", () => {
+            if (selectedNode) {
+                selectedNode.param = parseFloat(paramInput.value);
+                paramInput.style.display = "none";
+                draw();
+            }
+        });
+
+        nameInput.addEventListener("change", () => {
+            if (selectedNode) {
+                selectedNode.name = nameInput.value;
+                selectedNode.id = nameInput.value;
+                nameInput.style.display = "none";
+                draw();
+            }
+        });
+
+        function getMousePosition(e) {
+            const rect = svg.getBoundingClientRect();
+            return {
+                x: (e.clientX - rect.left - transform.x) / transform.k,
+                y: (e.clientY - rect.top - transform.y) / transform.k
+            };
+        }
+
+        function actualizarTablaNodos() {
+            const tbody = document.querySelector("#tabla-nodos tbody");
+            tbody.innerHTML = "";
+            nodes.forEach((node, i) => {
+                const fila = document.createElement("tr");
+
+                const idCell = document.createElement("td");
+                idCell.textContent = node.id;
+                fila.appendChild(idCell);
+
+                const nameCell = document.createElement("td");
+                const nameInput = document.createElement("input");
+                nameInput.value = node.name;
+                nameInput.onchange = () => {
+                    node.name = nameInput.value;
+                    draw();
+                };
+                nameCell.appendChild(nameInput);
+                fila.appendChild(nameCell);
+
+                const pgenCell = document.createElement("td");
+                const pgenInput = document.createElement("input");
+                pgenInput.type = "number";
+                pgenInput.step = "0.01";
+                pgenInput.min = "0";
+                pgenInput.max = "1";
+                pgenInput.value = node.param;
+                pgenInput.onchange = () => {
+                    node.param = parseFloat(pgenInput.value);
+                    draw();
+                };
+                pgenCell.appendChild(pgenInput);
+                fila.appendChild(pgenCell);
+
+                tbody.appendChild(fila);
+            });
+        }
+
+        function actualizarTablaAristas() {
+            const tbody = document.querySelector("#tabla-aristas tbody");
+            tbody.innerHTML = "";
+            links.forEach((link, i) => {
+                const fila = document.createElement("tr");
+
+                const origenCell = document.createElement("td");
+                origenCell.textContent = link.source.name;
+                fila.appendChild(origenCell);
+
+                const destinoCell = document.createElement("td");
+                destinoCell.textContent = link.target.name;
+                fila.appendChild(destinoCell);
+
+                const distCell = document.createElement("td");
+                const distInput = document.createElement("input");
+                distInput.type = "number";
+                distInput.value = link.distanciaKm;
+                distInput.onchange = () => {
+                    link.distanciaKm = parseFloat(distInput.value);
+                };
+                distCell.appendChild(distInput);
+                fila.appendChild(distCell);
+
+                tbody.appendChild(fila);
+            });
+        }
+
+        draw();
+    };
+
+        //-----------------------------------------SIMULACIÓN------------
         let cuentaIntervalo;
         let segundos = 4;
+        function getDistancia(id) {
+            const link = links.find(l => l.id === id);
+            return link ? link.distanciaKm : 0;
+        }
 
         function iniciarSimulacion() {
             const modo = document.getElementById("modo").value;
             const num_qubits = document.getElementById("num_qubits").value;
             console.log("Iniciando simulación única");
 
-            const dist_ab = document.getElementById("dist_ab").value;
-            const dist_ac = document.getElementById("dist_ac").value;
-            const dist_cb = document.getElementById("dist_cb").value;
+            const dist_ab = getDistancia("dist_ab");
+            const dist_ac = getDistancia("dist_ac");
+            const dist_cb = getDistancia("dist_cb");
+
             const pgen = document.getElementById("pgen").value;
             const pswap = document.getElementById("pswap").value;
 
@@ -359,76 +702,6 @@
                         modoAnterior = nuevoModo;
                     });
             }
-        });
-        function toggleMapa() {
-            const mapa = document.getElementById("mapa-nodos");
-            mapa.style.display = mapa.style.display === "none" ? "block" : "none";
-        }
-
-        const panzoomInstance = panzoom(document.getElementById("svg-mapa"), {
-        maxZoom: 3,
-        minZoom: 0.5,
-        zoomSpeed: 0.065
-        });
-
-        document.querySelectorAll(".draggable").forEach(nodo => {
-        let isDragging = false;
-        let offset = { x: 0, y: 0 };
-
-        nodo.addEventListener("mousedown", e => {
-            isDragging = true;
-            const transform = nodo.getAttribute("transform").match(/translate\(([^,]+),([^)]+)\)/);
-            offset.x = e.clientX - parseFloat(transform[1]);
-            offset.y = e.clientY - parseFloat(transform[2]);
-        });
-
-        window.addEventListener("mousemove", e => {
-            if (!isDragging) return;
-            const x = e.clientX - offset.x;
-            const y = e.clientY - offset.y;
-            nodo.setAttribute("transform", `translate(${x},${y})`);
-            actualizarLineas();
-        });
-
-        window.addEventListener("mouseup", () => isDragging = false);
-        });
-
-        function actualizarLineas() {
-        const pos = id => {
-            const t = document.getElementById(id).getAttribute("transform").match(/translate\(([^,]+),([^)]+)\)/);
-            return { x: parseFloat(t[1]), y: parseFloat(t[2]) };
-        };
-        const a = pos("nodo-alice");
-        const c = pos("nodo-charlie");
-        const b = pos("nodo-bob");
-
-        document.getElementById("line-ac").setAttribute("x1", a.x + 20);
-        document.getElementById("line-ac").setAttribute("y1", a.y);
-        document.getElementById("line-ac").setAttribute("x2", c.x - 20);
-        document.getElementById("line-ac").setAttribute("y2", c.y);
-
-        document.getElementById("line-cb").setAttribute("x1", c.x + 20);
-        document.getElementById("line-cb").setAttribute("y1", c.y);
-        document.getElementById("line-cb").setAttribute("x2", b.x - 20);
-        document.getElementById("line-cb").setAttribute("y2", b.y);
-
-        document.getElementById("line-ab").setAttribute("x1", a.x + 20);
-        document.getElementById("line-ab").setAttribute("y1", a.y);
-        document.getElementById("line-ab").setAttribute("x2", b.x - 20);
-        document.getElementById("line-ab").setAttribute("y2", b.y);
-        }
-
-        function actualizarParametrosNodos() {
-            const alicePgen = document.getElementById("alice-pgen").value;
-            const charliePgen = document.getElementById("charlie-pgen").value;
-            const charliePswap = document.getElementById("charlie-pswap").value;
-
-            document.getElementById("info-alice").textContent = `pgen = ${alicePgen}`;
-            document.getElementById("info-charlie").textContent = `pgen = ${charliePgen}, pswap = ${charliePswap}`;
-        }
-
-        ["alice-pgen", "charlie-pgen", "charlie-pswap"].forEach(id => {
-            document.getElementById(id).addEventListener("input", actualizarParametrosNodos);
         });
 
 
