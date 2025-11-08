@@ -9,6 +9,39 @@ app = Flask(__name__)
 contador = 0
 simulacion_en_curso = False
 
+# Reiniciar SimulaQron al iniciar el servidor
+print("[INIT] Reiniciando SimulaQron...")
+subprocess.run(["simulaqron", "reset", "--force"])
+subprocess.run(["simulaqron", "start", "--name", "default", "--force"])
+print("[INIT] SimulaQron iniciado.")
+
+resultado = subprocess.run(["simulaqron", "nodes", "list"], capture_output=True, text=True)
+nodos_existentes = resultado.stdout.strip().split("\n")
+
+
+"""
+@app.route("/crear_nodos_simulaqron")
+def crear_nodos_simulaqron():
+    nodos_raw = request.args.get("nodos", "")
+    nodos = nodos_raw.split(" ")
+
+    # Establecer red activa
+    print("[SIMULAQRON] Estableciendo red 'default' como activa...")
+    subprocess.run(["simulaqron", "set", "network.name", "default"])
+
+    # Obtener nodos ya existentes
+    resultado = subprocess.run(["simulaqron", "nodes", "get"], capture_output=True, text=True)
+    nodos_existentes = resultado.stdout.strip().split("\n")
+    print(f"[SERVIDOR] Nodos existentes: {nodos_existentes}")
+    nodos_creados = []
+    for nodo in nodos:
+        if nodo not in nodos_existentes:
+            subprocess.run(["simulaqron", "nodes", "add", nodo])
+            nodos_creados.append(nodo)
+
+    return jsonify({"status": "ok", "nodos_creados": nodos_creados})
+"""
+
 def retardo(distancia_km):
     """Calcula el tiempo de transmisión en segundos según la distancia en km."""
     return (distancia_km * 1000) / (2e8)
@@ -37,7 +70,7 @@ def limpiar_historial():
     try:
         open("historial_resultados.txt", "w").close()
         open("bob_resultado.txt", "w").close()
-        subprocess.run(["python3", "limpiar_qubits.py"])
+        subprocess.Popen(["python3", "limpiar_qubits.py"])
         print("[SERVIDOR] Historial y qubits limpiados correctamente.")
     except Exception as e:
         print(f"[ERROR] No se pudo limpiar el historial: {e}")
@@ -46,7 +79,7 @@ def limpiar_historial():
 @app.route("/limpiar_qubits")
 def limpiar_qubits():
     try:
-        subprocess.run(["python3", "limpiar_qubits.py"])
+        subprocess.Popen(["python3", "limpiar_qubits.py"])
         print("[SERVIDOR] Qubits limpiados correctamente.")
         return jsonify({"status": "ok"})
     except Exception as e:
@@ -57,8 +90,6 @@ def limpiar_qubits():
 @app.route("/simular")
 def simular():
     global contador, simulacion_en_curso
-    pgen = float(request.args.get("pgen", 0.8))
-    pswap = float(request.args.get("pswap", 0.9))
 
     if simulacion_en_curso:
         print("[SERVIDOR] Simulación en curso. Ignorando nueva petición.")
@@ -70,17 +101,40 @@ def simular():
 
     simulacion_en_curso = True
     inicio_real = time.time()
-    pgen = float(request.args.get("pgen", 0.8))
     pswap = float(request.args.get("pswap", 0.9))
     modo = request.args.get("modo", "puro")
     num_qubits = int(request.args.get("num_qubits", 2))
 
-    # Distancias físicas recibidas desde el HTML
-    dist_ab = float(request.args.get("dist_ab", 50))  # Alice ↔ Bob
-    dist_ac = float(request.args.get("dist_ac", 100)) # Alice ↔ Charlie
-    dist_cb = float(request.args.get("dist_cb", 50))  # Charlie ↔ Bob
+    # --- PGEN por nodo ---
+    pgen_nodos_raw = request.args.get("pgen_nodos", "")
+    pgen_por_nodo = {}
+    for item in pgen_nodos_raw.split(","):
+        if ":" in item:
+            nombre, valor = item.split(":")
+            pgen_por_nodo[nombre] = float(valor)
 
-    print(f"[WEB] Iniciando simulación en modo: {modo} (p={pgen}, qubits={num_qubits})")
+    # --- Distancias entre nodos ---
+    distancias_raw = request.args.get("distancias", "")
+    dist_por_par = {}
+    for item in distancias_raw.split(","):
+        partes = item.split(":")
+        if len(partes) == 3:
+            origen, destino, valor = partes
+            clave_directa = f"{origen}-{destino}"
+            clave_inversa = f"{destino}-{origen}"
+            dist_por_par[clave_directa] = float(valor)
+            dist_por_par[clave_inversa] = float(valor)  # acceso simétrico
+
+
+    # Obtener distancias específicas
+    dist_ab = dist_por_par.get("Alice-Bob", 50)
+    dist_ac = dist_por_par.get("Alice-Charlie", 100)
+    dist_cb = dist_por_par.get("Charlie-Bob", 50)
+
+    # Obtener pgen específico
+    pgen_alice = pgen_por_nodo.get("Alice", 0.8)
+
+    print(f"[WEB] Iniciando simulación en modo: {modo} (p={pgen_alice}, qubits={num_qubits})")
     print(f"[WEB] Distancias: AB={dist_ab} km, AC={dist_ac} km, CB={dist_cb} km")
 
     try:
@@ -103,7 +157,7 @@ def simular():
                 subprocess.run(["python3", "bob.py", modo, str(w_out), str(num_qubits)])
 
             elif modo == "werner":
-                subprocess.run(["python3", "alice.py", modo, str(pgen), str(num_qubits)])
+                subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_qubits)])
                 time.sleep(retardo(dist_ac))  # Alice → Repeater
 
                 subprocess.run(["python3", "repeater.py", str(num_qubits)])
@@ -120,7 +174,7 @@ def simular():
                 w_out = w_in  # En este modo, fidelidad se conserva
 
             elif modo == "swap":
-                subprocess.run(["python3", "alice.py", modo, str(pgen), str(num_qubits)])
+                subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_qubits)])
                 time.sleep(retardo(dist_ac))  # Alice → Charlie
 
                 subprocess.run(["python3", "repeater_swap.py", str(num_qubits), str(pswap)])

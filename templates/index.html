@@ -553,6 +553,9 @@
             return link ? link.distanciaKm : 0;
         }
 
+        const nombres_nodos = nodes.map(n => n.id).join(" ");
+        //fetch(`/crear_nodos_simulaqron?nodos=${nombres_nodos}`);
+
         function iniciarSimulacion() {
             const modo = document.getElementById("modo").value;
             const num_qubits = document.getElementById("num_qubits").value;
@@ -564,8 +567,10 @@
 
             const pgen = document.getElementById("pgen").value;
             const pswap = document.getElementById("pswap").value;
+            const pgen_nodos = nodes.map(n => `${n.id}:${n.param}`).join(",");
+            const distancias = links.map(l => `${l.source.id}:${l.target.id}:${l.distanciaKm}`).join(",");
 
-            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}&pgen=${pgen}&pswap=${pswap}`)
+            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}`)
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById("resultado").innerHTML =
@@ -591,7 +596,10 @@
             const dist_ac = document.getElementById("dist_ac").value;
             const dist_cb = document.getElementById("dist_cb").value;
 
-            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}&pgen=${pgen}&pswap=${pswap}`)
+            const pgen_nodos = nodes.map(n => `${n.id}:${n.param}`).join(",");
+            const distancias = links.map(l => `${l.source.id}:${l.target.id}:${l.distanciaKm}`).join(",");
+
+            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}`)
                 .then(response => response.json())
                 .then(data => {
                     mostrarResultado(data);
