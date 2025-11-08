@@ -1,0 +1,1 @@
+1: 1 (w_out=1.000), 0 (w_out=1.000) (modo=puro, qubits=2,estimado=0.000250s, real=0.578827s)
