@@ -5,21 +5,23 @@ from cqc.pythonLib.util import CQCTimeoutError
 
 def run_bob(modo, w_in, num_qubits):
     with CQCConnection("Bob") as bob:
-        resultados = []
+        mediciones = []
+        w_out = 0.0  # Valor por defecto
+
         for i in range(num_qubits):
             try:
                 with open("qubit_enviado.txt", "r") as f:
                     estado = f.readline().strip()
                 if estado != "ok":
                     print(f"[BOB] Qubit #{i+1} no recibido (fallo en pgen o pswap)")
-                    resultados.append("no recibido")
+                    mediciones.append("no recibido")
                     continue
 
                 if modo == "puro":
                     q = bob.recvEPR()
                     w_out = 1.0
                 elif modo == "werner":
-                    q = bob.recvQubit()
+                    q = bob.recvEPR()
                     w_out = w_in
                 elif modo == "swap":
                     q = bob.recvEPR()
@@ -27,19 +29,24 @@ def run_bob(modo, w_in, num_qubits):
                     w_out = round(w_in * w_bob, 3)
                     print(f"[BOB] Swap fidelidades: w_Alice={w_in:.3f}, w_Bob={w_bob:.3f}, w_out={w_out:.3f}")
                 else:
-                    resultados.append("modo inválido")
+                    mediciones.append("modo inválido")
                     continue
 
                 m = q.measure()
-                resultados.append(f"{m} (w_out={w_out:.3f})")
+                mediciones.append(int(m))
                 print(f"[BOB] Medición #{i+1}: {m} con fidelidad w_out={w_out:.3f}")
 
             except CQCTimeoutError:
                 print(f"[BOB] Timeout al recibir qubit #{i+1}")
-                resultados.append("timeout")
+                mediciones.append("timeout")
 
+        # Guardar resultado como lista + fidelidad única
         with open("bob_resultado.txt", "w") as f:
-            f.write(", ".join(resultados))
+            f.write(f"{mediciones} (w_out={w_out:.3f})")
+
+        # También guardar fidelidad por separado si se necesita
+        with open("fidelidad_bob.txt", "w") as f:
+            f.write(str(w_out))
 
 if __name__ == "__main__":
     modo = sys.argv[1]

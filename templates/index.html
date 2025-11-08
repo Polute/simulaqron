@@ -206,7 +206,7 @@
                 <label for="modo">Modo de envío:</label>
                 <select id="modo">
                     <option value="puro">Entrelazamiento puro (Alice → Bob)</option>
-                    <option value="werner">Estado de Werner (Alice → Repeater → Bob)</option>
+                    <option value="werner">Entrelazamiento con ruido (Alice → Bob)</option>
                     <option value="swap">Entanglement Swap (Alice → Charlie ←→ Bob)</option>
                 </select>
             </div>
@@ -248,9 +248,9 @@
         ];
 
         links = [
-            { id: "dist_ab", source: nodes[0], target: nodes[1], length: 200, distanciaKm: 50 },
-            { id: "dist_ac", source: nodes[0], target: nodes[2], length: 220, distanciaKm: 100 },
-            { id: "dist_cb", source: nodes[2], target: nodes[1], length: 180, distanciaKm: 50 }
+            { id: "dist_ab", source: nodes[0], target: nodes[1], length: 200, distanciaKm: 40 },
+            { id: "dist_ac", source: nodes[0], target: nodes[2], length: 220, distanciaKm: 15 },
+            { id: "dist_cb", source: nodes[2], target: nodes[1], length: 180, distanciaKm: 20 }
         ];
 
 

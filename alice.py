@@ -14,20 +14,22 @@ def run_alice(modo, pgen, num_qubits):
                 continue
 
             try:
-                w_alice = round(random.gauss(pgen, 0.05), 3)
-                w_alice = max(0.0, min(1.0, w_alice))
+                if modo == "puro":
+                    q = alice.createEPR("Bob")
+                    print(f"[ALICE] EPR #{i+1} creado con Bob.")
+                elif modo == "werner":
+                    q = alice.createEPR("Bob")
+                    print(f"[ALICE] EPR #{i+1} creado con Bob.")
+                elif modo == "swap":
+                    q = alice.createEPR("Charlie")
+                    print(f"[ALICE] EPR #{i+1} creado con Charlie.")
+                    alice.sendQubit(q, "Charlie")
+                w_alice = 0.90 #Fidelidad fija para Alice
                 with open("fidelidad_alice.txt", "w") as f:
                     f.write(str(w_alice))
                 with open("qubit_enviado.txt", "w") as f:
                     f.write("ok")
 
-                if modo == "puro":
-                    q = alice.createEPR("Bob")
-                    print(f"[ALICE] EPR #{i+1} creado con Bob.")
-                elif modo in ["werner", "swap"]:
-                    q = alice.createEPR("Charlie")
-                    print(f"[ALICE] EPR #{i+1} creado con Charlie.")
-                    alice.sendQubit(q, "Charlie")
             except CQCNoQubitError:
                 print(f"[ALICE] Fallo por falta de memoria cuántica al generar EPR #{i+1}")
                 with open("bob_resultado.txt", "w") as f:

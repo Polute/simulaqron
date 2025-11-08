@@ -1,6 +1,8 @@
 import sys
 import random
 from cqc.pythonLib import CQCConnection
+import time
+import math
 
 def entanglement_swap(num_qubits, pswap):
     with CQCConnection("Charlie") as repeater:
@@ -20,13 +22,40 @@ def entanglement_swap(num_qubits, pswap):
 
                 with open("fidelidad_alice.txt", "r") as f:
                     w_alice = float(f.read().strip())
+                
+                # Simular fidelidad del canal Charlie → Bob
                 w_bob = max(0.0, min(1.0, round(random.gauss(0.9, 0.05), 3)))
+
+                # Purificación en Charlie
+                p_pur = 0.7
+                if random.random() < p_pur:
+                    mejora = round(random.uniform(0.02, 0.08), 3)
+                    w_bob = min(w_bob + mejora, 1.0)
+                    print(f"[PURIFICACIÓN] Charlie purificó el estado: mejora={mejora}, nueva w_Bob={w_bob:.3f}")
+                else:
+                    print("[PURIFICACIÓN] Charlie no logró purificar el estado.")
+
+                # Simular tiempo de swapping
+                inicio_swap = time.time()
+                time.sleep(0.5)  # retardo interno del repetidor
+                fin_swap = time.time()
+                tiempo_swap = fin_swap - inicio_swap
+
+                # Coherencia(solo temporal, puesto que es solo la temporal de la operación de swap)
+                T_c = 10.0
+
+                C_t = round(math.exp(-tiempo_swap / T_c), 3)
 
                 if random.random() < pswap:
                     w_swap = round(w_alice * w_bob, 3)
-                    print(f"[SWAP] Swapping exitoso: w_Alice={w_alice}, w_Bob={w_bob}, w_out={w_swap}")
+                    w_final = round(w_swap * C_t , 3)
+
+                    print(f"[SWAP] Swapping exitoso:")
+                    print(f"w_Alice={w_alice:.3f}, w_Bob={w_bob:.3f}, w_swap={w_swap:.3f}")
+                    print(f"C_t={C_t}, w_out={w_final:.3f}")
+
                     with open("fidelidad_bob.txt", "w") as f_out:
-                        f_out.write(str(w_swap))
+                        f_out.write(str(w_final))
                     with open("qubit_enviado.txt", "w") as f:
                         f.write("ok")
                 else:
