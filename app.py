@@ -3,6 +3,9 @@ import subprocess
 import time
 from flask import Flask, render_template, jsonify, request
 import random
+import math
+import re
+
 
 
 app = Flask(__name__)
@@ -68,8 +71,11 @@ def limpiar_historial():
     contador = 0
     simulacion_en_curso = False
     try:
+        open("fidelidad_alice.txt", "w").close()
+        open("fidelidad_bob.txt", "w").close()
         open("historial_resultados.txt", "w").close()
         open("bob_resultado.txt", "w").close()
+        open("qubit_enviado.txt", "w").close()
         subprocess.Popen(["python3", "limpiar_qubits.py"])
         print("[SERVIDOR] Historial y qubits limpiados correctamente.")
     except Exception as e:
@@ -142,7 +148,7 @@ def simular():
         if modo == "puro":
             tiempo_estimado = retardo(dist_ab)
         elif modo == "werner":
-            tiempo_estimado = retardo(dist_cb) + retardo(dist_ac) + retardo(dist_ac)
+            tiempo_estimado = retardo(dist_ab)
         elif modo == "swap":
             tiempo_estimado = retardo(dist_cb) + retardo(dist_ac) + retardo(dist_ac)
         else:
@@ -158,10 +164,7 @@ def simular():
 
             elif modo == "werner":
                 subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_qubits)])
-                time.sleep(retardo(dist_ac))  # Alice → Repeater
-
-                subprocess.run(["python3", "repeater.py", str(num_qubits)])
-                time.sleep(retardo(dist_cb))  # Charlie → Bob
+                time.sleep(retardo(dist_ab))  # Alice → Repeater
 
                 # Leer fidelidad generada por Alice
                 try:
@@ -195,10 +198,45 @@ def simular():
             
         fin_real = time.time()
         tiempo_real = fin_real - inicio_real
+
+        # Parámetros de coherencia
+        T_c = 10.0  # tiempo de coherencia en segundos
+        L_c = 100.0  # longitud de coherencia en km
+
+        # Coherencia temporal
+        coherencia_temporal = round(math.exp(-tiempo_real / T_c), 3)
+
+        # Coherencia física (según modo)
+        if modo == "puro":
+            distancia_total = dist_ab
+        elif modo == "werner":
+            distancia_total = dist_ab
+        elif modo == "swap":
+            distancia_total = dist_ac + dist_cb
+        else:
+            distancia_total = 0.0
+
+        coherencia_fisica = round(math.exp(-distancia_total / L_c), 3)
+
         try:
+            # Leer resultado original
             with open("bob_resultado.txt", "r") as f:
                 resultado = f.read().strip()
 
+            # Extraer w_out original
+            match = re.search(r"w_out=(\d+\.\d+)", resultado)
+            if match:
+                w_out_original = float(match.group(1))
+                w_out_corregido = round(w_out_original * coherencia_temporal * coherencia_fisica, 3)
+
+                # Reemplazar w_out en el texto
+                resultado = re.sub(r"w_out=\d+\.\d+", f"w_out={w_out_corregido:.3f}", resultado)
+
+                # Reescribir archivo con nuevo w_out
+                with open("bob_resultado.txt", "w") as f:
+                    f.write(resultado)
+            else:
+                w_out_corregido = 0.0  # Si no se encuentra, usar valor por defecto
             if "ERROR" in resultado.upper():
                 print("[SERVIDOR] Error detectado en resultado. Deteniendo simulación.")
                 simulacion_en_curso = False
@@ -210,7 +248,18 @@ def simular():
 
             contador += 1
             with open("historial_resultados.txt", "a") as h:
-                h.write(f"{contador}: {resultado} (modo={modo}, qubits={num_qubits},estimado={tiempo_estimado:.6f}s, real={tiempo_real:.6f}s)\n")
+                if modo != "puro":
+                    h.write(
+                    f"{contador}: {resultado} (modo={modo}, qubits={num_qubits}, "
+                    f"estimado={tiempo_estimado:.6f}s, real={tiempo_real:.6f}s), "
+                    f"C_t={coherencia_temporal}, C_d={coherencia_fisica}\n"
+                )
+                else:
+                    h.write(
+                    f"{contador}: {resultado} (modo={modo}, qubits={num_qubits}, "
+                    f"estimado={tiempo_estimado:.6f}s, real={tiempo_real:.6f}s)\n"
+                )
+
 
         except FileNotFoundError:
             resultado = "ERROR: No se pudo leer el resultado."
