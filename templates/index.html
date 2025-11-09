@@ -137,9 +137,9 @@
         }
     </style>
 </head>
-
 <body>
     <div class="container-flex">
+        {% if rol == "alice" %}
         <!-- Columna izquierda: parámetros físicos -->
         <div class="columna-izquierda">
             <h2>Editor de Mapa Cuántico</h2>
@@ -220,7 +220,7 @@
             <button class="boton" onclick="detenerBucle()">Detener Bucle</button>
         
         </div>
-
+        {% endif %}
         <!-- Columna derecha: historial -->
         <div class="columna-derecha">
             <h2>Historial de Resultados</h2>
