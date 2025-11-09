@@ -5,12 +5,21 @@ from flask import Flask, render_template, jsonify, request
 import random
 import math
 import re
+import sys
+import requests
 
 
 
 app = Flask(__name__)
 contador = 0
 simulacion_en_curso = False
+
+if len(sys.argv) > 1 and sys.argv[1].lower() == "bob":
+    ROL = "bob"
+    PUERTO = 5001
+else:
+    ROL = "alice"
+    PUERTO = 5000
 
 # Reiniciar SimulaQron al iniciar el servidor
 print("[INIT] Reiniciando SimulaQron...")
@@ -49,6 +58,29 @@ def retardo(distancia_km):
     """Calcula el tiempo de transmisión en segundos según la distancia en km."""
     return (distancia_km * 1000) / (2e8)
 
+@app.route("/actualizar_historial", methods=["POST"])
+def actualizar_historial():
+    if ROL != "bob":
+        return jsonify({"error": "Este nodo no puede recibir historial."})
+
+    data = request.get_json()
+    resultado = data.get("resultado", "Sin resultado")
+    contador = data.get("contador", 0)
+    historial = data.get("historial", "Ninguna operación realizada")
+
+    print(f"[BOB] Contador qubit entrelazado recibido: {resultado}")
+    print(f"[BOB] Qubit entrelazado recibido: {resultado}")
+    print(f"[BOB] Qubits entrelazado recibido hasta ahora: {historial}")
+    print(f"[BOB] Historial actualizado con simulación #{contador}")
+
+    return render_template(
+        "receiver.html", 
+        resultado=resultado, 
+        contador=contador, 
+        historial=historial,
+        rol=ROL
+        )
+
 @app.route("/")
 def index():
     try:
@@ -63,7 +95,24 @@ def index():
     except FileNotFoundError:
         historial = []
 
-    return render_template("index.html", resultado=ultimo_resultado, contador=contador, historial=historial)
+    if ROL == "alice":
+        return render_template(
+            "index.html",
+            resultado=ultimo_resultado,
+            contador=contador,
+            historial=historial,
+            rol=ROL
+        )
+    elif ROL == "bob":
+        return render_template(
+            "receiver.html",
+            resultado=ultimo_resultado,
+            contador=contador,
+            historial=historial,
+            rol=ROL
+        )
+    else:
+        return "Rol no reconocido", 400
 
 @app.route("/limpiar_historial")
 def limpiar_historial():
@@ -271,6 +320,16 @@ def simular():
             historial = []
 
         simulacion_en_curso = False
+        if ROL == "alice":
+            try:
+                requests.post("http://localhost:5001/actualizar_historial", json={
+                    "resultado": resultado,
+                    "contador": contador,
+                    "historial": historial
+                })
+                print("[ALICE] Historial enviado a Bob.")
+            except Exception as e:
+                print(f"[ALICE] No se pudo enviar historial a Bob: {e}")
 
         return jsonify({
             "resultado": resultado,
@@ -288,4 +347,5 @@ def simular():
         })
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    print(f"[SERVIDOR] Iniciando servidor en el puerto {PUERTO} con rol {ROL}...")
+    app.run(host="0.0.0.0", port=PUERTO)

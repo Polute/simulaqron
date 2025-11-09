@@ -2,3 +2,4 @@ simulaqron==3.0.16
 flask
 markupsafe<2.1
 jinja2<3.0
+requests>=2.25

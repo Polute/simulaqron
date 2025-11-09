@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Historial de Simulación Cuántica</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            padding: 2em;
+        }
+        .contenedor {
+            max-width: 800px;
+            margin: auto;
+            background-color: white;
+            padding: 2em;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 1em;
+        }
+        .contador {
+            font-size: 1.2em;
+            margin-bottom: 1em;
+            background-color: #fff3e0;
+            border-left: 5px solid #ff9800;
+            padding: 1em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1em;
+        }
+        th, td {
+            padding: 0.6em;
+            border: 1px solid #ccc;
+            text-align: center;
+        }
+        th {
+            background-color: #eeeeee;
+        }
+    </style>
+</head>
+<body>
+    <div class="contenedor">
+        <h1>Historial de Resultados Recibidos</h1>
+
+        <div class="contador">
+            <strong>Simulaciones realizadas:</strong> {{ contador }}
+        </div>
+        <form method="GET" action="/">
+            <button type="submit" class="boton">🔄 Actualizar historial</button>
+        </form>
+
+        <table id="tabla-resultados">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Resultado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linea in historial %}
+                <tr>
+                    {% set partes = linea.split(":") %}
+                    <td>{{ partes[0].strip() }}</td>
+                    <td>{{ partes[1].strip() }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+
+</html>
