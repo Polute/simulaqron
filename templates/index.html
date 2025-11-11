@@ -210,10 +210,21 @@
                     <option value="swap">Entanglement Swap (Alice → Charlie ←→ Bob)</option>
                 </select>
             </div>
-            <div style="margin-top: 1em;">
-                <label for="num_qubits">Número de qubits:</label>
-                <input type="number" id="num_qubits" name="num_qubits" min="1" max="10" value="2">
+            <div style="margin-top: 1em; display: flex; align-items: center; gap: 1em;">
+                <div>
+                    <label for="num_paresEPR">Número de pares generados:</label><br>
+                    <input type="number" id="num_paresEPR" name="num_paresEPR" min="1" max="10" value="2">
+                </div>
+
+                <div>
+                    <label for="modo_tiempo">Generación:</label><br>
+                    <select id="modo_tiempo" name="modo_tiempo">
+                        <option value="secuencial">Secuencial</option>
+                        <option value="simultaneo">Simultáneo</option>
+                    </select>
+                </div>
             </div>
+
 
             <button class="boton" onclick="iniciarSimulacion()">Iniciar Simulación</button>
             <button class="boton" onclick="iniciarBucle()">Iniciar Bucle</button>
@@ -558,7 +569,7 @@
 
         function iniciarSimulacion() {
             const modo = document.getElementById("modo").value;
-            const num_qubits = document.getElementById("num_qubits").value;
+            const num_paresEPR = document.getElementById("num_paresEPR").value;
             console.log("Iniciando simulación única");
 
             const dist_ab = getDistancia("dist_ab");
@@ -569,8 +580,8 @@
             const pswap = document.getElementById("pswap").value;
             const pgen_nodos = nodes.map(n => `${n.id}:${n.param}`).join(",");
             const distancias = links.map(l => `${l.source.id}:${l.target.id}:${l.distanciaKm}`).join(",");
-
-            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}`)
+            const modo_tiempo = document.getElementById("modo_tiempo").value;
+            fetch(`/simular?modo=${modo}&num_paresEPR=${num_paresEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}`)
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById("resultado").innerHTML =
@@ -588,7 +599,7 @@
         function iniciarBucle() {
         
             const modo = document.getElementById("modo").value;
-            const num_qubits = document.getElementById("num_qubits").value;
+            const num_paresEPR = document.getElementById("num_paresEPR").value;
             console.log("Comienza bucle de simulación");
 
             document.getElementById("loading").style.display = "block";
@@ -598,8 +609,8 @@
 
             const pgen_nodos = nodes.map(n => `${n.id}:${n.param}`).join(",");
             const distancias = links.map(l => `${l.source.id}:${l.target.id}:${l.distanciaKm}`).join(",");
-
-            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}`)
+            const modo_tiempo = document.getElementById("modo_tiempo").value;
+            fetch(`/simular?modo=${modo}&num_paresEPR=${num_paresEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}`)
                 .then(response => response.json())
                 .then(data => {
                     mostrarResultado(data);
@@ -618,7 +629,7 @@
                             document.getElementById("loading").style.display = "block";
 
                             // Lanzar siguiente simulación
-                            fetch(`/simular?modo=${modo}&num_qubits=${num_qubits}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}&pgen=${pgen}&pswap=${pswap}`)
+                            fetch(`/simular?modo=${modo}&num_paresEPR=${num_paresEPR}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}&pgen=${pgen}&pswap=${pswap}`)
                                 .then(response => response.json())
                                 .then(data => {
                                     mostrarResultado(data);

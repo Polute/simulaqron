@@ -158,7 +158,9 @@ def simular():
     inicio_real = time.time()
     pswap = float(request.args.get("pswap", 0.9))
     modo = request.args.get("modo", "puro")
-    num_qubits = int(request.args.get("num_qubits", 2))
+    num_qubits = int(request.args.get("num_ParesEPR", 2))
+    modo_tiempo = request.args.get("modo_tiempo", "secuencial")
+    print(f"[WEB] Modo de tiempo seleccionado: {modo_tiempo}")
 
     # --- PGEN por nodo ---
     pgen_nodos_raw = request.args.get("pgen_nodos", "")
@@ -205,14 +207,14 @@ def simular():
         # Operaciones de simulación
         if modo in ["puro", "werner", "swap"]:
             if modo == "puro":
-                subprocess.run(["python3", "alice.py", modo, str(1.0), str(num_qubits)])
+                subprocess.run(["python3", "alice.py", modo, str(1.0), str(num_qubits), modo_tiempo])
                 time.sleep(retardo(dist_ab))  # Alice → Bob
 
                 w_out = 1.0
                 subprocess.run(["python3", "bob.py", modo, str(w_out), str(num_qubits)])
 
             elif modo == "werner":
-                subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_qubits)])
+                subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_qubits), modo_tiempo])
                 time.sleep(retardo(dist_ab))  # Alice → Repeater
 
                 # Leer fidelidad generada por Alice
@@ -226,7 +228,7 @@ def simular():
                 w_out = w_in  # En este modo, fidelidad se conserva
 
             elif modo == "swap":
-                subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_qubits)])
+                subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_qubits), modo_tiempo])
                 time.sleep(retardo(dist_ac))  # Alice → Charlie
 
                 subprocess.run(["python3", "repeater_swap.py", str(num_qubits), str(pswap)])
