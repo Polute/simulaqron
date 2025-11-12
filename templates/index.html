@@ -212,8 +212,8 @@
             </div>
             <div style="margin-top: 1em; display: flex; align-items: center; gap: 1em;">
                 <div>
-                    <label for="num_paresEPR">Número de pares generados:</label><br>
-                    <input type="number" id="num_paresEPR" name="num_paresEPR" min="1" max="10" value="2">
+                    <label for="num_ParesEPR">Número de pares generados:</label><br>
+                    <input type="number" id="num_ParesEPR" name="num_ParesEPR" min="1" max="10" value="2">
                 </div>
 
                 <div>
@@ -569,7 +569,7 @@
 
         function iniciarSimulacion() {
             const modo = document.getElementById("modo").value;
-            const num_paresEPR = document.getElementById("num_paresEPR").value;
+            const num_ParesEPR = document.getElementById("num_ParesEPR").value;
             console.log("Iniciando simulación única");
 
             const dist_ab = getDistancia("dist_ab");
@@ -581,7 +581,7 @@
             const pgen_nodos = nodes.map(n => `${n.id}:${n.param}`).join(",");
             const distancias = links.map(l => `${l.source.id}:${l.target.id}:${l.distanciaKm}`).join(",");
             const modo_tiempo = document.getElementById("modo_tiempo").value;
-            fetch(`/simular?modo=${modo}&num_paresEPR=${num_paresEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}`)
+            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}`)
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById("resultado").innerHTML =
@@ -599,7 +599,7 @@
         function iniciarBucle() {
         
             const modo = document.getElementById("modo").value;
-            const num_paresEPR = document.getElementById("num_paresEPR").value;
+            const num_ParesEPR = document.getElementById("num_ParesEPR").value;
             console.log("Comienza bucle de simulación");
 
             document.getElementById("loading").style.display = "block";
@@ -610,7 +610,7 @@
             const pgen_nodos = nodes.map(n => `${n.id}:${n.param}`).join(",");
             const distancias = links.map(l => `${l.source.id}:${l.target.id}:${l.distanciaKm}`).join(",");
             const modo_tiempo = document.getElementById("modo_tiempo").value;
-            fetch(`/simular?modo=${modo}&num_paresEPR=${num_paresEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}`)
+            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}`)
                 .then(response => response.json())
                 .then(data => {
                     mostrarResultado(data);
@@ -629,7 +629,7 @@
                             document.getElementById("loading").style.display = "block";
 
                             // Lanzar siguiente simulación
-                            fetch(`/simular?modo=${modo}&num_paresEPR=${num_paresEPR}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}&pgen=${pgen}&pswap=${pswap}`)
+                            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&dist_ab=${dist_ab}&dist_ac=${dist_ac}&dist_cb=${dist_cb}&pgen=${pgen}&pswap=${pswap}`)
                                 .then(response => response.json())
                                 .then(data => {
                                     mostrarResultado(data);

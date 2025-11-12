@@ -1,9 +1,0 @@
-1: ['timeout', 'no recibido'] (w_out=0.000) (modo=puro, qubits=2, estimado=0.000200s, real=10.601966s)
-2: ['no recibido', 'no recibido'] (w_out=0.000) (modo=puro, qubits=2, estimado=0.000200s, real=0.402681s)
-3: ['no recibido', 'no recibido'] (w_out=0.000) (modo=puro, qubits=2, estimado=0.000200s, real=0.463946s)
-4: ['no recibido', 'no recibido'] (w_out=0.000) (modo=puro, qubits=2, estimado=0.000200s, real=0.430258s)
-1: [0, 1] (w_out=0.636) (modo=puro, qubits=2, estimado=0.000200s, real=0.508388s)
-2: [0, 1] (w_out=0.646) (modo=puro, qubits=2, estimado=0.000200s, real=0.366436s)
-3: ['no recibido', 'no recibido'] (w_out=0.000) (modo=werner, qubits=2, estimado=0.000200s, real=0.351255s), C_t=0.965, C_d=0.67
-4: [1, 1] (w_out=0.575) (modo=werner, qubits=2, estimado=0.000200s, real=0.484143s), C_t=0.953, C_d=0.67
-5: [0, 'timeout'] (w_out=0.208) (modo=werner, qubits=2, estimado=0.000200s, real=10.637201s), C_t=0.345, C_d=0.67

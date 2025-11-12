@@ -30,7 +30,8 @@ Recuerde actualizar su requirements txt con:
 pip install -r requirements.txt
 ```
 
-Si te falla simulaqron, borra la carpeta simulaqron_env y vuelve a los pasos de crearla de Instrucciones.pdf
+Si te falla simulaqron, ejecuta setup_env.sh, con permisos de ejecución.
+Este borrara el entorno virtual y se te creará de nuevo con los requirements instalados
 
 
 Ya que se agregarán nuevos paquetes periodicamente y según hagan falta.
