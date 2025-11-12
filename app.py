@@ -7,6 +7,10 @@ import math
 import re
 import sys
 import requests
+from multiprocessing import Process, Manager
+from alice import run_alice
+from bob import run_bob
+from datetime import datetime
 
 
 
@@ -57,6 +61,9 @@ def crear_nodos_simulaqron():
 def retardo(distancia_km):
     """Calcula el tiempo de transmisión en segundos según la distancia en km."""
     return (distancia_km * 1000) / (2e8)
+
+def parse_timestamp(ts):
+    return datetime.strptime(ts, "%M:%S.%f")
 
 @app.route("/actualizar_historial", methods=["POST"])
 def actualizar_historial():
@@ -125,6 +132,9 @@ def limpiar_historial():
         open("historial_resultados.txt", "w").close()
         open("bob_resultado.txt", "w").close()
         open("qubit_enviado.txt", "w").close()
+        open("qubit_enviado_rep.txt", "w").close()
+        open("tiempo_creacion.txt").close()
+        open("tiempo_recepcion.txt").close()
         subprocess.Popen(["python3", "limpiar_qubits.py"])
         print("[SERVIDOR] Historial y qubits limpiados correctamente.")
     except Exception as e:
@@ -158,7 +168,7 @@ def simular():
     inicio_real = time.time()
     pswap = float(request.args.get("pswap", 0.9))
     modo = request.args.get("modo", "puro")
-    num_qubits = int(request.args.get("num_ParesEPR", 2))
+    num_ParesEPR = int(request.args.get("num_ParesEPR", 2))
     modo_tiempo = request.args.get("modo_tiempo", "secuencial")
     print(f"[WEB] Modo de tiempo seleccionado: {modo_tiempo}")
 
@@ -191,9 +201,9 @@ def simular():
     # Obtener pgen específico
     pgen_alice = pgen_por_nodo.get("Alice", 0.8)
 
-    print(f"[WEB] Iniciando simulación en modo: {modo} (p={pgen_alice}, qubits={num_qubits})")
+    print(f"[WEB] Iniciando simulación en modo: {modo} (p={pgen_alice}, qubits={num_ParesEPR})")
     print(f"[WEB] Distancias: AB={dist_ab} km, AC={dist_ac} km, CB={dist_cb} km")
-
+    
     try:
         # Calcular tiempo estimado según el modo
         if modo == "puro":
@@ -205,44 +215,105 @@ def simular():
         else:
             tiempo_estimado = 0
         # Operaciones de simulación
+        manager = Manager()
+        semaforos = [manager.Semaphore(0) for _ in range(num_ParesEPR)]
         if modo in ["puro", "werner", "swap"]:
-            if modo == "puro":
-                subprocess.run(["python3", "alice.py", modo, str(1.0), str(num_qubits), modo_tiempo])
-                time.sleep(retardo(dist_ab))  # Alice → Bob
+            if modo_tiempo == "simultaneo":
+                if modo == "puro":
+                    # Ejecutar Alice
+                    proceso_alice = Process(target=run_alice, args=(modo, 1.0, num_ParesEPR, modo_tiempo, semaforos))
+                    proceso_alice.start()
+                    time.sleep(retardo(dist_ab))  # Alice → Bob
+                    inicio_bob = manager.Event()
 
-                w_out = 1.0
-                subprocess.run(["python3", "bob.py", modo, str(w_out), str(num_qubits)])
+                    # En Alice, al final de run_alice:
+                    inicio_bob.set()
 
-            elif modo == "werner":
-                subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_qubits), modo_tiempo])
-                time.sleep(retardo(dist_ab))  # Alice → Repeater
+                    # En Bob, al inicio de run_bob:
+                    inicio_bob.wait()
 
-                # Leer fidelidad generada por Alice
-                try:
+                    # Ejecutar Bob
+                    w_in = 1.0
+                    proceso_bob = Process(target=run_bob, args=(modo, w_in, num_ParesEPR, modo_tiempo, semaforos))
+                    proceso_bob.start()
+
+                    proceso_alice.join()
+                    proceso_bob.join()
+
+                elif modo == "werner":
+                    proceso_alice = Process(target=run_alice, args=(modo, pgen_alice, num_ParesEPR, modo_tiempo, semaforos))
+                    proceso_alice.start()
+                    time.sleep(retardo(dist_ab))  # Alice → Repeater
+
+                    proceso_alice.join()
+
+                    # Leer fidelidad generada por Alice
                     with open("fidelidad_alice.txt", "r") as f:
-                        w_in = float(f.read().strip())
-                except:
-                    w_in = 0.0
+                        fidelidades = f.read().strip().split(",")
+                        valores = [float(w) for w in fidelidades if w != "None"]
+                        w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
 
-                subprocess.run(["python3", "bob.py", modo, str(w_in), str(num_qubits)])
-                w_out = w_in  # En este modo, fidelidad se conserva
+                    proceso_bob = Process(target=run_bob, args=(modo, w_in, num_ParesEPR, modo_tiempo, semaforos))
+                    proceso_bob.start()
+                    proceso_bob.join()
+                    w_out = w_in  # En este modo, fidelidad se conserva
 
-            elif modo == "swap":
-                subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_qubits), modo_tiempo])
-                time.sleep(retardo(dist_ac))  # Alice → Charlie
+                elif modo == "swap":
+                    proceso_alice = Process(target=run_alice, args=(modo, pgen_alice, num_ParesEPR, modo_tiempo, semaforos))
+                    proceso_alice.start()
+                    time.sleep(retardo(dist_ac))  # Alice → Charlie
 
-                subprocess.run(["python3", "repeater_swap.py", str(num_qubits), str(pswap)])
-                time.sleep(retardo(dist_cb))  # Charlie → Bob
+                    proceso_alice.join()
 
-                # Leer fidelidad generada por Alice
-                try:
+                    subprocess.run(["python3", "repeater_swap.py", str(num_ParesEPR), str(pswap)])
+                    time.sleep(retardo(dist_cb))  # Charlie → Bob
+
                     with open("fidelidad_alice.txt", "r") as f:
-                        w_in = float(f.read().strip())
-                except:
-                    w_in = 0.0
+                        fidelidades = f.read().strip().split(",")
+                        valores = [float(w) for w in fidelidades if w != "None"]
+                        w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
 
-                subprocess.run(["python3", "bob.py", modo, str(w_in), str(num_qubits)])
-                w_out = w_in  # Bob calculará el producto con su propio w
+                    proceso_bob = Process(target=run_bob, args=(modo, w_in, num_ParesEPR, modo_tiempo, semaforos))
+                    proceso_bob.start()
+                    proceso_bob.join()
+                    w_out = w_in  # Bob calculará el producto con su propio w
+            else:
+                if modo in ["puro", "werner", "swap"]:
+                    if modo == "puro":
+                        print(f"[ALICE] Aver que pasa antes de ejecutar")
+                        subprocess.run(["python3", "alice.py", modo, str(1.0), str(num_ParesEPR), modo_tiempo, "no_semaforos"])
+                        time.sleep(retardo(dist_ab))  # Alice → Bob
+                        w_out = 1.0
+                        subprocess.run(["python3", "bob.py", modo, str(w_out), str(num_ParesEPR), modo_tiempo, "no_semaforos"])
+
+                    elif modo == "werner":
+                        subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_ParesEPR), modo_tiempo, "no_semaforos"])
+                        time.sleep(retardo(dist_ab))  # Alice → Repeater
+
+                        # Leer fidelidad generada por Alice
+                        with open("fidelidad_alice.txt", "r") as f:
+                            fidelidades = f.read().strip().split(",")
+                            valores = [float(w) for w in fidelidades if w != "None"]
+                            w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
+
+                        subprocess.run(["python3", "bob.py", modo, str(w_in), str(num_ParesEPR), modo_tiempo,"no_semaforos"])
+                        w_out = w_in  # En este modo, fidelidad se conserva
+
+                    elif modo == "swap":
+                        subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_ParesEPR), modo_tiempo, "no_semaforos"])
+                        time.sleep(retardo(dist_ac))  # Alice → Charlie
+
+                        subprocess.run(["python3", "repeater_swap.py", str(num_ParesEPR), str(pswap)])
+                        time.sleep(retardo(dist_cb))  # Charlie → Bob
+
+                        # Leer fidelidad generada por Alice
+                        with open("fidelidad_alice.txt", "r") as f:
+                            fidelidades = f.read().strip().split(",")
+                            valores = [float(w) for w in fidelidades if w != "None"]
+                            w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
+
+                        subprocess.run(["python3", "bob.py", modo, str(w_in), str(num_ParesEPR), modo_tiempo,"no_semaforos"])
+                        w_out = w_in  # Bob calculará el producto con su propio w
 
         else:
             w_out = 0.0  # Modo desconocido
@@ -254,8 +325,25 @@ def simular():
         T_c = 10.0  # tiempo de coherencia en segundos
         L_c = 100.0  # longitud de coherencia en km
 
-        # Coherencia temporal
-        coherencia_temporal = round(math.exp(-tiempo_real / T_c), 3)
+
+        with open("tiempo_creacion.txt", "r") as f:
+            t_creacion = f.read().strip().split(",")
+
+        with open("tiempo_recepcion.txt", "r") as f:
+            t_recepcion = f.read().strip().split(",")
+
+        coherencias_temporales = []
+
+        for i in range(len(t_creacion)):
+            if t_creacion[i] != "None" and t_recepcion[i] != "None":
+                t1 = parse_timestamp(t_creacion[i])
+                t2 = parse_timestamp(t_recepcion[i])
+                delta = (t2 - t1).total_seconds()
+                ct = round(math.exp(-delta / T_c), 3)
+            else:
+                ct = 1.0
+            coherencias_temporales.append(ct)
+
 
         # Coherencia física (según modo)
         if modo == "puro":
@@ -270,24 +358,35 @@ def simular():
         coherencia_fisica = round(math.exp(-distancia_total / L_c), 3)
 
         try:
-            # Leer resultado original
+            # Leer mediciones y fidelidades originales
             with open("bob_resultado.txt", "r") as f:
-                resultado = f.read().strip()
+                mediciones = f.read().strip().split(",")
 
-            # Extraer w_out original
-            match = re.search(r"w_out=(\d+\.\d+)", resultado)
-            if match:
-                w_out_original = float(match.group(1))
-                w_out_corregido = round(w_out_original * coherencia_temporal * coherencia_fisica, 3)
+            with open("fidelidad_bob.txt", "r") as f:
+                fidelidades = f.read().strip().split(",")
 
-                # Reemplazar w_out en el texto
-                resultado = re.sub(r"w_out=\d+\.\d+", f"w_out={w_out_corregido:.3f}", resultado)
+            # Aplicar corrección de fidelidad si no es modo puro
+            fidelidades_corregidas = []
+            for idx, w in enumerate(fidelidades):
+                if w != "None":
+                    w_out_original = float(w)
+                    ct = coherencias_temporales[idx] if idx < len(coherencias_temporales) else 1.0
+                    if modo != "puro":
+                        w_out_corregido = round(w_out_original * ct * coherencia_fisica, 3)
+                    else:
+                        w_out_corregido = 1.0
+                    fidelidades_corregidas.append(f"w{idx+1}={w_out_corregido:.3f}")
+                else:
+                    fidelidades_corregidas.append(f"w{idx+1}=None")
 
-                # Reescribir archivo con nuevo w_out
-                with open("bob_resultado.txt", "w") as f:
-                    f.write(resultado)
-            else:
-                w_out_corregido = 0.0  # Si no se encuentra, usar valor por defecto
+            # Construir resultado compacto
+            resultado = (
+                f"[{','.join(mediciones)}]"
+                f"({','.join(fidelidades_corregidas)})"
+                f"(modo={modo},num_ParesEPR={num_ParesEPR})"
+            )
+
+            # Verificar si hubo error
             if "ERROR" in resultado.upper():
                 print("[SERVIDOR] Error detectado en resultado. Deteniendo simulación.")
                 simulacion_en_curso = False
@@ -297,31 +396,31 @@ def simular():
                     "historial": []
                 })
 
+            # Actualizar historial
             contador += 1
             with open("historial_resultados.txt", "a") as h:
+                h.write(
+                    f"{contador}: {resultado} "
+                    f"(estimado={tiempo_estimado:.6f}s, real={tiempo_real:.6f}s"
+                )
                 if modo != "puro":
-                    h.write(
-                    f"{contador}: {resultado} (modo={modo}, qubits={num_qubits}, "
-                    f"estimado={tiempo_estimado:.6f}s, real={tiempo_real:.6f}s), "
-                    f"C_t={coherencia_temporal}, C_d={coherencia_fisica}\n"
-                )
-                else:
-                    h.write(
-                    f"{contador}: {resultado} (modo={modo}, qubits={num_qubits}, "
-                    f"estimado={tiempo_estimado:.6f}s, real={tiempo_real:.6f}s)\n"
-                )
-
+                    h.write(f", Se le aplica coherencia temporal y la del canal cuántico asociado")
+                h.write(")\n")
 
         except FileNotFoundError:
             resultado = "ERROR: No se pudo leer el resultado."
 
+        # Leer historial completo
         try:
             with open("historial_resultados.txt", "r") as h:
                 historial = [line.strip() for line in h.readlines()]
         except FileNotFoundError:
             historial = []
 
+        # Finalizar simulación
         simulacion_en_curso = False
+
+        # Enviar historial a Bob si el rol es Alice
         if ROL == "alice":
             try:
                 requests.post("http://localhost:5001/actualizar_historial", json={
@@ -333,6 +432,7 @@ def simular():
             except Exception as e:
                 print(f"[ALICE] No se pudo enviar historial a Bob: {e}")
 
+        # Devolver todo junto en un único mensaje
         return jsonify({
             "resultado": resultado,
             "contador": contador,
@@ -350,4 +450,5 @@ def simular():
 
 if __name__ == "__main__":
     print(f"[SERVIDOR] Iniciando servidor en el puerto {PUERTO} con rol {ROL}...")
-    app.run(host="0.0.0.0", port=PUERTO)
+    app.run(host="0.0.0.0", port=PUERTO, debug=True) #Quitar debug=True si no estoy en produccion
+
