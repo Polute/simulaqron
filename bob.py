@@ -12,22 +12,10 @@ from datetime import datetime
 # Bloqueo global para escritura segura en archivos compartidos
 lock = Lock()
 
-def recogerEPR(modo, w_in, i, modo_tiempo):
+def recogerEPR(modo, w_in, i, modo_tiempo, enviados, fidelidades):
     """
     Recibe un qubit EPR y guarda la medición y fidelidad en archivos compartidos.
     """
-    with lock:
-        try:
-            with open("qubit_enviado.txt", "r") as f:
-                enviados = f.read().strip().split(",")
-        except FileNotFoundError:
-            enviados = []
-
-        try:
-            with open("fidelidad_alice.txt", "r") as f:
-                fidelidades = f.read().strip().split(",")
-        except FileNotFoundError:
-            fidelidades = []
 
     # Determinar fidelidad de entrada
     if modo_tiempo == "simultaneo":
@@ -48,8 +36,12 @@ def recogerEPR(modo, w_in, i, modo_tiempo):
             print(f"[BOB] Qubit #{i} no recibido (fallo en pgen o pswap)")
         else:
             try:
+                ahora = datetime.now()
+                timestamp = ahora.strftime("%M:%S.%f")[:-3]  # recorta a milésimas
+                print(f"[TIEMPO REC] {timestamp}")
                 #  Recibir qubit y calcular fidelidad
                 q = bob.recvEPR()
+                print(f"[TIEMPO REC FINAL] {timestamp}")
                 if modo == "puro":
                     w_out = 1.0
                 elif modo == "werner":
@@ -65,7 +57,6 @@ def recogerEPR(modo, w_in, i, modo_tiempo):
                 #  Medir qubit
                 m = q.measure()
 
-                
                 t_recepcion = datetime.now().strftime("%M:%S.%f")[:-3]
 
                 # Guardar tiempo en archivo indexado
@@ -126,16 +117,31 @@ def run_bob(modo, w_in, num_ParesEPR, modo_tiempo, semaforos):
     """
     Ejecuta la recepción de múltiples qubits EPR, en paralelo o secuencialmente.
     """
+    with lock:
+        try:
+            with open("qubit_enviado.txt", "r") as f:
+                enviados = f.read().strip().split(",")
+        except FileNotFoundError:
+            enviados = []
+
+        try:
+            with open("fidelidad_alice.txt", "r") as f:
+                fidelidades = f.read().strip().split(",")
+        except FileNotFoundError:
+            fidelidades = []
 
     if modo_tiempo == "simultaneo":
         with ThreadPoolExecutor() as executor:
             for i in range(num_ParesEPR):
-                print(f"[BOB] Esperando semáforo para qubit #{i}")
-                semaforos[i].acquire()
-                executor.submit(recogerEPR, modo, w_in, i, modo_tiempo)
+                if(enviados[i] == "ok"):
+                    print(f"[BOB] Esperando semáforo para qubit #{i}")
+                    semaforos[i].acquire()
+                    time.sleep(0.01)
+                    executor.submit(recogerEPR, modo, w_in, i, modo_tiempo, enviados, fidelidades)
+                    time.sleep(0.01)
     else:
         for i in range(num_ParesEPR):
-            recogerEPR(modo, w_in, i, modo_tiempo)
+            recogerEPR(modo, w_in, i, modo_tiempo, enviados, fidelidades)
 
 
 
@@ -148,12 +154,7 @@ if __name__ == "__main__":
     modo_tiempo = sys.argv[4]       # "secuencial" o "simultaneo"
     semaforos_raw = sys.argv[5]     # "no_semaforos" o marcador
 
-    # Decidir si usar semáforos
-    if modo_tiempo == "simultaneo" and semaforos_raw != "no_semaforos":
-        manager = Manager()
-        semaforos = [manager.Semaphore(0) for _ in range(num_ParesEPR)]
-    else:
-        semaforos = None
+    semaforos = None
 
     # Ejecutar Bob
     run_bob(modo, w_in, num_ParesEPR, modo_tiempo, semaforos)

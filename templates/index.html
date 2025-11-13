@@ -135,6 +135,12 @@
             padding: 0.2em;
             font-size: 0.9em;
         }
+        .matrix-input {
+            width: 40px;       /* ancho pequeño */
+            text-align: center; /* centrar el número */
+            padding: 2px;
+            margin: 1px;
+        }
     </style>
 </head>
 <body>
@@ -160,9 +166,60 @@
             <svg id="canvas"></svg>
 
             <h3>Parámetros físicos</h3>
-            <label for="pswap">pswap (0.0 - 1.0):</label>
-            <input type="number" id="pswap" name="pswap" min="0" max="1" step="0.01" value="0.9"><br><br>
+            <div style="display: flex; align-items: flex-start; gap: 40px;">
+                <div>
+                    <label for="pswap">pswap (0.0 - 1.0):</label>
+                    <input type="number" id="pswap" name="pswap" min="0" max="1" step="0.01" value="0.9">
+                </div>
 
+                <div>
+                    <label for="tipo_canal">Tipo de canal cuántico:</label>
+                    <select id="tipo_canal" onchange="toggleCanalInput()">
+                        <option value="numero">Número (0–1)</option>
+                        <option value="matriz">Matriz 4x4</option>
+                    </select>
+
+                    <!-- Input numérico -->
+                    <div id="canal_numero">
+                        <label for="canal_cuantico">Valor:</label>
+                        <input type="number" id="canal_cuantico" name="canal_cuantico" min="0" max="1" step="0.01" value="1.0">
+                    </div>
+
+                    <!-- Matriz 4x4 -->
+                    <div id="canal_matriz" style="display:none; margin-top:5px;">
+                        <label>Canal cuántico (matriz 4x4):</label>
+                        <table style="border-collapse: collapse; margin-top: 5px;">
+                        <tbody>
+                            <tr>
+                            <td><input type="number" step="0.01" id="m00" value="1.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m01" value="0.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m02" value="0.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m03" value="0.0" class="matrix-input"></td>
+                            </tr>
+                            <tr>
+                            <td><input type="number" step="0.01" id="m10" value="0.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m11" value="1.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m12" value="0.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m13" value="0.0" class="matrix-input"></td>
+                            </tr>
+                            <tr>
+                            <td><input type="number" step="0.01" id="m20" value="0.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m21" value="0.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m22" value="1.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m23" value="0.0" class="matrix-input"></td>
+                            </tr>
+                            <tr>
+                            <td><input type="number" step="0.01" id="m30" value="0.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m31" value="0.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m32" value="0.0" class="matrix-input"></td>
+                            <td><input type="number" step="0.01" id="m33" value="1.0" class="matrix-input"></td>
+                            </tr>
+                        </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <br><br>
             <h3>Nodos</h3>
             <table id="tabla-nodos">
                 <thead>
@@ -222,6 +279,9 @@
                         <option value="secuencial">Secuencial</option>
                         <option value="simultaneo">Simultáneo</option>
                     </select>
+                    <div id="decoherenciaInfo" style="margin-top: 0.5em; color: #555; display: none;">
+                        En modo <strong>simultáneo</strong>, el tiempo de decoherencia de los pares EPR puede diferir debido a la computación paralela.
+                    </div>
                 </div>
             </div>
 
@@ -250,7 +310,22 @@
         </div>
     </div>
 
+    <script>
+        document.getElementById("modo_tiempo").addEventListener("change", function () {
+            const info = document.getElementById("decoherenciaInfo");
+            if (this.value === "simultaneo") {
+                info.style.display = "block";
+            } else {
+                info.style.display = "none";
+            }
+        });
+        document.getElementById("tipo_canal").addEventListener("change", function() {
+            const tipo = this.value;
+            document.getElementById("canal_numero").style.display = (tipo === "numero") ? "block" : "none";
+            document.getElementById("canal_matriz").style.display = (tipo === "matriz") ? "block" : "none";
+        });
 
+    </script>
     <script>
         nodes = [
             { id: "Alice", name: "Alice", x: 100, y: 100, param: 0.8 },
@@ -581,7 +656,9 @@
             const pgen_nodos = nodes.map(n => `${n.id}:${n.param}`).join(",");
             const distancias = links.map(l => `${l.source.id}:${l.target.id}:${l.distanciaKm}`).join(",");
             const modo_tiempo = document.getElementById("modo_tiempo").value;
-            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}`)
+            const canal_cuantico = getCanalCuantico();
+
+            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}&canal_cuantico=${encodeURIComponent(canal_cuantico)}`)
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById("resultado").innerHTML =
@@ -610,7 +687,8 @@
             const pgen_nodos = nodes.map(n => `${n.id}:${n.param}`).join(",");
             const distancias = links.map(l => `${l.source.id}:${l.target.id}:${l.distanciaKm}`).join(",");
             const modo_tiempo = document.getElementById("modo_tiempo").value;
-            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}`)
+            const canal_cuantico = getCanalCuantico();
+            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}&canal_cuantico=${encodeURIComponent(canal_cuantico)}`)
                 .then(response => response.json())
                 .then(data => {
                     mostrarResultado(data);
@@ -706,7 +784,7 @@
         document.getElementById("modo").addEventListener("change", () => {
             const nuevoModo = document.getElementById("modo").value;
             if (nuevoModo !== modoAnterior) {
-                fetch("/limpiar_qubits")
+                fetch("/limpieza_docs")
                     .then(response => response.json())
                     .then(data => {
                         if (data.status === "ok") {
@@ -722,6 +800,42 @@
                     });
             }
         });
+        document.getElementById("num_ParesEPR").addEventListener("change", () => {
+            const nuevoModo = document.getElementById("num_ParesEPR").value;
+            if (nuevoModo !== modoAnterior) {
+                fetch("/limpieza_docs")
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === "ok") {
+                            document.getElementById("estado").innerHTML =
+                                "<strong>Estado:</strong> Qubits limpiados al cambiar de num_ParesEPR generados.";
+                            console.log("Qubits limpiados correctamente.");
+                        } else {
+                            document.getElementById("estado").innerHTML =
+                                "<strong>Estado:</strong> Error al limpiar qubits.";
+                            console.warn("Error al limpiar qubits.");
+                        }
+                        modoAnterior = nuevoModo;
+                    });
+            }
+        });
+
+        function getCanalCuantico() {
+            const tipo = document.getElementById("tipo_canal").value;
+            if (tipo === "numero") {
+                return document.getElementById("canal_cuantico").value;
+            } else {
+                const matrix = [];
+                for (let i = 0; i < 4; i++) {
+                    const row = [];
+                    for (let j = 0; j < 4; j++) {
+                        row.push(parseFloat(document.getElementById(`m${i}${j}`).value));
+                    }
+                    matrix.push(row);
+                }
+                return JSON.stringify(matrix);
+            }
+        }
 
 
     </script>

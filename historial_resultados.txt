@@ -1,0 +1,5 @@
+1: [0,0](w1=0.878,w2=0.878)(modo=werner,num_ParesEPR=2) (estimado=0.000200s, real=0.400706s, Se le aplica coherencia temporal y la del canal cuántico asociado)
+2: [1,1](w1=0.878,w2=0.878)(modo=werner,num_ParesEPR=2) (estimado=0.000200s, real=0.406379s, Se le aplica coherencia temporal y la del canal cuántico asociado)
+3: [1,0](w1=0.877,w2=0.877)(modo=werner,num_ParesEPR=2) (estimado=0.000200s, real=0.406368s, Se le aplica coherencia temporal y la del canal cuántico asociado)
+4: [0,1](w1=0.878,w2=0.878)(modo=werner,num_ParesEPR=2) (estimado=0.000200s, real=0.397521s, Se le aplica coherencia temporal y la del canal cuántico asociado)
+5: [0,no recibido](w1=0.685,w2=None)(modo=swap,num_ParesEPR=2) (estimado=0.000250s, real=0.919176s, Se le aplica coherencia temporal y la del canal cuántico asociado)

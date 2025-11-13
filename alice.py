@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from cqc.pythonLib import CQCConnection
 from cqc.pythonLib.util import CQCNoQubitError
 from datetime import datetime
+import time
 
 
 #  Bloqueo global para escritura segura en archivos compartidos
@@ -35,13 +36,16 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
                         tiempos = []
 
                     while len(tiempos) <= i:
-                        tiempos.append("None")
-
+                        tiempos.append("00:00.000")  # valor por defecto válido
+                    if estado == "fallo":
+                        t_creacion = "00:00.000"
                     tiempos[i] = t_creacion
 
                     with open("tiempo_creacion.txt", "w") as f:
                         f.write(",".join(tiempos))
-
+                ahora = datetime.now()
+                timestamp = ahora.strftime("%M:%S.%f")[:-3]  # recorta a milésimas
+                print(f"[TIEMPO GEN] {timestamp}")
                 if modo == "puro":
                     q = alice.createEPR("Bob")
                     q1_ID = q.get_entInfo().id_AB
@@ -53,11 +57,17 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
                     print(f"[ALICE] EPR #{i+1} creado con Bob (modo puro).")
                 elif modo == "werner":
                     q = alice.createEPR("Bob")
+                    print(f"[TIEMPO] {timestamp}")
+                    q1_ID = q.get_entInfo().id_AB
+                    print(f"[ALICE] EPR generado con id:{q1_ID}")
                     w_alice = 0.90
                     print(f"[ALICE] EPR #{i+1} creado con Bob (modo werner).")
                 elif modo == "swap":
                     q = alice.createEPR("Charlie")
                     alice.sendQubit(q, "Charlie")
+                    print(f"[TIEMPO] {timestamp}")
+                    q1_ID = q.get_entInfo().id_AB
+                    print(f"[ALICE] EPR generado con id:{q1_ID}")
                     w_alice = 0.90
                     print(f"[ALICE] EPR #{i+1} creado y enviado a Charlie (modo swap).")
                 else:
@@ -117,7 +127,9 @@ def run_alice(modo, pgen, num_ParesEPR, modo_tiempo, semaforos):
     if modo_tiempo == "simultaneo":
         with ThreadPoolExecutor() as executor:
             for i in range(num_ParesEPR):
+                time.sleep(0.01)
                 executor.submit(generar_epr, i, modo, pgen, modo_tiempo, semaforos)
+                time.sleep(0.01)
     else:
         for i in range(num_ParesEPR):
             generar_epr(i, modo, pgen, modo_tiempo, semaforos)
