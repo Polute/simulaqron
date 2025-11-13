@@ -3,21 +3,23 @@ import subprocess
 
 def nodo_activo(nombre):
     try:
-        resultado = subprocess.run(["simulaqron", "getnodes"], capture_output=True, text=True)
-        nodos = resultado.stdout.strip().split("\n")
+        resultado = subprocess.run(["simulaqron", "nodes", "get"], capture_output=True, text=True)
+        nodos = resultado.stdout.strip().split()
+        print(nodos)
         return nombre in nodos
     except Exception as e:
         print(f"[ERROR] No se pudo verificar el nodo {nombre}: {e}")
         return False
 
 def limpiar_nodo(nombre):
+    print(f"[LIMPIAR] Verificando nodo {nombre}...")
     if not nodo_activo(nombre):
         print(f"[LIMPIAR] Nodo {nombre} no está activo. Se omite.")
         return
 
     try:
         with CQCConnection(nombre) as nodo:
-            for _ in range(10):  # máximo 10 intentos
+            for _ in range(1):  # máximo 10 intentos
                 try:
                     q = nodo.recvQubit()
                     q.release()

@@ -11,6 +11,7 @@ from multiprocessing import Process, Manager
 from alice import run_alice
 from bob import run_bob
 from datetime import datetime
+import json
 
 
 
@@ -132,11 +133,27 @@ def limpiar_historial():
         open("historial_resultados.txt", "w").close()
         open("bob_resultado.txt", "w").close()
         open("qubit_enviado.txt", "w").close()
+        open("tiempo_creacion.txt", "w").close()
+        open("tiempo_recepcion.txt", "w").close()
         open("qubit_enviado_rep.txt", "w").close()
-        open("tiempo_creacion.txt").close()
-        open("tiempo_recepcion.txt").close()
-        subprocess.Popen(["python3", "limpiar_qubits.py"])
+        # subprocess.Popen(["python3", "limpiar_qubits.py"]) Preparado para imprevistos de memoria cuantica
         print("[SERVIDOR] Historial y qubits limpiados correctamente.")
+    except Exception as e:
+        print(f"[ERROR] No se pudo limpiar el historial: {e}")
+    return jsonify({"status": "ok"})
+
+@app.route("/limpieza_docs")
+def limpiar_txt():
+    try:
+        open("fidelidad_alice.txt", "w").close()
+        open("fidelidad_bob.txt", "w").close()
+        open("bob_resultado.txt", "w").close()
+        open("qubit_enviado.txt", "w").close()
+        open("tiempo_creacion.txt", "w").close()
+        open("tiempo_recepcion.txt", "w").close()
+        open("qubit_enviado_rep.txt", "w").close()
+        # subprocess.Popen(["python3", "limpiar_qubits.py"]) Preparado para imprevistos de memoria cuantica
+        print("[SERVIDOR] Trazas de los qubits y qubits limpiados correctamente.")
     except Exception as e:
         print(f"[ERROR] No se pudo limpiar el historial: {e}")
     return jsonify({"status": "ok"})
@@ -340,22 +357,33 @@ def simular():
                 t2 = parse_timestamp(t_recepcion[i])
                 delta = (t2 - t1).total_seconds()
                 ct = round(math.exp(-delta / T_c), 3)
+                print(f"[DECOHERENCIA TEMPORAL] Par EPR #{i}: {ct}")
             else:
                 ct = 1.0
             coherencias_temporales.append(ct)
 
 
-        # Coherencia física (según modo)
-        if modo == "puro":
-            distancia_total = dist_ab
-        elif modo == "werner":
-            distancia_total = dist_ab
-        elif modo == "swap":
-            distancia_total = dist_ac + dist_cb
-        else:
-            distancia_total = 0.0
 
-        coherencia_fisica = round(math.exp(-distancia_total / L_c), 3)
+
+        # Recibir canal cuántico desde la petición
+        canal_cuantico = request.args.get("canal_cuantico", "1.0")
+
+        try:
+            # Caso 1: el usuario ha introducido un número (0–1)
+            canal_cuantico = float(canal_cuantico)
+            coherencia_fisica = round(canal_cuantico, 3)
+
+        except ValueError:
+            # Caso 2: el usuario ha introducido una matriz 4x4 en formato JSON
+            canal_cuantico = json.loads(canal_cuantico)  # lista de listas 4x4
+
+            # Ejemplo de operación: usar la traza como medida de coherencia
+            traza = sum(canal_cuantico[i][i] for i in range(4))
+            coherencia_fisica = round(traza, 3)
+
+        print("Canal cuántico recibido:", canal_cuantico)
+        print("Coherencia física calculada:", coherencia_fisica)
+
 
         try:
             # Leer mediciones y fidelidades originales
@@ -364,13 +392,13 @@ def simular():
 
             with open("fidelidad_bob.txt", "r") as f:
                 fidelidades = f.read().strip().split(",")
-
             # Aplicar corrección de fidelidad si no es modo puro
             fidelidades_corregidas = []
             for idx, w in enumerate(fidelidades):
                 if w != "None":
                     w_out_original = float(w)
                     ct = coherencias_temporales[idx] if idx < len(coherencias_temporales) else 1.0
+                    print(ct)
                     if modo != "puro":
                         w_out_corregido = round(w_out_original * ct * coherencia_fisica, 3)
                     else:
