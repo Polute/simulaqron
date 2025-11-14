@@ -12,6 +12,7 @@ from alice import run_alice
 from bob import run_bob
 from datetime import datetime
 import json
+import importlib.resources
 
 
 
@@ -25,43 +26,134 @@ if len(sys.argv) > 1 and sys.argv[1].lower() == "bob":
 else:
     ROL = "alice"
     PUERTO = 5000
+app = Flask(__name__)
+
 
 # Reiniciar SimulaQron al iniciar el servidor
 print("[INIT] Reiniciando SimulaQron...")
 subprocess.run(["simulaqron", "reset", "--force"])
-subprocess.run(["simulaqron", "start", "--name", "default", "--force"])
-print("[INIT] SimulaQron iniciado.")
-
-resultado = subprocess.run(["simulaqron", "nodes", "list"], capture_output=True, text=True)
-nodos_existentes = resultado.stdout.strip().split("\n")
+subprocess.run(["simulaqron", "start", "--name", "default", "--force", "-n", "Alice,Bob,Charlie"])
+print("[INIT] Inicializando SimulaQron...")
 
 
-"""
 @app.route("/crear_nodos_simulaqron")
 def crear_nodos_simulaqron():
+    limpiar_historial()
     nodos_raw = request.args.get("nodos", "")
-    nodos = nodos_raw.split(" ")
+    nodos = [n for n in nodos_raw.split(" ") if n]  # evita strings vacíos
 
-    # Establecer red activa
-    print("[SIMULAQRON] Estableciendo red 'default' como activa...")
-    subprocess.run(["simulaqron", "set", "network.name", "default"])
+    log_file = "simulaqron_log.txt"
+
+    def log(msg):
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
 
     # Obtener nodos ya existentes
-    resultado = subprocess.run(["simulaqron", "nodes", "get"], capture_output=True, text=True)
-    nodos_existentes = resultado.stdout.strip().split("\n")
-    print(f"[SERVIDOR] Nodos existentes: {nodos_existentes}")
     nodos_creados = []
+    resultado = subprocess.run(["simulaqron", "nodes", "get"],
+                            capture_output=True, text=True)
+    nodos_existentes = resultado.stdout.strip().split()  # ahora es lista correcta
+    log(f"[SERVIDOR] Nodos existentes: {nodos_existentes}")
+
     for nodo in nodos:
         if nodo not in nodos_existentes:
-            subprocess.run(["simulaqron", "nodes", "add", nodo])
+            print(nodo)
+            res_add = subprocess.run(["simulaqron", "nodes", "add", nodo, "--force"],
+                                    capture_output=True, text=True)
             nodos_creados.append(nodo)
+            log(f"[SERVIDOR] Nodo creado: {nodo} -> {res_add.stdout.strip()} {res_add.stderr.strip()}")
+
+    log(f"[SERVIDOR] Nodos creados en esta petición: {nodos_creados}")
+    log("--------------------------------------------------")
+    resultado_fin= subprocess.run(["simulaqron", "nodes", "get"],
+                            capture_output=True, text=True)
+    nodos_existentes_fin = resultado_fin.stdout.strip().split()
+    log(f"[SERVIDOR] Nodos existentes tras operacion: {nodos_existentes_fin}")
 
     return jsonify({"status": "ok", "nodos_creados": nodos_creados})
-"""
+
+@app.route("/modificar_links", methods=["POST"])
+def mod_links():
+    data = request.get_json()
+    links = data.get("links", [])
+
+    conexiones = []
+    for link in links:
+        origen = link["source"]
+        destino = link["target"]
+
+        # Actualizar vecinos de origen
+        subprocess.run(
+            ["simulaqron", "nodes", "add", origen, "--force", "--neighbors", destino],
+            capture_output=True, text=True
+        )
+        # Actualizar vecinos de destino
+        subprocess.run(
+            ["simulaqron", "nodes", "add", destino, "--force", "--neighbors", origen],
+            capture_output=True, text=True
+        )
+
+        conexiones.append((origen, destino))
+
+    return jsonify({"status": "ok", "conexiones": conexiones})
+
+
+
+def buscar_network_json(base_dir):
+    """
+    Busca el archivo network.json dentro de cualquier subcarpeta de base_dir.
+    Devuelve la primera ruta encontrada o None.
+    """
+    for root, dirs, files in os.walk(base_dir):
+        if "network.json" in files and root.endswith("simulaqron/config"):
+            print(os.path.join(root, "network.json"))
+            return os.path.join(root, "network.json")
+    return None
+
+def mostrar_topologia():
+    # Busca desde el directorio actual del proyecto
+    ruta = buscar_network_json(os.getcwd())
+    if ruta is None:
+        # Si no lo encuentra, busca en el entorno de site-packages
+        ruta = buscar_network_json(os.path.dirname(__file__))
+
+    if ruta is None:
+        print("[ERROR] No se encontró simulaqron/config/network.json")
+        return {}
+
+    with open(ruta) as f:
+        data = json.load(f)
+    print("[DEBUG] JSON completo:", data)
+
+    try:
+        topology = data["default"]["topology"]
+        node_names = list(data["default"]["nodes"].keys())
+    except KeyError:
+        print("[ERROR] El archivo no contiene 'default' o 'topology'")
+        return {}
+
+    # Si la topología es null, crear pseudo-topología completa
+    if topology is None:
+        pseudo_topology = {}
+        for nodo in node_names:
+            pseudo_topology[nodo] = [n for n in node_names if n != nodo]
+        return pseudo_topology
+
+    resultado = {}
+    for nodo, vecinos in topology.items():
+        resultado[nodo] = vecinos
+        print(f"Nodo {nodo} conectado con: {{{', '.join(vecinos)}}}")
+
+    return resultado
+
+@app.route("/topologia", methods=["GET"])
+def topologia():
+    return jsonify(mostrar_topologia())
+
 
 def retardo(distancia_km):
     """Calcula el tiempo de transmisión en segundos según la distancia en km."""
-    return (distancia_km * 1000) / (2e8)
+    return (distancia_km * 1000) / (2e8) #(2/3)c
 
 def parse_timestamp(ts):
     return datetime.strptime(ts, "%M:%S.%f")
@@ -136,6 +228,7 @@ def limpiar_historial():
         open("tiempo_creacion.txt", "w").close()
         open("tiempo_recepcion.txt", "w").close()
         open("qubit_enviado_rep.txt", "w").close()
+        open("simulaqron_log.txt","w").close()
         # subprocess.Popen(["python3", "limpiar_qubits.py"]) Preparado para imprevistos de memoria cuantica
         print("[SERVIDOR] Historial y qubits limpiados correctamente.")
     except Exception as e:
@@ -152,6 +245,7 @@ def limpiar_txt():
         open("tiempo_creacion.txt", "w").close()
         open("tiempo_recepcion.txt", "w").close()
         open("qubit_enviado_rep.txt", "w").close()
+        open("simulaqron_log.txt","w").close()
         # subprocess.Popen(["python3", "limpiar_qubits.py"]) Preparado para imprevistos de memoria cuantica
         print("[SERVIDOR] Trazas de los qubits y qubits limpiados correctamente.")
     except Exception as e:
@@ -180,7 +274,6 @@ def simular():
             "contador": contador,
             "historial": []
         })
-
     simulacion_en_curso = True
     inicio_real = time.time()
     pswap = float(request.args.get("pswap", 0.9))
@@ -232,10 +325,11 @@ def simular():
         else:
             tiempo_estimado = 0
         # Operaciones de simulación
-        manager = Manager()
-        semaforos = [manager.Semaphore(0) for _ in range(num_ParesEPR)]
+
         if modo in ["puro", "werner", "swap"]:
             if modo_tiempo == "simultaneo":
+                manager = Manager()
+                semaforos = [manager.Semaphore(0) for _ in range(num_ParesEPR)]
                 if modo == "puro":
                     # Ejecutar Alice
                     proceso_alice = Process(target=run_alice, args=(modo, 1.0, num_ParesEPR, modo_tiempo, semaforos))
