@@ -125,11 +125,9 @@ def run_alice(modo, pgen, num_ParesEPR, modo_tiempo, semaforos):
     """
 
     if modo_tiempo == "simultaneo":
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=num_ParesEPR) as executor:
             for i in range(num_ParesEPR):
-                time.sleep(0.01)
                 executor.submit(generar_epr, i, modo, pgen, modo_tiempo, semaforos)
-                time.sleep(0.01)
     else:
         for i in range(num_ParesEPR):
             generar_epr(i, modo, pgen, modo_tiempo, semaforos)

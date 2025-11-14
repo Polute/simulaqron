@@ -1,0 +1,5 @@
+[SERVIDOR] Nodos existentes: ['Alice', 'Bob', 'Charlie']
+[SERVIDOR] Nodo creado: Nodo_1763124965850 ->  
+[SERVIDOR] Nodos creados en esta petición: ['Nodo_1763124965850']
+--------------------------------------------------
+[SERVIDOR] Nodos existentes tras operacion: ['Alice', 'Bob', 'Charlie', 'Nodo_1763124965850']
