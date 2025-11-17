@@ -17,12 +17,15 @@ def entanglement_swap(num_ParesEPR, pswap):
                 continue
             else:
                 try: 
-                    q1 = repeater.recvQubit()
+                    print("antes")
+                    q1 = repeater.recvEPR()
                     print(f"[SWAP] Qubit #{i+1} de Alice recibido.")
-
+                    print("despues")
                     q2 = repeater.createEPR("Bob")
+                    print("despues")
                     print(f"[SWAP] EPR #{i+1} con Bob creado.")
                 except Exception as e:
+                    print(q1)
                     print(f"[SWAP] Error en swapping #{i+1}: {e}")
 
                 try:
@@ -30,7 +33,7 @@ def entanglement_swap(num_ParesEPR, pswap):
                         fidelidades = f.read().strip().split(",")
                 except FileNotFoundError:
                     fidelidades = []
-
+                
                 w_alice = float(fidelidades[i])
                 
                 # Simular fidelidad del canal Charlie → Bob

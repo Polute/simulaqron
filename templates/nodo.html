@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Nodo {{ nodo_info.name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            padding: 2em;
+        }
+        .container-flex {
+            display: flex;
+            gap: 1em;
+            justify-content: space-between;
+            align-items: flex-start;
+            width: 100%;
+        }
+        .columna {
+            flex: 1;
+            background-color: white;
+            padding: 1.5em;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h2 { color: #333; }
+        table {
+            margin-top: 1em;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            padding: 0.6em;
+            border: 1px solid #ccc;
+            text-align: center;
+        }
+        th { background-color: #eeeeee; }
+        #canvas {
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ccc;
+            background-color: #f0f0f0;
+        }
+        .link { stroke: red; stroke-width: 2px; }
+    </style>
+</head>
+<body>
+<div class="container-flex">
+    <div class="columna">
+        <h2>Mapa del Nodo {{ nodo_info.name }}</h2>
+        <svg id="canvas"></svg>
+
+        <h3>Información del Nodo</h3>
+        <table id="tabla-nodo">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Roles</th>
+                    <th>pgen</th>
+                    <th>pswap</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{ nodo_info.id }}</td>
+                    <td><input type="text" id="nameInput" value="{{ nodo_info.name }}"></td>
+                    <td>
+                        {% for role in ["emisor","receptor","repeater"] %}
+                            <label>
+                                <input type="checkbox" class="roleChk" value="{{ role }}" {% if role in nodo_info.roles %}checked{% endif %}>{{ role }}
+                            </label>
+                        {% endfor %}
+                    </td>
+                    <td><input type="number" id="pgenInput" min="0" max="1" step="0.01" value="{{ nodo_info.param }}"></td>
+                    <td><input type="number" id="pswapInput" min="0" max="1" step="0.01" value="{{ nodo_info.get('pswap',0.0) }}"></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Vecinos</h3>
+        <table id="tabla-aristas">
+            <thead>
+                <tr><th>Origen</th><th>Destino</th><th>Distancia (km)</th></tr>
+            </thead>
+            <tbody>
+                {% for vecino in nodo_info.get("neighbors", []) %}
+                <tr>
+                    <td>{{ nodo_info.name }}</td>
+                    <td>{{ vecino.name }}</td>
+                    <td><input type="number" class="distInput" value="{{ vecino.distanceKm }}"></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const nodo= JSON.parse('{{ nodo_info|tojson|safe }}');
+
+    // Actualizar nombre
+    document.getElementById("nameInput").addEventListener("change", e => {
+        fetch("/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: e.target.value })
+        });
+    });
+
+    // Actualizar pgen
+    document.getElementById("pgenInput").addEventListener("change", e => {
+        fetch("/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pgen: parseFloat(e.target.value) })
+        });
+    });
+
+    // Actualizar pswap
+    document.getElementById("pswapInput").addEventListener("change", e => {
+        fetch("/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pswap: parseFloat(e.target.value) })
+        });
+    });
+
+    // Actualizar roles
+    document.querySelectorAll(".roleChk").forEach(chk => {
+        chk.addEventListener("change", () => {
+            const roles = [];
+            document.querySelectorAll(".roleChk").forEach(c => {
+                if (c.checked) roles.push(c.value);
+            });
+            fetch("/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ roles })
+            });
+        });
+    });
+
+    // Actualizar distancias con vecinos
+    document.querySelectorAll(".distInput").forEach((input, idx) => {
+        input.addEventListener("change", e => {
+            nodo.neighbors[idx].distanceKm = parseFloat(e.target.value);
+            fetch("/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ neighbors: nodo.neighbors })
+            });
+        });
+    });
+
+    // Dibujar mapa simple
+    const svg = document.getElementById("canvas");
+    const ns = "http://www.w3.org/2000/svg";
+
+    const circle = document.createElementNS(ns, "circle");
+    circle.setAttribute("cx", 150);
+    circle.setAttribute("cy", 150);
+    circle.setAttribute("r", 20);
+    circle.setAttribute("fill", "lightblue");
+    svg.appendChild(circle);
+
+    const label = document.createElementNS(ns, "text");
+    label.setAttribute("x", 150);
+    label.setAttribute("y", 190);
+    label.setAttribute("text-anchor", "middle");
+    label.textContent = nodo.name;
+    svg.appendChild(label);
+
+    let angle = 0;
+    nodo.neighbors?.forEach(vecino => {
+        const x = 150 + 100 * Math.cos(angle);
+        const y = 150 + 100 * Math.sin(angle);
+        angle += (2 * Math.PI) / nodo.neighbors.length;
+
+        const vCircle = document.createElementNS(ns, "circle");
+        vCircle.setAttribute("cx", x);
+        vCircle.setAttribute("cy", y);
+        vCircle.setAttribute("r", 15);
+        vCircle.setAttribute("fill", "orange");
+        svg.appendChild(vCircle);
+
+        const vLabel = document.createElementNS(ns, "text");
+        vLabel.setAttribute("x", x);
+        vLabel.setAttribute("y", y + 25);
+        vLabel.setAttribute("text-anchor", "middle");
+        vLabel.textContent = vecino.name;
+        svg.appendChild(vLabel);
+
+        const line = document.createElementNS(ns, "line");
+        line.setAttribute("x1", 150);
+        line.setAttribute("y1", 150);
+        line.setAttribute("x2", x);
+        line.setAttribute("y2", y);
+        line.setAttribute("class", "link");
+        svg.appendChild(line);
+    });
+</script>
+</body>
+</html>

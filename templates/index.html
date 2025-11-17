@@ -145,7 +145,7 @@
 </head>
 <body>
     <div class="container-flex">
-        {% if rol == "alice" %}
+        {% if rol != "bob" %}
         <!-- Columna izquierda: parámetros físicos -->
         <div class="columna-izquierda">
             <h2>Editor de Mapa Cuántico</h2>
@@ -158,6 +158,7 @@
                 <button id="zoomIn" class="boton">➕</button>
                 <button id="zoomOut" class="boton">➖</button>
                 <button id="resetView" class="boton">📍</button>
+                <button id="btnActualizarMapa">Actualizar mapa</button>
             </div>
 
             <input type="number" id="paramInput" class="param-input" />
@@ -316,12 +317,37 @@
         </div>
     </div>
     <script>
+        // Rol recibido desde Flask
+        const rol = "{{ rol }}";
+
         // Nodos predefinidos
-        const nodes = [
-            { id: "node_alice", name: "Alice", x: 100, y: 100, param: 0.8, roles: ["emisor","receptor"] },   
-            { id: "node_bob",   name: "Bob",   x: 300, y: 100, param: 0.7, roles: ["receptor","repeater"] },
+        const predefinedNodes = [
+            { id: "node_alice", name: "Alice",   x: 100, y: 100, param: 0.8, roles: ["emisor","receptor"] },
+            { id: "node_bob",   name: "Bob",     x: 300, y: 100, param: 0.7, roles: ["receptor","repeater"] },
             { id: "node_charlie", name: "Charlie", x: 200, y: 250, param: 0.9, roles: ["emisor","repeater"] }
         ];
+
+        let nodes = [];
+
+        if (rol === "master") {
+            // El master recibe una lista de nodos desde Flask
+            const nodos_recibidos = JSON.parse('{{ nodos|tojson|safe }}');
+
+            if (nodos_recibidos.length > 0) {
+                nodes = nodos_recibidos;
+            } else {
+                // Si no recibió nada, usar los predefinidos
+                nodes = predefinedNodes;
+            }
+        } else {
+            // Nodo individual
+            const nodo_info = JSON.parse('{{ nodo_info|tojson|safe }}');
+            nodes = [nodo_info];
+        }
+
+        console.log("Rol:", rol);
+        console.log("Nodes:", nodes);
+
         // Links predefinidos
         const links = [
             { source: "Alice", target: "Bob", distanciaKm: 40 },
@@ -329,17 +355,7 @@
             { source: "Charlie", target: "Bob", distanciaKm: 20 }
         ];
 
-        /* Al cargar la página, enviar nodos y links al backend
-        window.addEventListener("load", () => {
-            fetch("/inicializar_red", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ nodes, links })
-            })
-            .then(res => res.json())
-            .then(data => console.log("Red inicializada:", data))
-            .catch(err => console.error("Error inicializando red:", err));
-        });*/
+
         document.getElementById("mostrarTopologia").addEventListener("click", () => {
             fetch("/topologia")
                 .then(res => res.json())
@@ -381,6 +397,7 @@
             const zoomInBtn = document.getElementById("zoomIn");
             const zoomOutBtn = document.getElementById("zoomOut");
             const resetViewBtn = document.getElementById("resetView");
+            const actualizarMapaBtn = document.getElementById("btnActualizarMapa");
 
             let modoNodo = false;
             let modoArista = false;
@@ -421,6 +438,21 @@
                 transform = { x: 0, y: 0, k: 1 };
                 draw();
             };
+
+            actualizarMapaBtn.addEventListener("click", () => {
+                fetch("/actualizar_mapa")
+                    .then(res => res.json())
+                    .then(data => {
+                        nodes = data.nodes;   // sustituye la lista de nodos
+                        links = data.links;   // ahora también recibes los enlaces
+                        draw();               // redibuja el mapa con los nuevos nodos
+                        actualizarTablaNodos();
+                        actualizarTablaAristas();
+                    })
+                    .catch(err => console.error("Error al actualizar mapa:", err));
+            });
+
+
 
             function createNode(x, y) {
                 const node = {

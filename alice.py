@@ -64,7 +64,6 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
                     print(f"[ALICE] EPR #{i+1} creado con Bob (modo werner).")
                 elif modo == "swap":
                     q = alice.createEPR("Charlie")
-                    alice.sendQubit(q, "Charlie")
                     print(f"[TIEMPO] {timestamp}")
                     q1_ID = q.get_entInfo().id_AB
                     print(f"[ALICE] EPR generado con id:{q1_ID}")

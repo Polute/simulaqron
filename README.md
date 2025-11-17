@@ -11,10 +11,20 @@ Si ya tienes Python 3.10.x y el entorno virtual `simulaqron_env` correctamente i
 3. Actualmente, el simulador se ejecuta de dos formas:
 
 ```bash
-python app.py
+python app.py master
 ```
-La cual simula la red completa en una máquina local(Puerto 5000)
+La cual simula la red completa en una máquina local(Puerto 8000)
 
+Para ejecutar individualmente cada nodo, con info que contienen local, ejecuta:
+
+```bash
+python app.py 
+```
+
+Realizalo en varias terminales, las cuales se abriran en puertos distintos cada vez que lo ejecutes
+
+
+Y para simplemente escuchar lo que hace master, ejecuta:
 
 ```bash
 python app.py bob
