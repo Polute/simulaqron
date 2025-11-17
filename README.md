@@ -4,11 +4,8 @@
 
 Si ya tienes Python 3.10.x y el entorno virtual `simulaqron_env` correctamente instalado y activado, puedes ejecutar el simulador directamente descargando el archivo ZIP con los archivos esenciales:
 
-
-
-1. Descarga el archivo `simulador.zip` desde la rama `main` del repositorio
-2. Extrae el contenido en tu entorno de trabajo
-3. Actualmente, el simulador se ejecuta de dos formas:
+1. Extrae el contenido en tu entorno de trabajo
+2. Actualmente, el simulador se ejecuta de dos formas:
 
 ```bash
 python app.py master
