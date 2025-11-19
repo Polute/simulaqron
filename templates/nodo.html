@@ -9,45 +9,105 @@
             background-color: #f4f4f4;
             padding: 2em;
         }
-        .container-flex {
-            display: flex;
-            gap: 1em;
-            justify-content: space-between;
-            align-items: flex-start;
-            width: 100%;
-        }
+
         .columna {
-            flex: 1;
             background-color: white;
             padding: 1.5em;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            max-width: 100%;
         }
-        h2 { color: #333; }
+
+        h1, h2 {
+            color: #333;
+        }
+
         table {
             margin-top: 1em;
             border-collapse: collapse;
             width: 100%;
+            font-size: 0.9em;
         }
+
         th, td {
             padding: 0.6em;
             border: 1px solid #ccc;
             text-align: center;
         }
-        th { background-color: #eeeeee; }
+
+        th {
+            background-color: #eeeeee;
+        }
+
         #canvas {
             width: 100%;
-            height: 300px;
+            height: 400px;
             border: 1px solid #ccc;
             background-color: #f0f0f0;
+            cursor: grab;
         }
-        .link { stroke: red; stroke-width: 2px; }
+
+        .link {
+            stroke: red;
+            stroke-width: 2px;
+        }
+
+        .pgen-input,
+        .name-input {
+            position: absolute;
+            display: none;
+            z-index: 10;
+        }
+
+        .label {
+            font-size: 12px;
+            text-anchor: middle;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        .node {
+            cursor: pointer;
+        }
+
+        #tabla-nodos, #tabla-aristas {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1em;
+            font-size: 0.9em;
+        }
+
+        #tabla-nodos th, #tabla-nodos td,
+        #tabla-aristas th, #tabla-aristas td {
+            border: 1px solid #ccc;
+            padding: 0.4em;
+            text-align: center;
+        }
+
+        #tabla-nodos input, #tabla-aristas input {
+            width: 90%;
+            padding: 0.2em;
+            font-size: 0.9em;
+        }
+
+        .matrix-input {
+            width: 40px;
+            text-align: center;
+            padding: 2px;
+            margin: 1px;
+        }
     </style>
 </head>
 <body>
 <div class="container-flex">
     <div class="columna">
-        <h2>Mapa del Nodo {{ nodo_info.name }}</h2>
+        <h2>
+            Mapa del Nodo {{ nodo_info.name }}
+            <button onclick="window.open('/info', '_blank')">Ver JSON del Nodo</button>
+        </h2>
         <svg id="canvas"></svg>
 
         <h3>Información del Nodo</h3>
@@ -72,7 +132,7 @@
                             </label>
                         {% endfor %}
                     </td>
-                    <td><input type="number" id="pgenInput" min="0" max="1" step="0.01" value="{{ nodo_info.param }}"></td>
+                    <td><input type="number" id="pgenInput" min="0" max="1" step="0.01" value="{{ nodo_info.pgen }}"></td>
                     <td><input type="number" id="pswapInput" min="0" max="1" step="0.01" value="{{ nodo_info.get('pswap',0.0) }}"></td>
                 </tr>
             </tbody>
@@ -95,110 +155,179 @@
         </table>
     </div>
 </div>
-
 <script>
-    const nodo= JSON.parse('{{ nodo_info|tojson|safe }}');
+window.onload = function () {
+    const nodo = JSON.parse('{{ nodo_info|tojson|safe }}');
+    const svg = document.getElementById("canvas");
+    const ns = "http://www.w3.org/2000/svg";
 
-    // Actualizar nombre
+   // Actualizar el nombre del nodo cuando cambia el input
     document.getElementById("nameInput").addEventListener("change", e => {
         fetch("/update", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: e.target.value })
+            body: JSON.stringify({ name: e.target.value, lastUpdated: Date.now() })
         });
     });
 
-    // Actualizar pgen
+    // Actualizar el parámetro de generación (pgen) cuando cambia el input
     document.getElementById("pgenInput").addEventListener("change", e => {
         fetch("/update", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pgen: parseFloat(e.target.value) })
+            body: JSON.stringify({ pgen: parseFloat(e.target.value), lastUpdated: Date.now() })
         });
     });
 
-    // Actualizar pswap
+    // Actualizar el parámetro de intercambio (pswap) cuando cambia el input
     document.getElementById("pswapInput").addEventListener("change", e => {
         fetch("/update", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pswap: parseFloat(e.target.value) })
+            body: JSON.stringify({ pswap: parseFloat(e.target.value), lastUpdated: Date.now() })
         });
     });
 
-    // Actualizar roles
+    // Actualizar los roles seleccionados cuando se marca o desmarca un checkbox
     document.querySelectorAll(".roleChk").forEach(chk => {
         chk.addEventListener("change", () => {
-            const roles = [];
-            document.querySelectorAll(".roleChk").forEach(c => {
-                if (c.checked) roles.push(c.value);
-            });
+            const roles = Array.from(document.querySelectorAll(".roleChk"))
+                .filter(c => c.checked)
+                .map(c => c.value);
             fetch("/update", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ roles })
+                body: JSON.stringify({ roles, lastUpdated: Date.now() })
             });
         });
     });
 
-    // Actualizar distancias con vecinos
+    // Actualizar las distancias con vecinos cuando cambia un input de distancia
     document.querySelectorAll(".distInput").forEach((input, idx) => {
         input.addEventListener("change", e => {
             nodo.neighbors[idx].distanceKm = parseFloat(e.target.value);
             fetch("/update", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ neighbors: nodo.neighbors })
+                body: JSON.stringify({ neighbors: nodo.neighbors, lastUpdated: Date.now() })
             });
         });
     });
 
-    // Dibujar mapa simple
-    const svg = document.getElementById("canvas");
-    const ns = "http://www.w3.org/2000/svg";
-
-    const circle = document.createElementNS(ns, "circle");
-    circle.setAttribute("cx", 150);
-    circle.setAttribute("cy", 150);
-    circle.setAttribute("r", 20);
-    circle.setAttribute("fill", "lightblue");
-    svg.appendChild(circle);
-
-    const label = document.createElementNS(ns, "text");
-    label.setAttribute("x", 150);
-    label.setAttribute("y", 190);
-    label.setAttribute("text-anchor", "middle");
-    label.textContent = nodo.name;
-    svg.appendChild(label);
-
-    let angle = 0;
-    nodo.neighbors?.forEach(vecino => {
-        const x = 150 + 100 * Math.cos(angle);
-        const y = 150 + 100 * Math.sin(angle);
-        angle += (2 * Math.PI) / nodo.neighbors.length;
-
-        const vCircle = document.createElementNS(ns, "circle");
-        vCircle.setAttribute("cx", x);
-        vCircle.setAttribute("cy", y);
-        vCircle.setAttribute("r", 15);
-        vCircle.setAttribute("fill", "orange");
-        svg.appendChild(vCircle);
-
-        const vLabel = document.createElementNS(ns, "text");
-        vLabel.setAttribute("x", x);
-        vLabel.setAttribute("y", y + 25);
-        vLabel.setAttribute("text-anchor", "middle");
-        vLabel.textContent = vecino.name;
-        svg.appendChild(vLabel);
-
-        const line = document.createElementNS(ns, "line");
-        line.setAttribute("x1", 150);
-        line.setAttribute("y1", 150);
-        line.setAttribute("x2", x);
-        line.setAttribute("y2", y);
-        line.setAttribute("class", "link");
-        svg.appendChild(line);
+    // Preparar vecinos con posiciones iniciales
+    const vecinos = nodo.neighbors.map((vecino, i) => {
+        const angle = (2 * Math.PI * i) / nodo.neighbors.length;
+        return {
+            ...vecino,
+            x: nodo.x + 100 * Math.cos(angle),
+            y: nodo.y + 100 * Math.sin(angle)
+        };
     });
+
+    function drawMapa() {
+        svg.innerHTML = "";
+
+        // Nodo central
+        const centralCircle = document.createElementNS(ns, "circle");
+        centralCircle.setAttribute("cx", nodo.x);
+        centralCircle.setAttribute("cy", nodo.y);
+        centralCircle.setAttribute("r", 20);
+        centralCircle.setAttribute("fill", "lightblue");
+        centralCircle.style.cursor = "grab";
+        svg.appendChild(centralCircle);
+
+        const centralLabel = document.createElementNS(ns, "text");
+        centralLabel.setAttribute("x", nodo.x);
+        centralLabel.setAttribute("y", nodo.y + 40);
+        centralLabel.setAttribute("text-anchor", "middle");
+        centralLabel.textContent = nodo.name;
+        svg.appendChild(centralLabel);
+
+        // Vecinos y enlaces
+        vecinos.forEach((vecino, i) => {
+            const line = document.createElementNS(ns, "line");
+            line.setAttribute("x1", nodo.x);
+            line.setAttribute("y1", nodo.y);
+            line.setAttribute("x2", vecino.x);
+            line.setAttribute("y2", vecino.y);
+            line.setAttribute("stroke", "#999");
+            line.setAttribute("stroke-width", "2");
+            svg.appendChild(line);
+
+            const vCircle = document.createElementNS(ns, "circle");
+            vCircle.setAttribute("cx", vecino.x);
+            vCircle.setAttribute("cy", vecino.y);
+            vCircle.setAttribute("r", 15);
+            vCircle.setAttribute("fill", "orange");
+            vCircle.style.cursor = "grab";
+            svg.appendChild(vCircle);
+
+            const vLabel = document.createElementNS(ns, "text");
+            vLabel.setAttribute("x", vecino.x);
+            vLabel.setAttribute("y", vecino.y + 25);
+            vLabel.setAttribute("text-anchor", "middle");
+            vLabel.textContent = vecino.name;
+            svg.appendChild(vLabel);
+        });
+
+        // Arrastrar nodo central
+        let draggingCentral = false;
+        let offsetX = 0, offsetY = 0;
+
+        centralCircle.addEventListener("mousedown", e => {
+            draggingCentral = true;
+            offsetX = e.offsetX - nodo.x;
+            offsetY = e.offsetY - nodo.y;
+        });
+
+        svg.addEventListener("mousemove", e => {
+            if (draggingCentral) {
+                nodo.x = e.offsetX - offsetX;
+                nodo.y = e.offsetY - offsetY;
+                drawMapa();
+            }
+        });
+
+        svg.addEventListener("mouseup", () => draggingCentral = false);
+        svg.addEventListener("mouseleave", () => draggingCentral = false);
+
+        // Arrastrar vecinos
+        const circles = svg.querySelectorAll("circle");
+        const labels = svg.querySelectorAll("text");
+        const lines = svg.querySelectorAll("line");
+
+        vecinos.forEach((vecino, i) => {
+            let isDragging = false;
+            let offsetX, offsetY;
+            const circle = circles[i + 1];
+            const label = labels[i + 1];
+            const line = lines[i];
+
+            circle.addEventListener("mousedown", e => {
+                isDragging = true;
+                offsetX = e.offsetX - vecino.x;
+                offsetY = e.offsetY - vecino.y;
+            });
+
+            svg.addEventListener("mousemove", e => {
+                if (!isDragging) return;
+                vecino.x = e.offsetX - offsetX;
+                vecino.y = e.offsetY - offsetY;
+                circle.setAttribute("cx", vecino.x);
+                circle.setAttribute("cy", vecino.y);
+                label.setAttribute("x", vecino.x);
+                label.setAttribute("y", vecino.y + 25);
+                line.setAttribute("x2", vecino.x);
+                line.setAttribute("y2", vecino.y);
+            });
+
+            svg.addEventListener("mouseup", () => isDragging = false);
+            svg.addEventListener("mouseleave", () => isDragging = false);
+        });
+    }
+
+    drawMapa();
+};
 </script>
 </body>
 </html>

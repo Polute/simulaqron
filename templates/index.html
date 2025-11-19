@@ -89,7 +89,7 @@
             text-align: center;
         }
         th { background-color: #eeeeee; }
-        .param-input,
+        .pgen-input,
         .name-input {
             position: absolute;
             display: none;
@@ -145,9 +145,8 @@
 </head>
 <body>
     <div class="container-flex">
-        {% if rol != "bob" %}
         <!-- Columna izquierda: parámetros físicos -->
-        <div class="columna-izquierda">
+        <div class="columna-izquierda" style="position: relative;">
             <h2>Editor de Mapa Cuántico</h2>
 
             <div class="controles">
@@ -158,13 +157,28 @@
                 <button id="zoomIn" class="boton">➕</button>
                 <button id="zoomOut" class="boton">➖</button>
                 <button id="resetView" class="boton">📍</button>
-                <button id="btnActualizarMapa">Actualizar mapa</button>
+                <button id="btnActualizarNodos">Actualizar nodos</button>
             </div>
 
-            <input type="number" id="paramInput" class="param-input" />
+            <input type="number" id="pgenInput" class="pgen-input" />
             <input type="text" id="nameInput" class="name-input" />
 
-            <svg id="canvas"></svg>
+            <div id="mapa-wrapper" style="position: relative;">
+                <svg id="canvas"></svg>
+                <button id="btnrecibirInfo" style="
+                    position: absolute;
+                    top: 20px;
+                    right: 20px;
+                    z-index: 10;
+                    padding: 6px 12px;
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                ">Actualizar info</button>
+            </div>
+
 
             <h3>Parámetros físicos</h3>
             <div style="display: flex; align-items: flex-start; gap: 40px;">
@@ -294,11 +308,8 @@
 
 
             <button class="boton" onclick="iniciarSimulacion()">Iniciar Simulación</button>
-            <button class="boton" onclick="iniciarBucle()">Iniciar Bucle</button>
-            <button class="boton" onclick="detenerBucle()">Detener Bucle</button>
         
         </div>
-        {% endif %}
         <!-- Columna derecha: historial -->
         <div class="columna-derecha">
             <h2>Historial de Resultados</h2>
@@ -322,39 +333,60 @@
 
         // Nodos predefinidos
         const predefinedNodes = [
-            { id: "node_alice", name: "Alice",   x: 100, y: 100, param: 0.8, roles: ["emisor","receptor"] },
-            { id: "node_bob",   name: "Bob",     x: 300, y: 100, param: 0.7, roles: ["receptor","repeater"] },
-            { id: "node_charlie", name: "Charlie", x: 200, y: 250, param: 0.9, roles: ["emisor","repeater"] }
+            { id: "node_alice", name: "Alice_pre",   x: 100, y: 100, pgen: 0.8, roles: ["emisor","receptor"] },
+            { id: "node_bob",   name: "Bob_pre",     x: 300, y: 100, pgen: 0.7, roles: ["receptor","repeater"] },
+            { id: "node_charlie", name: "Charlie_pre", x: 200, y: 250, pgen: 0.9, roles: ["emisor","repeater"] }
         ];
 
         let nodes = [];
-
+        let links = [];
         if (rol === "master") {
-            // El master recibe una lista de nodos desde Flask
-            const nodos_recibidos = JSON.parse('{{ nodos|tojson|safe }}');
-
-            if (nodos_recibidos.length > 0) {
-                nodes = nodos_recibidos;
-            } else {
-                // Si no recibió nada, usar los predefinidos
-                nodes = predefinedNodes;
-            }
-        } else {
-            // Nodo individual
             const nodo_info = JSON.parse('{{ nodo_info|tojson|safe }}');
-            nodes = [nodo_info];
+            console.log("Objeto nodo_info recibido:", nodo_info);
+
+            if (nodo_info.nodes && nodo_info.nodes.length > 0) {
+                // Inicializar nodos
+                nodes = nodo_info.nodes;
+                console.log("Nodos inicializados desde nodo_info:", nodes);
+
+                nodes.forEach(nodo => {
+                    console.log("Procesando nodo:", nodo.name, "con vecinos:", nodo.neighbors);
+                    if (Array.isArray(nodo.neighbors)) {
+                        nodo.neighbors.forEach(vecino => {
+                            const link = {
+                                source: nodo.name,        // o nodo.id si prefieres
+                                target: vecino.name,
+                                distanciaKm: vecino.distanceKm
+                            };
+                            links.push(link);
+                            console.log("Link añadido:", link);
+                        });
+                    }
+                });
+            } else {
+                // Fallback: usar predefinidos
+                nodes = predefinedNodes;
+                console.log("Usando nodos predefinidos:", nodes);
+                predefinedNodes.forEach(nodo => {
+                    console.log("Procesando nodo predefinido:", nodo.name, "con vecinos:", nodo.neighbors);
+                    if (Array.isArray(nodo.neighbors)) {
+                        nodo.neighbors.forEach(vecino => {
+                            const link = {
+                                source: nodo.name,
+                                target: vecino.name,
+                                distanciaKm: vecino.distanceKm
+                            };
+                            links.push(link);
+                            console.log("Link añadido (predefinido):", link);
+                        });
+                    }
+                });
+            }
         }
 
-        console.log("Rol:", rol);
-        console.log("Nodes:", nodes);
-
-        // Links predefinidos
-        const links = [
-            { source: "Alice", target: "Bob", distanciaKm: 40 },
-            { source: "Alice", target: "Charlie", distanciaKm: 15 },
-            { source: "Charlie", target: "Bob", distanciaKm: 20 }
-        ];
-
+        console.log("Rol actual:", rol);
+        console.log("Lista final de Nodes:", nodes);
+        console.log("Lista final de Links:", links);
 
         document.getElementById("mostrarTopologia").addEventListener("click", () => {
             fetch("/topologia")
@@ -383,13 +415,12 @@
             document.getElementById("canal_numero").style.display = (tipo === "numero") ? "block" : "none";
             document.getElementById("canal_matriz").style.display = (tipo === "matriz") ? "block" : "none";
         });
-
     </script>
     <script>
         //-----------------------------------------MAPA-----------------------------------------------
         window.onload = function () {
             const svg = document.getElementById("canvas");
-            const paramInput = document.getElementById("paramInput");
+            const paramInput = document.getElementById("pgenInput");
             const nameInput = document.getElementById("nameInput");
             const pgenInput = document.getElementById("pgen");
             const modoNodoBtn = document.getElementById("modoNodo");
@@ -397,7 +428,8 @@
             const zoomInBtn = document.getElementById("zoomIn");
             const zoomOutBtn = document.getElementById("zoomOut");
             const resetViewBtn = document.getElementById("resetView");
-            const actualizarMapaBtn = document.getElementById("btnActualizarMapa");
+            const actualizarNodosBtn = document.getElementById("btnActualizarNodos");
+            const recibirInfoBtn = document.getElementById("btnrecibirInfo")
 
             let modoNodo = false;
             let modoArista = false;
@@ -438,21 +470,100 @@
                 transform = { x: 0, y: 0, k: 1 };
                 draw();
             };
-
-            actualizarMapaBtn.addEventListener("click", () => {
+            // Recibir información desde el master y actualizar el mapa
+            recibirInfoBtn.addEventListener("click", () => {
                 fetch("/actualizar_mapa")
                     .then(res => res.json())
                     .then(data => {
-                        nodes = data.nodes;   // sustituye la lista de nodos
-                        links = data.links;   // ahora también recibes los enlaces
-                        draw();               // redibuja el mapa con los nuevos nodos
+                        console.log("Datos recibidos de /actualizar_mapa:", data);
+
+                        // Merge inteligente: no machacar cambios locales si son más recientes
+                        data.nodes.forEach(remoteNode => {
+                            const localNode = nodes.find(n => n.id === remoteNode.id);
+                            if (localNode) {
+                                if (!localNode.lastUpdated || localNode.lastUpdated < remoteNode.lastUpdated) {
+                                    Object.assign(localNode, remoteNode);
+                                } else {
+                                    console.log(`Manteniendo cambios locales en nodo ${localNode.name}`);
+                                }
+                            } else {
+                                nodes.push(remoteNode);
+                            }
+                        });
+
+                        // Recalcular links
+                        links.length = 0;
+                        nodes.forEach(nodo => {
+                            if (Array.isArray(nodo.neighbors)) {
+                                nodo.neighbors.forEach(vecino => {
+                                    links.push({
+                                        source: nodo.name,
+                                        target: vecino.name,
+                                        distanciaKm: vecino.distanceKm
+                                    });
+                                });
+                            }
+                        });
+
+                        draw();
                         actualizarTablaNodos();
                         actualizarTablaAristas();
                     })
-                    .catch(err => console.error("Error al actualizar mapa:", err));
+                    .catch(err => console.error("Error al recibir info de nodos:", err));
             });
+            // Enviar todos los cambios a cada nodo
+            actualizarNodosBtn.addEventListener("click", () => {
+                nodes.forEach(node => {
+                    const puerto = obtenerPuertoDesdeId(node.id);
+                    if (!puerto) return;
 
+                    fetch(`http://127.0.0.1:${puerto}/update`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            id: node.id,
+                            name: node.name,
+                            pgen: node.pgen,
+                            roles: node.roles,
+                            neighbors: node.neighbors,
+                            parEPR: node.parEPR,
+                            lastUpdated: Date.now() // importante: marcar timestamp
+                        })
+                    }).catch(err => console.error(`Error al actualizar nodo ${node.name}:`, err));
+                });
 
+                // Esperar un momento y luego refrescar el mapa completo desde master
+                setTimeout(() => {
+                    fetch("/actualizar_mapa")
+                        .then(res => res.json())
+                        .then(data => {
+                            console.log("Datos recibidos de /actualizar_mapa:", data);
+
+                            // Machacar nodes locales con lo que diga el master
+                            nodes.length = 0;
+                            nodes.push(...data.nodes);
+
+                            // Recalcular links
+                            links.length = 0;
+                            nodes.forEach(nodo => {
+                                if (Array.isArray(nodo.neighbors)) {
+                                    nodo.neighbors.forEach(vecino => {
+                                        links.push({
+                                            source: nodo.name,
+                                            target: vecino.name,
+                                            distanciaKm: vecino.distanceKm
+                                        });
+                                    });
+                                }
+                            });
+
+                            draw();
+                            actualizarTablaNodos();
+                            actualizarTablaAristas();
+                        })
+                        .catch(err => console.error("Error al actualizar mapa:", err));
+                }, 1500);
+            });
 
             function createNode(x, y) {
                 const node = {
@@ -475,36 +586,26 @@
         }
 
         function createLink(sourceNode, targetNode) {
-            // Verificar si ya existe una arista entre estos dos nodos (por nombre)
             const existe = links.some(link =>
                 (link.source === sourceNode.name && link.target === targetNode.name) ||
                 (link.source === targetNode.name && link.target === sourceNode.name)
             );
-
-            if (existe) return; // No crear duplicado
+            if (existe) return;
 
             const distanciaKm = 50;
             const length = Math.hypot(targetNode.x - sourceNode.x, targetNode.y - sourceNode.y);
 
-            // Guardamos solo los nombres
             links.push({ source: sourceNode.name, target: targetNode.name, length, distanciaKm });
             draw();
-            
+
             fetch("/modificar_links", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     links: [{ source: sourceNode.name, target: targetNode.name }]
                 })
-            })
-            .then(res => res.json())
-            .then(data => {
-                console.log("Respuesta del servidor (crear link):", data);
-            })
-            .catch(err => console.error("Error al crear link en Simulaqron:", err));
-
+            });
         }
-
 
         function draw() {
             svg.innerHTML = "";
@@ -512,11 +613,18 @@
             g.setAttribute("transform", `translate(${transform.x},${transform.y}) scale(${transform.k})`);
             svg.appendChild(g);
 
-            // Dibujar aristas
             links.forEach(link => {
                 const sourceNode = nodes.find(n => n.name === link.source);
                 const targetNode = nodes.find(n => n.name === link.target);
-                if (!sourceNode || !targetNode) return;
+
+                if (!sourceNode) {
+                    console.warn(`Nodo no conectado a la red: ${link.source}`);
+                    return;
+                }
+                if (!targetNode) {
+                    console.warn(`Nodo no conectado a la red: ${link.target}`);
+                    return;
+                }
 
                 const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                 line.setAttribute("x1", sourceNode.x);
@@ -524,15 +632,9 @@
                 line.setAttribute("x2", targetNode.x);
                 line.setAttribute("y2", targetNode.y);
                 line.setAttribute("class", "link");
-                line.addEventListener("dblclick", () => {
-                    const nueva = prompt("Distancia en km:", link.distanciaKm);
-                    if (nueva !== null) {
-                        link.distanciaKm = parseFloat(nueva);
-                        draw();
-                    }
-                });
                 g.appendChild(line);
             });
+
 
             // Dibujar nodos
             nodes.forEach(node => {
@@ -541,6 +643,7 @@
                 circle.setAttribute("cy", node.y);
                 circle.setAttribute("r", 20);
                 circle.setAttribute("class", "node");
+
                 circle.addEventListener("mousedown", e => {
                     if (modoArista) {
                         if (linkStart && linkStart !== node) {
@@ -553,6 +656,7 @@
                         draggingNode = node;
                     }
                 });
+
                 g.appendChild(circle);
 
                 const nameLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -566,7 +670,7 @@
                 paramLabel.setAttribute("x", node.x);
                 paramLabel.setAttribute("y", node.y + 50);
                 paramLabel.setAttribute("class", "label");
-                paramLabel.textContent = "pgen = " + node.param;
+                paramLabel.textContent = "pgen = " + node.pgen;
                 g.appendChild(paramLabel);
             });
 
@@ -615,8 +719,8 @@
 
         paramInput.addEventListener("change", () => {
             if (selectedNode) {
-                selectedNode.param = parseFloat(paramInput.value);
-                paramInput.style.display = "none";
+                selectedNode.pgen = parseFloat(pgenInput.value);
+                pgenInput.style.display = "none";
                 draw();
             }
         });
@@ -637,10 +741,19 @@
                 y: (e.clientY - rect.top - transform.y) / transform.k
             };
         }
-
+        function obtenerPuertoDesdeId(id) {
+            const mapa = {
+                "node_alice": 5000,
+                "node_bob": 5002,
+                "node_charlie": 5003
+                // Agrega más si tienes más nodos
+            };
+            return mapa[id];
+        }
         function actualizarTablaNodos() {
             const tbody = document.querySelector("#tabla-nodos tbody");
             tbody.innerHTML = "";
+
             nodes.forEach(node => {
                 const fila = document.createElement("tr");
 
@@ -654,7 +767,37 @@
                 const nameInput = document.createElement("input");
                 nameInput.value = node.name;
                 nameInput.onchange = () => {
-                    node.name = nameInput.value;
+                    const oldName = node.name;
+                    const newName = nameInput.value;
+
+                    // Actualizar el nombre del nodo
+                    node.name = newName;
+
+                    // Actualizar vecinos que lo referencian
+                    nodes.forEach(n => {
+                        n.neighbors.forEach(vecino => {
+                            if (vecino.name === oldName) {
+                                vecino.name = newName;
+                            }
+                        });
+                    });
+
+                    // Actualizar enlaces
+                    links.forEach(link => {
+                        if (link.source === oldName) link.source = newName;
+                        if (link.target === oldName) link.target = newName;
+                    });
+
+                    // Enviar cambio de nombre al backend del nodo
+                    const puerto = obtenerPuertoDesdeId(node.id);
+                    if (puerto) {
+                        fetch(`http://localhost:${puerto}/update`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ name: newName })
+                        });
+                    }
+
                     draw();
                 };
                 nameCell.appendChild(nameInput);
@@ -662,7 +805,7 @@
 
                 // Roles (checkboxes)
                 const rolesCell = document.createElement("td");
-                ["emisor","receptor","repeater"].forEach(role => {
+                ["emisor", "receptor", "repeater"].forEach(role => {
                     const chk = document.createElement("input");
                     chk.type = "checkbox";
                     chk.checked = node.roles.includes(role);
@@ -688,9 +831,9 @@
                 pgenInput.step = "0.01";
                 pgenInput.min = "0";
                 pgenInput.max = "1";
-                pgenInput.value = node.param;
+                pgenInput.value = node.pgen;
                 pgenInput.onchange = () => {
-                    node.param = parseFloat(pgenInput.value);
+                    node.pgen = parseFloat(pgenInput.value);
                     draw();
                 };
                 pgenCell.appendChild(pgenInput);
@@ -719,7 +862,17 @@
                 distInput.type = "number";
                 distInput.value = link.distanciaKm;
                 distInput.onchange = () => {
-                    link.distanciaKm = parseFloat(distInput.value);
+                    const nuevaDistancia = parseFloat(distInput.value);
+                    link.distanciaKm = nuevaDistancia;
+
+                    // 🔑 Actualizar también el neighbors del nodo origen
+                    const origenNode = nodes.find(n => n.name === link.source);
+                    if (origenNode && Array.isArray(origenNode.neighbors)) {
+                        const vecino = origenNode.neighbors.find(v => v.name === link.target);
+                        if (vecino) {
+                            vecino.distanceKm = nuevaDistancia;
+                        }
+                    }
                 };
                 distCell.appendChild(distInput);
                 fila.appendChild(distCell);
@@ -732,8 +885,6 @@
     };
 
         //-----------------------------------------SIMULACIÓN------------
-        let cuentaIntervalo;
-        let segundos = 4;
         function getDistancia(id) {
             const link = links.find(l => l.id === id);
             return link ? link.distanciaKm : 0;
@@ -755,7 +906,7 @@
             const pswap = document.getElementById("pswap").value;
 
             // Nodos con su pgen
-            const pgen_nodos = nodes.map(n => `${n.name}:${n.param}`).join(",");
+            const pgen_nodos = nodes.map(n => `${n.name}:${n.pgen}`).join(",");
 
             // Distancias en formato origen:destino:valor
             const distancias = links.map(l => `${l.source}:${l.target}:${l.distanciaKm}`).join(",");
@@ -778,58 +929,6 @@
                 });
         }
 
-        function iniciarBucle() {
-        
-            const modo = document.getElementById("modo").value;
-            const num_ParesEPR = document.getElementById("num_ParesEPR").value;
-            console.log("Comienza bucle de simulación");
-
-            document.getElementById("loading").style.display = "block";
-            const dist_ab = document.getElementById("dist_ab").value;
-            const dist_ac = document.getElementById("dist_ac").value;
-            const dist_cb = document.getElementById("dist_cb").value;
-
-            const pgen_nodos = nodes.map(n => `${n.id}:${n.param}`).join(",");
-            const distancias = links.map(l => `${l.source.id}:${l.target.id}:${l.distanciaKm}`).join(",");
-            const modo_tiempo = document.getElementById("modo_tiempo").value;
-            const canal_cuantico = getCanalCuantico();
-            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}&canal_cuantico=${encodeURIComponent(canal_cuantico)}`)
-                .then(response => response.json())
-                .then(data => {
-                    mostrarResultado(data);
-
-                    // Activar contador para siguientes simulaciones
-                    segundos = 4;
-                    actualizarCuenta();
-
-                    cuentaIntervalo = setInterval(() => {
-                        if (segundos > 0) {
-                            segundos--;
-                            actualizarCuenta();
-                        } else {
-                            // Detener contador visual y mostrar solo "Ejecutando..."
-                            document.getElementById("cuenta").innerText = "";
-                            document.getElementById("loading").style.display = "block";
-
-                            // Lanzar siguiente simulación
-                            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}&canal_cuantico=${encodeURIComponent(canal_cuantico)}`)
-                                .then(response => response.json())
-                                .then(data => {
-                                    mostrarResultado(data);
-                                    //Si el resultado contiene "ERROR", detener el bucle
-                                    if (data.resultado.includes("ERROR")) {
-                                        detenerBucle();
-                                        document.getElementById("estado").innerHTML =
-                                            "<strong>Estado:</strong> Error detectado. Detenido el bucle. Limpia el historial.";
-                                        return;
-                                    }
-                                    segundos = 4;
-                                    actualizarCuenta();
-                                });
-                        }
-                    }, 1000);
-                });
-        }
 
         function mostrarResultado(data) {
             document.getElementById("resultado").innerHTML =
@@ -842,24 +941,6 @@
             document.getElementById("loading").style.display = "none";
         }
 
-        function actualizarCuenta() {
-            if (segundos > 0) {
-                document.getElementById("cuenta").innerText =
-                    "Próxima simulación en: " + segundos + " segundos";
-            } else {
-                document.getElementById("cuenta").innerText = "";
-            }
-        }
-
-
-
-
-        function detenerBucle() {
-            console.log("Termina bucle de simulación");
-            clearInterval(cuentaIntervalo);
-            document.getElementById("loading").style.display = "none";
-            document.getElementById("cuenta").innerText = "";
-        }
 
         function actualizarTabla(historial) {
             const tbody = document.querySelector("#tabla-resultados tbody");

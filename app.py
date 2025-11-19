@@ -14,6 +14,8 @@ from datetime import datetime
 import json
 import importlib.resources
 import socket
+from flask_cors import CORS
+
 
 
 
@@ -91,7 +93,31 @@ def retardo(distancia_km):
 
 def parse_timestamp(ts):
     return datetime.strptime(ts, "%M:%S.%f")
+def construir_links_desde_nodos(nodos):
+    """
+    A partir de la lista de nodos (cada uno con 'neighbors'),
+    devuelve una lista de enlaces con source, target y distanciaKm.
+    """
+    links = []
+    for nodo in nodos:
+        source = nodo.get("id") or nodo.get("name")  # usa id si existe, si no name
+        for vecino in nodo.get("neighbors", []):
+            target = vecino.get("id") or vecino.get("name")
+            distancia = vecino.get("distanceKm", 0)
 
+            # Evitar duplicados (Alice->Bob y Bob->Alice)
+            existe = any(
+                (l["source"] == source and l["target"] == target) or
+                (l["source"] == target and l["target"] == source)
+                for l in links
+            )
+            if not existe:
+                links.append({
+                    "source": source,
+                    "target": target,
+                    "distanciaKm": distancia
+                })
+    return links
 
 # Reiniciar SimulaQron al iniciar el servidor
 print("[INIT] Reiniciando SimulaQron...")
@@ -110,7 +136,7 @@ def app_open(ROL, PUERTO):
             "name": "Alice",
             "x": 100,
             "y": 100,
-            "param": 0.8,
+            "pgen": 0.8,
             "roles": ["emisor", "receptor"],
             "neighbors": []   # Alice no tiene vecinos iniciales
         },
@@ -119,7 +145,7 @@ def app_open(ROL, PUERTO):
             "name": "Bob",
             "x": 300,
             "y": 100,
-            "param": 0.7,
+            "pgen": 0.7,
             "roles": ["receptor", "repeater"],
             "neighbors": [
                 {"name": "Alice", "distanceKm": 50}
@@ -130,7 +156,7 @@ def app_open(ROL, PUERTO):
             "name": "Charlie",
             "x": 200,
             "y": 250,
-            "param": 0.9,
+            "pgen": 0.9,
             "roles": ["emisor", "repeater"],
             "neighbors": [
                 {"name": "Alice", "distanceKm": 70},
@@ -141,9 +167,41 @@ def app_open(ROL, PUERTO):
 
     # Nodos predefinidos
     PREDEFINED_NODES = [
-        { "id": "node_alice", "name": "Alice",   "x": 100, "y": 100, "param": 0.8, "roles": ["emisor","receptor"] },
-        { "id": "node_bob",   "name": "Bob",     "x": 300, "y": 100, "param": 0.7, "roles": ["receptor","repeater"] },
-        { "id": "node_charlie","name": "Charlie","x": 200, "y": 250, "param": 0.9, "roles": ["emisor","repeater"] }
+        {
+            "id": "node_alice",
+            "name": "Alice_pre",
+            "x": 100,
+            "y": 100,
+            "pgen": 0.8,
+            "roles": ["emisor", "receptor"],
+            "neighbors": [],   # Alice no tiene vecinos iniciales
+            "parEPR": []
+        },
+        {
+            "id": "node_bob",
+            "name": "Bob_pre",
+            "x": 300,
+            "y": 100,
+            "pgen": 0.7,
+            "roles": ["receptor", "repeater"],
+            "neighbors": [
+                {"name": "Alice_pre", "distanceKm": 50}
+            ],
+            "parEPR": []
+        },
+        {
+            "id": "node_charlie",
+            "name": "Charlie_pre",
+            "x": 200,
+            "y": 250,
+            "pgen": 0.9,
+            "roles": ["emisor", "repeater"],
+            "neighbors": [
+                {"name": "Alice_pre", "distanceKm": 70},
+                {"name": "Bob_pre", "distanceKm": 40}
+            ],
+            "parEPR": []
+        }
     ]
     nodo_info = PORT_NODE_MAP.get(PUERTO, {"id": "node_unknown", "name": "Desconocido", "neighbors": []})
     app = Flask(__name__)
@@ -169,7 +227,6 @@ def app_open(ROL, PUERTO):
                 historial=historial,
                 rol=ROL,
                 nodo_info=nodo_info,
-                nodos = []
 
             )
         elif ROL == "bob":
@@ -180,7 +237,6 @@ def app_open(ROL, PUERTO):
                 historial=historial,
                 rol=ROL,
                 nodo_info=nodo_info,
-                nodos=[]
             )
         elif ROL == "master":
             nodos = []
@@ -189,19 +245,26 @@ def app_open(ROL, PUERTO):
                     continue
                 try:
                     res = requests.get(f"http://localhost:{port}/info", timeout=1)
-                    nodos.append(res.json())
+                    nodos.append(res.json())   # cada res.json() es un nodo completo
                 except Exception:
                     pass
+
             if not nodos:
                 nodos = PREDEFINED_NODES
 
-            return render_template("index.html",
-                                   resultado=ultimo_resultado,
-                                   contador=len(historial),
-                                   historial=historial,
-                                   rol=ROL,
-                                   nodo_info={},
-                                   nodos=nodos)
+            # Enviar solo los nodos, sin links
+            nodo_info_master = {
+                "nodes": nodos
+            }
+
+            return render_template(
+                "index.html",
+                resultado=ultimo_resultado,
+                contador=len(historial),
+                historial=historial,
+                rol=ROL,
+                nodo_info=nodo_info_master
+            )
 
     # Endpoint JSON del estado del nodo
     @app.route("/info")
@@ -212,34 +275,36 @@ def app_open(ROL, PUERTO):
     @app.route("/update", methods=["POST"])
     def update():
         data = request.get_json()
-        for key in ["id", "name", "pgen", "pswap", "roles", "neighbors"]:
+        for key in ["id", "name", "pgen", "pswap", "roles", "neighbors", "parEPR"]:
             if key in data:
                 nodo_info[key] = data[key]
         return jsonify({"status": "ok", "nodo_info": nodo_info})
 
-    # Endpoint para que master refresque el mapa
     @app.route("/actualizar_mapa")
     def actualizar_mapa():
         nodos = []
-        links = []
         for port in range(5000, 5011):
             if port == 5001:
                 continue
             try:
                 res = requests.get(f"http://localhost:{port}/info", timeout=1)
                 nodo = res.json()
-                print(f"[MASTER] Datos recibidos del puerto {port}:")
-                print(json.dumps(nodo, indent=4, ensure_ascii=False))
-
                 nodos.append(nodo)
-                for vecino in nodo.get("neighbors", []):
-                    if nodo["name"] < vecino["name"]:
-                        links.append({"source": nodo["name"], "target": vecino["name"], "distanceKm": vecino.get("distanceKm", 0)})
             except Exception:
                 pass
 
         if not nodos:
             nodos = PREDEFINED_NODES
+
+        # construir links en base a neighbors
+        links = []
+        for nodo in nodos:
+            for vecino in nodo.get("neighbors", []):
+                links.append({
+                    "source": nodo["name"],
+                    "target": vecino["name"],
+                    "distanciaKm": vecino.get("distanceKm", 0)
+                })
 
         return jsonify({"nodes": nodos, "links": links})
 
@@ -339,6 +404,34 @@ def app_open(ROL, PUERTO):
 
         return jsonify({"status": "ok", "conexiones": conexiones})
 
+    @app.route("/renombrar_nodo", methods=["POST"])
+    def renombrar_nodo():
+        data = request.get_json()
+        antiguo = data["old_name"]
+        nuevo = data["new_name"]
+
+        # Actualizar topología en SimulaQron
+        topologia = mostrar_topologia()
+        if antiguo not in topologia:
+            return jsonify({"error": "Nodo no encontrado en topología"}), 404
+
+        vecinos = topologia[antiguo]
+
+        # Eliminar nodo antiguo
+        subprocess.run(["simulaqron", "nodes", "remove", antiguo], capture_output=True)
+
+        # Crear nodo nuevo con mismos vecinos
+        subprocess.run(["simulaqron", "nodes", "add", nuevo, "--force", "--neighbors", ",".join(vecinos)], capture_output=True)
+
+        # Actualizar vecinos que tenían al antiguo como vecino
+        for nodo, lista in topologia.items():
+            if nodo == antiguo:
+                continue
+            if antiguo in lista:
+                nueva_lista = [nuevo if v == antiguo else v for v in lista]
+                subprocess.run(["simulaqron", "nodes", "add", nodo, "--force", "--neighbors", ",".join(nueva_lista)], capture_output=True)
+
+        return jsonify({"status": "ok", "renombrado": {"de": antiguo, "a": nuevo}})
 
 
     @app.route("/topologia", methods=["GET"])
@@ -699,7 +792,7 @@ def app_open(ROL, PUERTO):
             simulacion_en_curso = False
 
             # Enviar historial a Bob si el rol es Alice
-            if ROL == "alice":
+            if ROL == "alice" or ROL == "master":
                 try:
                     requests.post("http://localhost:5001/actualizar_historial", json={
                         "resultado": resultado,
