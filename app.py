@@ -279,7 +279,7 @@ def app_open(ROL, PUERTO):
             if key in data:
                 nodo_info[key] = data[key]
         return jsonify({"status": "ok", "nodo_info": nodo_info})
-
+    NODOS_PUERTOS = {}  # nodo_name -> puerto
     @app.route("/actualizar_mapa")
     def actualizar_mapa():
         nodos = []
@@ -289,6 +289,7 @@ def app_open(ROL, PUERTO):
             try:
                 res = requests.get(f"http://localhost:{port}/info", timeout=1)
                 nodo = res.json()
+                NODOS_PUERTOS[nodo["name"]] = port
                 nodos.append(nodo)
             except Exception:
                 pass
@@ -307,8 +308,26 @@ def app_open(ROL, PUERTO):
                 })
 
         return jsonify({"nodes": nodos, "links": links})
+    @app.route("/mandate", methods=["POST"])
+    def enviar_instrucciones(nodo_name, instrucciones):
+        if nodo_name not in NODOS_PUERTOS:
+            print(f"No se encontró puerto para nodo {nodo_name}")
+            return
 
-    
+        puerto = NODOS_PUERTOS[nodo_name]
+        url = f"http://localhost:{puerto}/update"
+
+        payload = {"instrucciones": instrucciones}
+
+        try:
+            res = requests.post(url, json=payload, timeout=2)
+            if res.status_code == 200:
+                print(f"Instrucciones enviadas a {nodo_name}: {instrucciones}")
+            else:
+                print(f"Error enviando instrucciones a {nodo_name}: {res.status_code}")
+        except Exception as e:
+            print(f"Excepción enviando a {nodo_name}: {e}")
+
     @app.route("/crear_nodos_simulaqron")
     def crear_nodos_simulaqron():
         limpiar_historial()

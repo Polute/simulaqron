@@ -313,12 +313,76 @@
         marcoPapelera.addEventListener("drop", e => {
             e.preventDefault();
             const dragging = workspace.querySelector(".dragging");
+
             if (dragging) {
+                const op = dragging.dataset.op;
+                if (op === "epr") {
+                    const src = dragging.dataset.src;
+                    const dst = dragging.dataset.dst;
+
+                    if (src && dst) {
+                        eliminarUnaEpr(src, dst);
+                        console.log("EPR eliminado:", { src, dst });
+                    }
+
+                }else if (op === "pur") {
+                    if (dragging.dataset.paresUsados) {
+                        const usados = JSON.parse(dragging.dataset.paresUsados);
+
+                        // Restaurar SOLO el primer EPR consumido (el que PUR realmente elimina)
+                        const e1 = usados[0];
+
+                        // Asegurar existencia de listas
+                        if (!eprHistoryGlobal[e1.src]) eprHistoryGlobal[e1.src] = [];
+                        if (!eprHistoryGlobal[e1.dst]) eprHistoryGlobal[e1.dst] = [];
+
+                        // Restaurar 1 copia en cada nodo
+                        eprHistoryGlobal[e1.src].push(e1);
+                        eprHistoryGlobal[e1.dst].push(e1);
+
+                        console.log("PUR eliminada → restaurado 1 EPR:", e1);
+                        console.log("Historial global tras restaurar PUR:", eprHistoryGlobal);
+                    }
+                } else if (op === "swap") {
+                    const id1 = dragging.dataset.src;
+                    const id2 = dragging.dataset.dst;
+                    const helper = dragging.dataset.helper;
+
+                    if (helper && id1) {
+                        eliminarUnaEpr(helper, id1);
+                        console.log("SWAP eliminó EPR helper-node1:", helper, id1);
+                    }
+                    if (helper && id2) {
+                        eliminarUnaEpr(helper, id2);
+                        console.log("SWAP eliminó EPR helper-node2:", helper, id2);
+                    }
+
+                }
+
                 dragging.remove();
                 actualizarBloques();
+
+                console.log("Historial global tras borrar bloque:", eprHistoryGlobal);
             }
+
             marcoPapelera.classList.remove("dragover");
         });
+        function eliminarUnaEpr(src, dst) {
+            if (eprHistoryGlobal[src]) {
+                const i = eprHistoryGlobal[src].findIndex(
+                    e => e.src === src && e.dst === dst
+                );
+                if (i !== -1) eprHistoryGlobal[src].splice(i, 1);
+            }
+
+            if (eprHistoryGlobal[dst]) {
+                const j = eprHistoryGlobal[dst].findIndex(
+                    e => e.src === src && e.dst === dst
+                );
+                if (j !== -1) eprHistoryGlobal[dst].splice(j, 1);
+            }
+        }
+
 
         // Quitar efecto visual al salir
         marcoPapelera.addEventListener("dragleave", e => {
@@ -350,10 +414,14 @@
                         b.dataset.finalizado = true;
 
                         // Guardar EPR en historial global
-                        eprHistoryGlobal[prevNode.dataset.src].push({ src: prevNode.dataset.src, dst: nextNode.dataset.src });
-                        eprHistoryGlobal[nextNode.dataset.src].push({ src: prevNode.dataset.src, dst: nextNode.dataset.src });
+                        const nuevoEpr = { src: prevNode.dataset.src, dst: nextNode.dataset.src };
 
-                        console.log("Historial global actualizado:", eprHistoryGlobal);
+                        eprHistoryGlobal[prevNode.dataset.src].push(nuevoEpr);
+                        eprHistoryGlobal[nextNode.dataset.src].push(nuevoEpr);
+
+                        console.log("EPR agregado:", nuevoEpr);
+                        console.log("Historial global:", eprHistoryGlobal);
+
 
                         // Ocultar nodos visualmente, pero mantener historial
                         prevNode.style.display = "none";
@@ -362,47 +430,83 @@
                         b.textContent = "⚛️ EPR 🚫";
                     }
 
-                } else if (b.dataset.op === "pur") {
-                    let candidato = null;
-                    let paresUsar = [];
+                }else if (b.dataset.op === "pur") {
+                    let posiblesCandidatos = [];
 
                     for (let nodo in eprHistoryGlobal) {
                         const eprs = eprHistoryGlobal[nodo] || [];
+                        
+                        // Solo EPR donde este nodo es el que los creó (src)
+                        const creados = eprs.filter(e => e.src === nodo);
 
-                        // Contar ocurrencias de cada par src-dst
                         const paresContados = {};
-                        eprs.forEach(e => {
+                        creados.forEach(e => {
                             const key = [e.src, e.dst].sort().join("-");
                             paresContados[key] = (paresContados[key] || 0) + 1;
                         });
 
-                        // Buscar un par que aparezca al menos 2 veces
-                        let parParaPur = null;
                         for (let k in paresContados) {
                             if (paresContados[k] >= 2) {
-                                parParaPur = k;
+                                const paresUsar = creados.filter(e => [e.src, e.dst].sort().join("-") === k).slice(0, 2);
+                                posiblesCandidatos.push({ nodo, paresUsar });
                                 break;
                             }
                         }
-
-                        if (parParaPur) {
-                            candidato = nodo;
-                            paresUsar = eprs.filter(e => [e.src, e.dst].sort().join("-") === parParaPur).slice(0, 2);
-                            break;
-                        }
                     }
 
-                    if (candidato) {
-                        b.dataset.src = candidato;
-                        b.textContent = `🧪 ${candidato}`;
-                        b.dataset.finalizado = true;
-
-                        // Eliminar los EPR usados del historial
-                        eprHistoryGlobal[candidato] = eprHistoryGlobal[candidato].filter(e => !paresUsar.includes(e));
-                    } else {
+                    if (posiblesCandidatos.length === 0) {
                         b.textContent = "🧪 Purificación 🚫";
+                    } else {
+                        // Crear selector desplegable con estilo similar a bloques
+                        const select = document.createElement("select");
+                        select.style.fontSize = "0.85em";
+                        select.style.padding = "3px 6px";
+                        select.style.borderRadius = "4px";
+                        select.style.border = "1px solid #aaa";
+                        select.style.background = "#fff";
+                        select.style.cursor = "pointer";
+                        select.style.marginLeft = "5px";
+
+                        const defaultOption = document.createElement("option");
+                        defaultOption.textContent = "Select a node";
+                        defaultOption.disabled = true;
+                        defaultOption.selected = true;
+                        select.appendChild(defaultOption);
+
+                        posiblesCandidatos.forEach(candidato => {
+                            const option = document.createElement("option");
+                            option.value = candidato.nodo;
+                            option.textContent = candidato.nodo;
+                            select.appendChild(option);
+                        });
+
+                        b.textContent = "🧪 Purificar: ";
+                        b.appendChild(select);
+
+                        select.addEventListener("change", () => {
+                            const nodoSeleccionado = select.value;
+                            const elegido = posiblesCandidatos.find(c => c.nodo === nodoSeleccionado);
+                            const { nodo, paresUsar } = elegido;
+
+                            // Asignar datos al bloque
+                            b.dataset.src = nodo;
+                            b.dataset.finalizado = true;
+                            b.dataset.paresUsados = JSON.stringify(paresUsar);
+                            b.textContent = `🧪 ${nodo}`;
+
+                            // Eliminar 1 EPR consumido en ambos nodos
+                            const e1 = paresUsar[0];
+                            eliminarUnaEpr(e1.src, e1.dst);
+
+                            console.log("🧪 PUR aplicada:", elegido);
+                            console.log("Historial global tras PUR:", eprHistoryGlobal);
+
+                            // Quitar selector tras seleccionar
+                            select.remove();
+                        });
                     }
-                } else if (b.dataset.op === "swap") {
+                }
+                else if (b.dataset.op === "swap") {
                     // SWAP: usar nodos aunque estén ocultos, validar con historial
                     const helperNode = blocks.slice(0, idx).reverse().find(bb => bb.dataset.op === "node");
                     const nextTwoNodes = blocks.slice(idx + 1).filter(bb => bb.dataset.op === "node").slice(0, 2);
@@ -454,6 +558,7 @@
             const blocks = workspace.querySelectorAll(".block");
             const orders = [];
             const eprHistory = [];
+            const ordersPorNodo = {}; // <-- objeto donde agrupamos órdenes por nodo
 
             blocks.forEach((b, i) => {
                 if (b.style.display === "none") return; // ignorar nodos ocultos
@@ -463,12 +568,21 @@
                 if (op === "epr") {
                     const src = b.dataset.src || "???";
                     const dst = b.dataset.dst || "???";
+
                     if (!src || !dst) {
                         orders.push(`ERROR: Bloque EPR en posición ${i} sin src o dst`);
                         return;
                     }
+
                     orders.push(`ENTANGLEMENT: ${src} crea EPR con ${dst} [pos ${i}]`);
                     eprHistory.push({ src, dst });
+
+                    // Agregar instrucciones por nodo
+                    if (!ordersPorNodo[src]) ordersPorNodo[src] = [];
+                    ordersPorNodo[src].push({ accion: "genera EPR", destino: dst });
+
+                    if (!ordersPorNodo[dst]) ordersPorNodo[dst] = [];
+                    ordersPorNodo[dst].push({ accion: "recibe EPR", origen: src });
 
                 } else if (op === "pur") {
                     const src = b.dataset.src;
@@ -481,24 +595,28 @@
                         orders.push(`ERROR: ${src} no tiene suficientes EPR previos para purificar [pos ${i}]`);
                     } else {
                         orders.push(`PURIFICACIÓN: ${src} purifica dos EPR previos [pos ${i}]`);
+                        if (!ordersPorNodo[src]) ordersPorNodo[src] = [];
+                        ordersPorNodo[src].push({ accion: "purifica", detalle: "dos EPR previos" });
                     }
 
                 } else if (op === "swap") {
                     const id1 = b.dataset.src;
                     const id2 = b.dataset.dst;
-                    const id3 = b.dataset.helper;
-                    if (!id1 || !id2 || !id3) {
+                    const helper = b.dataset.helper;
+                    if (!id1 || !id2 || !helper) {
                         orders.push(`ERROR: Bloque SWAP en posición ${i} incompleto (falta src, dst o helper)`);
                         return;
                     }
 
-                    const valid1 = eprHistory.some(e => (e.src === id1 && e.dst === id3) || (e.src === id3 && e.dst === id1));
-                    const valid2 = eprHistory.some(e => (e.src === id2 && e.dst === id3) || (e.src === id3 && e.dst === id2));
+                    const valid1 = eprHistory.some(e => (e.src === id1 && e.dst === helper) || (e.src === helper && e.dst === id1));
+                    const valid2 = eprHistory.some(e => (e.src === id2 && e.dst === helper) || (e.src === helper && e.dst === id2));
 
                     if (!valid1 || !valid2) {
-                        orders.push(`ERROR: ${id3} no tiene EPR previos con ${id1} y ${id2} para SWAP [pos ${i}]`);
+                        orders.push(`ERROR: ${helper} no tiene EPR previos con ${id1} y ${id2} para SWAP [pos ${i}]`);
                     } else {
-                        orders.push(`SWAP: ${id3} hace entanglement swapping entre ${id1} y ${id2} [pos ${i}]`);
+                        orders.push(`SWAP: ${helper} hace entanglement swapping entre ${id1} y ${id2} [pos ${i}]`);
+                        if (!ordersPorNodo[helper]) ordersPorNodo[helper] = [];
+                        ordersPorNodo[helper].push({ accion: "swap", con: [id1, id2] });
                     }
 
                 } else if (op === "node") {
@@ -508,8 +626,20 @@
                 }
             });
 
+            // Mostrar en pantalla
             document.getElementById("ordenesTexto").textContent = orders.join("\n");
+
+            // Enviar automáticamente al endpoint /mandate
+            fetch("/mandate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(ordersPorNodo)
+            })
+            .then(response => response.json())
+            .then(data => console.log("Instrucciones enviadas al servidor:", data))
+            .catch(error => console.error("Error enviando instrucciones:", error));
         }
+
 
 
         function crearBloquesDinamicos(nodos) {

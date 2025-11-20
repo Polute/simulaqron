@@ -178,6 +178,15 @@ th { background-color: #eeeeee; }
     cursor: grab;
     user-select: none;
 }
+.pur-select {
+    font-size: 0.85em;
+    padding: 3px 6px;
+    border-radius: 4px;
+    border: 1px solid #aaa;
+    background: #fff;
+    cursor: pointer;
+    margin-left: 5px;
+}
 
 
 .op-doble { background: #6fa8dc; color: white; }
