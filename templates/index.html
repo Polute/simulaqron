@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Simulación Cuántica</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_index.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_index.css') }}?v=8">
 </head>
 <body>
     <div class="container-flex">
@@ -175,15 +175,21 @@
                 <div class="columna-operaciones">
                     <h3>Órdenes Cuánticas</h3>
                         <!-- Paleta de bloques disponibles -->
-                        <div class="paleta">
-                            <div class="block op-doble" draggable="true" data-op="epr" data-src="Alice" data-dst="Bob">Alice → Bob</div>
-                            <div class="block op-simple" draggable="true" data-op="pur" data-src="Charlie">Charlie pur</div>
-                            <div class="block op-doble" draggable="true" data-op="epr" data-src="Bob" data-dst="Charlie">Bob → Charlie</div>
-                            <div class="block op-doble" draggable="true" data-op="swap" data-src="Alice" data-dst="Charlie" data-helper="Bob">Alice ↔ Charlie (Bob)</div>
+                        <div id="paleta" class="paleta">
+                            <!-- Bloques fijos -->
+                            <div class="block op-doble" draggable="true" data-op="epr">⚛️ Entanglement</div>
+                            <div class="block op-doble" draggable="true" data-op="swap">⚛️ Swapping</div>
+                            <div class="block op-simple" draggable="true" data-op="pur">🧪 Purificación</div>
                         </div>
 
                     <!-- Workspace horizontal -->
-                    <h4>Secuencia de órdenes</h4>
+                    <h4>Secuencia de órdenes
+                        <button id="limpiar-workspace" class="boton">Limpiar Workspace</button>
+                        <!-- Zona de eliminación de bloques -->
+                        <div id="marco-papelera" class="marco-papelera">
+                            🗑️
+                        </div>
+                    </h4>
                     <div id="workspace" class="workspace">
                         <!-- Aquí se soltarán los bloques -->
                     </div>
@@ -209,7 +215,8 @@
             </div>
            </div> 
     </div>
-    <script>// --- DRAG DESDE LA PALETA ---
+    <script>
+        // --- DRAG DESDE LA PALETA ---
         document.querySelectorAll(".paleta .block").forEach(block => {
             block.addEventListener("dragstart", e => {
                 e.dataTransfer.setData("text", block.textContent);
@@ -224,45 +231,327 @@
 
         // --- WORKSPACE ---
         const workspace = document.getElementById("workspace");
+        const limpiarBtn = document.getElementById("limpiar-workspace");
 
-        workspace.addEventListener("dragover", e => e.preventDefault());
+        // Historial global de EPR: mantiene todos los pares aunque los nodos se oculten
+        let eprHistoryGlobal = [];
 
+        limpiarBtn.addEventListener("click", () => {
+            eprHistoryGlobal = [];
+            workspace.innerHTML = ""; // Borra todo
+        });
+
+        // --- Drag interno del workspace ---
+        workspace.addEventListener("dragstart", e => {
+            if (e.target.classList.contains("block")) {
+                e.target.classList.add("dragging");
+                e.dataTransfer.setData("text/plain", null); // para Firefox
+            }
+        });
+
+        workspace.addEventListener("dragend", e => {
+            e.target.classList.remove("dragging");
+        });
+
+        workspace.addEventListener("dragover", e => {
+            e.preventDefault();
+            const dragging = workspace.querySelector(".dragging");
+            if (!dragging) return;
+
+            const afterElement = getDragAfterElement(workspace, e.clientX);
+            if (afterElement == null) {
+                workspace.appendChild(dragging);
+            } else {
+                workspace.insertBefore(dragging, afterElement);
+            }
+        });
+
+        function getDragAfterElement(container, x) {
+            const draggableElements = [...container.querySelectorAll(".block:not(.dragging)")];
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = x - box.left - box.width / 2;
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        // --- Drop desde paleta ---
         workspace.addEventListener("drop", e => {
             e.preventDefault();
 
             const newBlock = document.createElement("div");
             newBlock.className = e.dataTransfer.getData("class");
-            newBlock.textContent = e.dataTransfer.getData("text");
             newBlock.dataset.op = e.dataTransfer.getData("op");
-            newBlock.dataset.src = e.dataTransfer.getData("src");
-            newBlock.dataset.dst = e.dataTransfer.getData("dst");
-            newBlock.dataset.helper = e.dataTransfer.getData("helper");
+            newBlock.draggable = true;
             const width = parseInt(e.dataTransfer.getData("width"), 10);
             newBlock.style.width = width + "px";
 
+            if (newBlock.dataset.op === "node") {
+                newBlock.dataset.src = e.dataTransfer.getData("src");
+                newBlock.textContent = newBlock.dataset.src;
+            } else {
+                newBlock.textContent = newBlock.dataset.op.toUpperCase();
+            }
+
             workspace.appendChild(newBlock);
+
+            actualizarBloques();
+        });
+        const marcoPapelera = document.getElementById("marco-papelera");
+
+        // Permitir drop
+        marcoPapelera.addEventListener("dragover", e => {
+            e.preventDefault();
+            marcoPapelera.classList.add("dragover");
         });
 
+        // Borrar bloque al soltar sobre la papelera
+        marcoPapelera.addEventListener("drop", e => {
+            e.preventDefault();
+            const dragging = workspace.querySelector(".dragging");
+            if (dragging) {
+                dragging.remove();
+                actualizarBloques();
+            }
+            marcoPapelera.classList.remove("dragover");
+        });
+
+        // Quitar efecto visual al salir
+        marcoPapelera.addEventListener("dragleave", e => {
+            marcoPapelera.classList.remove("dragover");
+        });
+
+        function actualizarBloques() {
+            const blocks = Array.from(workspace.querySelectorAll(".block"));
+
+            // Inicializar historial para cada nodo
+            blocks.forEach(b => {
+                if (b.dataset.op === "node") {
+                    if (!eprHistoryGlobal[b.dataset.src]) eprHistoryGlobal[b.dataset.src] = [];
+                }
+            });
+
+            blocks.forEach((b, idx) => {
+                if (b.dataset.finalizado) return;
+
+                if (b.dataset.op === "epr") {
+                    // Buscar nodos alrededor, sin importar si están visibles
+                    const prevNode = blocks.slice(0, idx).reverse().find(bb => bb.dataset.op === "node");
+                    const nextNode = blocks.slice(idx + 1).find(bb => bb.dataset.op === "node");
+
+                    if (prevNode && nextNode) {
+                        b.dataset.src = prevNode.dataset.src;
+                        b.dataset.dst = nextNode.dataset.src;
+                        b.textContent = `${prevNode.dataset.src} → ${nextNode.dataset.src}`;
+                        b.dataset.finalizado = true;
+
+                        // Guardar EPR en historial global
+                        eprHistoryGlobal[prevNode.dataset.src].push({ src: prevNode.dataset.src, dst: nextNode.dataset.src });
+                        eprHistoryGlobal[nextNode.dataset.src].push({ src: prevNode.dataset.src, dst: nextNode.dataset.src });
+
+                        console.log("Historial global actualizado:", eprHistoryGlobal);
+
+                        // Ocultar nodos visualmente, pero mantener historial
+                        prevNode.style.display = "none";
+                        nextNode.style.display = "none";
+                    } else {
+                        b.textContent = "⚛️ EPR 🚫";
+                    }
+
+                } else if (b.dataset.op === "pur") {
+                    let candidato = null;
+                    let paresUsar = [];
+
+                    for (let nodo in eprHistoryGlobal) {
+                        const eprs = eprHistoryGlobal[nodo] || [];
+
+                        // Contar ocurrencias de cada par src-dst
+                        const paresContados = {};
+                        eprs.forEach(e => {
+                            const key = [e.src, e.dst].sort().join("-");
+                            paresContados[key] = (paresContados[key] || 0) + 1;
+                        });
+
+                        // Buscar un par que aparezca al menos 2 veces
+                        let parParaPur = null;
+                        for (let k in paresContados) {
+                            if (paresContados[k] >= 2) {
+                                parParaPur = k;
+                                break;
+                            }
+                        }
+
+                        if (parParaPur) {
+                            candidato = nodo;
+                            paresUsar = eprs.filter(e => [e.src, e.dst].sort().join("-") === parParaPur).slice(0, 2);
+                            break;
+                        }
+                    }
+
+                    if (candidato) {
+                        b.dataset.src = candidato;
+                        b.textContent = `🧪 ${candidato}`;
+                        b.dataset.finalizado = true;
+
+                        // Eliminar los EPR usados del historial
+                        eprHistoryGlobal[candidato] = eprHistoryGlobal[candidato].filter(e => !paresUsar.includes(e));
+                    } else {
+                        b.textContent = "🧪 Purificación 🚫";
+                    }
+                } else if (b.dataset.op === "swap") {
+                    // SWAP: usar nodos aunque estén ocultos, validar con historial
+                    const helperNode = blocks.slice(0, idx).reverse().find(bb => bb.dataset.op === "node");
+                    const nextTwoNodes = blocks.slice(idx + 1).filter(bb => bb.dataset.op === "node").slice(0, 2);
+
+                    if (helperNode && nextTwoNodes.length === 2) {
+                        const [n1, n2] = nextTwoNodes;
+                        b.dataset.src = n1.dataset.src;
+                        b.dataset.dst = n2.dataset.src;
+                        b.dataset.helper = helperNode.dataset.src;
+
+                        console.log("=== SWAP DEBUG ===");
+                        console.log("Helper node:", helperNode.dataset.src);
+                        console.log("Target nodes:", n1.dataset.src, n2.dataset.src);
+                        console.log("Historial global del helper:", eprHistoryGlobal[helperNode.dataset.src]);
+
+                        // Validar que el helper tiene EPR previos con ambos nodos
+                        const valid1 = eprHistoryGlobal[helperNode.dataset.src].some(e =>
+                            [e.src, e.dst].sort().join("-") === [helperNode.dataset.src, n1.dataset.src].sort().join("-")
+                        );
+
+                        const valid2 = eprHistoryGlobal[helperNode.dataset.src].some(e =>
+                            [e.src, e.dst].sort().join("-") === [helperNode.dataset.src, n2.dataset.src].sort().join("-")
+                        );
+
+                        console.log("Resultados validación swap:", valid1, valid2);
+                        console.log("==================");
+
+                        if (valid1 && valid2) {
+                            b.textContent = `${n1.dataset.src}<=>${n2.dataset.src}(${helperNode.dataset.src})`;
+                            b.dataset.finalizado = true;
+
+                            // Ocultar nodos visualmente
+                            helperNode.style.display = "none";
+                            n1.style.display = "none";
+                            n2.style.display = "none";
+                        } else {
+                            b.textContent = "⚛️ Swap 🚫";
+                        }
+                    } else {
+                        b.textContent = "⚛️ Swap 🚫";
+                    }
+                }
+            });
+        }
 
 
-        // Exportar órdenes a texto
+        // Exportar órdenes usando el mismo historial
         function mostrarOrdenes() {
             const blocks = workspace.querySelectorAll(".block");
             const orders = [];
-            blocks.forEach(b => {
+            const eprHistory = [];
+
+            blocks.forEach((b, i) => {
+                if (b.style.display === "none") return; // ignorar nodos ocultos
+
                 const op = b.dataset.op;
+
                 if (op === "epr") {
-                    orders.push(`${b.dataset.src}->${b.dataset.dst}`);
+                    const src = b.dataset.src || "???";
+                    const dst = b.dataset.dst || "???";
+                    if (!src || !dst) {
+                        orders.push(`ERROR: Bloque EPR en posición ${i} sin src o dst`);
+                        return;
+                    }
+                    orders.push(`ENTANGLEMENT: ${src} crea EPR con ${dst} [pos ${i}]`);
+                    eprHistory.push({ src, dst });
+
                 } else if (op === "pur") {
-                    orders.push(`${b.dataset.src} pur`);
+                    const src = b.dataset.src;
+                    if (!src) {
+                        orders.push(`ERROR: Bloque PUR en posición ${i} sin nodo asignado`);
+                        return;
+                    }
+                    const eprCount = eprHistory.filter(e => e.src === src || e.dst === src).length;
+                    if (eprCount < 2) {
+                        orders.push(`ERROR: ${src} no tiene suficientes EPR previos para purificar [pos ${i}]`);
+                    } else {
+                        orders.push(`PURIFICACIÓN: ${src} purifica dos EPR previos [pos ${i}]`);
+                    }
+
                 } else if (op === "swap") {
-                    orders.push(`${b.dataset.src}<->${b.dataset.dst}(${b.dataset.helper})`);
+                    const id1 = b.dataset.src;
+                    const id2 = b.dataset.dst;
+                    const id3 = b.dataset.helper;
+                    if (!id1 || !id2 || !id3) {
+                        orders.push(`ERROR: Bloque SWAP en posición ${i} incompleto (falta src, dst o helper)`);
+                        return;
+                    }
+
+                    const valid1 = eprHistory.some(e => (e.src === id1 && e.dst === id3) || (e.src === id3 && e.dst === id1));
+                    const valid2 = eprHistory.some(e => (e.src === id2 && e.dst === id3) || (e.src === id3 && e.dst === id2));
+
+                    if (!valid1 || !valid2) {
+                        orders.push(`ERROR: ${id3} no tiene EPR previos con ${id1} y ${id2} para SWAP [pos ${i}]`);
+                    } else {
+                        orders.push(`SWAP: ${id3} hace entanglement swapping entre ${id1} y ${id2} [pos ${i}]`);
+                    }
+
+                } else if (op === "node") {
+                    orders.push(`NODE: ${b.dataset.src} [pos ${i}]`);
+                } else {
+                    orders.push(`ERROR: Operación desconocida "${op}" [pos ${i}]`);
                 }
             });
+
             document.getElementById("ordenesTexto").textContent = orders.join("\n");
         }
-    </script>
-    <script>
+
+
+        function crearBloquesDinamicos(nodos) {
+            const paleta = document.getElementById("paleta");
+
+            nodos.forEach(nodo => {
+                // Evitar bloques duplicados fijos (EPR y Pur)
+                if (nodo.name.includes("Entrel") || nodo.name.includes("Pur")) return;
+
+                const block = document.createElement("div");
+                block.className = "block op-simple";
+                block.draggable = true;
+
+                // Guardamos info del nodo en dataset para análisis posterior
+                block.dataset.op = "node";
+                block.dataset.src = nodo.name;    // nombre del nodo
+                block.dataset.id = nodo.id;       // id del nodo
+                block.dataset.pgen = nodo.pgen;   // probabilidad de generación
+                block.dataset.neighbors = JSON.stringify(nodo.neighbors); // vecinos en JSON
+                block.dataset.parEPR = JSON.stringify(nodo.parEPR);
+
+                // Texto del bloque = nombre del nodo
+                block.textContent = nodo.name;
+
+                // Drag & Drop
+                block.addEventListener("dragstart", e => {
+                    e.dataTransfer.setData("text", block.textContent);
+                    e.dataTransfer.setData("op", block.dataset.op);
+                    e.dataTransfer.setData("src", block.dataset.src);
+                    e.dataTransfer.setData("id", block.dataset.id);
+                    e.dataTransfer.setData("pgen", block.dataset.pgen);
+                    e.dataTransfer.setData("neighbors", block.dataset.neighbors);
+                    e.dataTransfer.setData("parEPR", block.dataset.parEPR);
+                    e.dataTransfer.setData("class", block.className);
+                    e.dataTransfer.setData("width", block.offsetWidth);
+                });
+
+                paleta.appendChild(block);
+            });
+        }
+
+
         // Rol recibido desde Flask
         const rol = "{{ rol }}";
 
@@ -322,6 +611,12 @@
         console.log("Rol actual:", rol);
         console.log("Lista final de Nodes:", nodes);
         console.log("Lista final de Links:", links);
+
+        // Crear bloques para los nodos detectados
+        document.addEventListener("DOMContentLoaded", () => {
+            crearBloquesDinamicos(nodes);
+        });
+
 
         document.getElementById("mostrarTopologia").addEventListener("click", () => {
             fetch("/topologia")

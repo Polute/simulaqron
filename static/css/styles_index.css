@@ -157,9 +157,14 @@ th { background-color: #eeeeee; }
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-
     align-items: flex-start;
     justify-content: flex-start;
+
+    /* Necesario para que se vea */
+    min-height: 150px;
+    padding: 10px;
+    border: 2px dashed #ccc;
+    background: #fafafa;
 }
 
 .block {
@@ -177,3 +182,28 @@ th { background-color: #eeeeee; }
 
 .op-doble { background: #6fa8dc; color: white; }
 .op-simple { background: #93c47d; color: white; }
+
+
+h4 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.marco-papelera {
+    border: 2px dashed red;
+    padding: 5px;
+    text-align: center;
+    color: red;
+    font-size: 1.2em;
+    cursor: pointer;
+    width: 100px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.marco-papelera.dragover {
+    background-color: rgba(255,0,0,0.1);
+}
