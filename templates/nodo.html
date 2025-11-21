@@ -18,7 +18,7 @@
             max-width: 100%;
         }
 
-        h1, h2 {
+        h1, h2, h3 {
             color: #333;
         }
 
@@ -99,6 +99,15 @@
             padding: 2px;
             margin: 1px;
         }
+
+        #ordenesNodo {
+            background-color: #f9f9f9;
+            border: 1px solid #ccc;
+            padding: 1em;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -153,15 +162,20 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        <h3>Órdenes del Nodo</h3>
+        <pre id="ordenesNodo">Cargando...</pre>
     </div>
 </div>
+
 <script>
 window.onload = function () {
     const nodo = JSON.parse('{{ nodo_info|tojson|safe }}');
+    const nodo_id = nodo.id;
     const svg = document.getElementById("canvas");
     const ns = "http://www.w3.org/2000/svg";
 
-   // Actualizar el nombre del nodo cuando cambia el input
+    // Actualizar nombre del nodo
     document.getElementById("nameInput").addEventListener("change", e => {
         fetch("/update", {
             method: "POST",
@@ -170,7 +184,7 @@ window.onload = function () {
         });
     });
 
-    // Actualizar el parámetro de generación (pgen) cuando cambia el input
+    // Actualizar pgen
     document.getElementById("pgenInput").addEventListener("change", e => {
         fetch("/update", {
             method: "POST",
@@ -179,7 +193,7 @@ window.onload = function () {
         });
     });
 
-    // Actualizar el parámetro de intercambio (pswap) cuando cambia el input
+    // Actualizar pswap
     document.getElementById("pswapInput").addEventListener("change", e => {
         fetch("/update", {
             method: "POST",
@@ -188,7 +202,7 @@ window.onload = function () {
         });
     });
 
-    // Actualizar los roles seleccionados cuando se marca o desmarca un checkbox
+    // Actualizar roles
     document.querySelectorAll(".roleChk").forEach(chk => {
         chk.addEventListener("change", () => {
             const roles = Array.from(document.querySelectorAll(".roleChk"))
@@ -202,7 +216,7 @@ window.onload = function () {
         });
     });
 
-    // Actualizar las distancias con vecinos cuando cambia un input de distancia
+    // Actualizar distancias vecinos
     document.querySelectorAll(".distInput").forEach((input, idx) => {
         input.addEventListener("change", e => {
             nodo.neighbors[idx].distanceKm = parseFloat(e.target.value);
@@ -327,7 +341,35 @@ window.onload = function () {
     }
 
     drawMapa();
-};
+
+    const preOrdenes = document.getElementById("ordenesNodo");
+
+    // Función para actualizar la lista de órdenes desde el servidor
+    function actualizarOrdenes() {
+        fetch("/orders")
+            .then(res => res.json())
+            .then(data => {
+                if (!data || data.length === 0) {
+                    preOrdenes.textContent = "No hay órdenes aún.";
+                } else {
+                    preOrdenes.textContent = data
+                        .map((o, i) => `${i + 1}. ${JSON.stringify(o)}`)
+                        .join("\n");
+                }
+            })
+            .catch(err => {
+                console.error("Error al obtener órdenes:", err);
+                preOrdenes.textContent = "Error al obtener órdenes.";
+            });
+    }
+
+    // Llamada inicial
+    actualizarOrdenes();
+
+    // Refrescar automáticamente cada 1 segundo
+    setInterval(actualizarOrdenes, 10000);
+
+    };
 </script>
 </body>
 </html>

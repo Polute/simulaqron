@@ -26,6 +26,8 @@ def seleccionar_puerto(inicio=5000, fin=5010, excluir=None):
             return puerto
     return None
 
+ORDERS = []
+
 def app_open(PUERTO):
     # Diccionario que mapea puertos a nodos completos
     PORT_NODE_MAP = {
@@ -117,6 +119,38 @@ def app_open(PUERTO):
             # Guardar timestamp de última actualización
         nodo_info["lastUpdated"] = data.get("lastUpdated", time())
         return jsonify({"status": "ok", "nodo_info": nodo_info})
+    
+
+    @app.route("/mandate", methods=["POST"])
+    def receive_mandate():
+        global ORDERS
+        data = request.get_json()
+
+        if isinstance(data, dict):
+            for nodo_id, instrucciones in data.items():
+                # asegurarse de que instrucciones sea iterable de dicts
+                if isinstance(instrucciones, list):
+                    for instr in instrucciones:
+                        ORDERS.append(instr)
+                else:
+                    ORDERS.append(instrucciones)
+        elif isinstance(data, list):
+            for item in data:
+                ORDERS.append(item)
+        else:
+            ORDERS.append(data)
+
+        return jsonify({"status": "ok", "ORDERS": ORDERS})
+
+
+
+    # Consultar órdenes pendientes (GET)
+    @app.route("/orders", methods=["GET"])
+    def get_orders():
+        global ORDERS
+        return jsonify(ORDERS)
+
+
     
     print(f"[SERVIDOR] Inicializando nodo en el puerto {PUERTO}...")
     app.run(host="127.0.0.1", port=PUERTO, debug=True, use_reloader=False) #Quitar debug=True si no estoy en produccion

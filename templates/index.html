@@ -391,6 +391,7 @@
 
         function actualizarBloques() {
             const blocks = Array.from(workspace.querySelectorAll(".block"));
+            const actualizarInfoBtn = 
 
             // Inicializar historial para cada nodo
             blocks.forEach(b => {
@@ -553,12 +554,18 @@
         }
 
 
-        // Exportar órdenes usando el mismo historial
+       // Exportar órdenes usando el mismo historial
         function mostrarOrdenes() {
             const blocks = workspace.querySelectorAll(".block");
             const orders = [];
             const eprHistory = [];
-            const ordersPorNodo = {}; // <-- objeto donde agrupamos órdenes por nodo
+            const ordersPorNodo = {}; // objeto donde agrupamos órdenes por nodo
+
+            // Construir un mapeo name -> id
+            const nameToId = {};
+            nodes.forEach(n => { 
+                nameToId[n.name] = n.id;
+            });
 
             blocks.forEach((b, i) => {
                 if (b.style.display === "none") return; // ignorar nodos ocultos
@@ -566,57 +573,64 @@
                 const op = b.dataset.op;
 
                 if (op === "epr") {
-                    const src = b.dataset.src || "???";
-                    const dst = b.dataset.dst || "???";
+                    const srcName = b.dataset.src || "???";
+                    const dstName = b.dataset.dst || "???";
 
-                    if (!src || !dst) {
+                    if (!srcName || !dstName) {
                         orders.push(`ERROR: Bloque EPR en posición ${i} sin src o dst`);
                         return;
                     }
 
-                    orders.push(`ENTANGLEMENT: ${src} crea EPR con ${dst} [pos ${i}]`);
-                    eprHistory.push({ src, dst });
+                    orders.push(`ENTANGLEMENT: ${srcName} crea EPR con ${dstName} [pos ${i}]`);
+                    eprHistory.push({ src: srcName, dst: dstName });
 
-                    // Agregar instrucciones por nodo
-                    if (!ordersPorNodo[src]) ordersPorNodo[src] = [];
-                    ordersPorNodo[src].push({ accion: "genera EPR", destino: dst });
+                    // IDs para enviar al backend
+                    const srcId = nameToId[srcName];
+                    const dstId = nameToId[dstName];
 
-                    if (!ordersPorNodo[dst]) ordersPorNodo[dst] = [];
-                    ordersPorNodo[dst].push({ accion: "recibe EPR", origen: src });
+                    if (!ordersPorNodo[srcId]) ordersPorNodo[srcId] = [];
+                    ordersPorNodo[srcId].push({ accion: "genera EPR", destino: dstId });
+
+                    if (!ordersPorNodo[dstId]) ordersPorNodo[dstId] = [];
+                    ordersPorNodo[dstId].push({ accion: "recibe EPR", origen: srcId });
 
                 } else if (op === "pur") {
-                    const src = b.dataset.src;
-                    if (!src) {
+                    const srcName = b.dataset.src;
+                    if (!srcName) {
                         orders.push(`ERROR: Bloque PUR en posición ${i} sin nodo asignado`);
                         return;
                     }
-                    const eprCount = eprHistory.filter(e => e.src === src || e.dst === src).length;
+
+                    const eprCount = eprHistory.filter(e => e.src === srcName || e.dst === srcName).length;
                     if (eprCount < 2) {
-                        orders.push(`ERROR: ${src} no tiene suficientes EPR previos para purificar [pos ${i}]`);
+                        orders.push(`ERROR: ${srcName} no tiene suficientes EPR previos para purificar [pos ${i}]`);
                     } else {
-                        orders.push(`PURIFICACIÓN: ${src} purifica dos EPR previos [pos ${i}]`);
-                        if (!ordersPorNodo[src]) ordersPorNodo[src] = [];
-                        ordersPorNodo[src].push({ accion: "purifica", detalle: "dos EPR previos" });
+                        orders.push(`PURIFICACIÓN: ${srcName} purifica dos EPR previos [pos ${i}]`);
+                        const srcId = nameToId[srcName];
+                        if (!ordersPorNodo[srcId]) ordersPorNodo[srcId] = [];
+                        ordersPorNodo[srcId].push({ accion: "purifica", detalle: "dos EPR previos" });
                     }
 
                 } else if (op === "swap") {
-                    const id1 = b.dataset.src;
-                    const id2 = b.dataset.dst;
-                    const helper = b.dataset.helper;
-                    if (!id1 || !id2 || !helper) {
+                    const id1Name = b.dataset.src;
+                    const id2Name = b.dataset.dst;
+                    const helperName = b.dataset.helper;
+
+                    if (!id1Name || !id2Name || !helperName) {
                         orders.push(`ERROR: Bloque SWAP en posición ${i} incompleto (falta src, dst o helper)`);
                         return;
                     }
 
-                    const valid1 = eprHistory.some(e => (e.src === id1 && e.dst === helper) || (e.src === helper && e.dst === id1));
-                    const valid2 = eprHistory.some(e => (e.src === id2 && e.dst === helper) || (e.src === helper && e.dst === id2));
+                    const valid1 = eprHistory.some(e => (e.src === id1Name && e.dst === helperName) || (e.src === helperName && e.dst === id1Name));
+                    const valid2 = eprHistory.some(e => (e.src === id2Name && e.dst === helperName) || (e.src === helperName && e.dst === id2Name));
 
                     if (!valid1 || !valid2) {
-                        orders.push(`ERROR: ${helper} no tiene EPR previos con ${id1} y ${id2} para SWAP [pos ${i}]`);
+                        orders.push(`ERROR: ${helperName} no tiene EPR previos con ${id1Name} y ${id2Name} para SWAP [pos ${i}]`);
                     } else {
-                        orders.push(`SWAP: ${helper} hace entanglement swapping entre ${id1} y ${id2} [pos ${i}]`);
-                        if (!ordersPorNodo[helper]) ordersPorNodo[helper] = [];
-                        ordersPorNodo[helper].push({ accion: "swap", con: [id1, id2] });
+                        orders.push(`SWAP: ${helperName} hace entanglement swapping entre ${id1Name} y ${id2Name} [pos ${i}]`);
+                        const helperId = nameToId[helperName];
+                        if (!ordersPorNodo[helperId]) ordersPorNodo[helperId] = [];
+                        ordersPorNodo[helperId].push({ accion: "swap", con: [nameToId[id1Name], nameToId[id2Name]] });
                     }
 
                 } else if (op === "node") {
@@ -626,10 +640,10 @@
                 }
             });
 
-            // Mostrar en pantalla
+            // Mostrar en pantalla usando nombres
             document.getElementById("ordenesTexto").textContent = orders.join("\n");
 
-            // Enviar automáticamente al endpoint /mandate
+            // Enviar automáticamente al endpoint /mandate usando IDs
             fetch("/mandate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -642,12 +656,16 @@
 
 
 
+
         function crearBloquesDinamicos(nodos) {
             const paleta = document.getElementById("paleta");
 
             nodos.forEach(nodo => {
                 // Evitar bloques duplicados fijos (EPR y Pur)
-                if (nodo.name.includes("Entrel") || nodo.name.includes("Pur")) return;
+                if (nodo.name.includes("epr") || nodo.name.includes("Pur") ||nodo.name.includes("swap")) return;
+                // 🔍 Si ya existe un bloque con este ID, no crearlo de nuevo
+                const yaExiste = paleta.querySelector(`[data-id="${nodo.id}"]`);
+                if (yaExiste) return;
 
                 const block = document.createElement("div");
                 block.className = "block op-simple";
@@ -748,6 +766,7 @@
         });
 
 
+
         document.getElementById("mostrarTopologia").addEventListener("click", () => {
             fetch("/topologia")
                 .then(res => res.json())
@@ -836,7 +855,17 @@
                     .then(res => res.json())
                     .then(data => {
                         console.log("Datos recibidos de /actualizar_mapa:", data);
+                        
+                        // Detectar nodos vivos
+                        const nodosVivos = new Set(data.nodes.map(n => n.id));
 
+                        // Eliminar nodos muertos del array local
+                        for (let i = nodes.length - 1; i >= 0; i--) {
+                            if (!nodosVivos.has(nodes[i].id)) {
+                                console.log("Nodo desconectado eliminado:", nodes[i].name);
+                                nodes.splice(i, 1);
+                            }
+                        }
                         // Merge inteligente: no machacar cambios locales si son más recientes
                         data.nodes.forEach(remoteNode => {
                             const localNode = nodes.find(n => n.id === remoteNode.id);
@@ -864,12 +893,17 @@
                                 });
                             }
                         });
+                        const paleta = document.getElementById("paleta");
+                        paleta.querySelectorAll('[data-op="node"]').forEach(b => b.remove());
+                        console.log("nodos",nodes);
+                        crearBloquesDinamicos(nodes);
 
                         draw();
                         actualizarTablaNodos();
                         actualizarTablaAristas();
                     })
                     .catch(err => console.error("Error al recibir info de nodos:", err));
+                    // Mostrar aviso al usuario
             });
             // Enviar todos los cambios a cada nodo
             actualizarNodosBtn.addEventListener("click", () => {

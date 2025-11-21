@@ -288,11 +288,18 @@ def app_open(ROL, PUERTO):
                 continue
             try:
                 res = requests.get(f"http://localhost:{port}/info", timeout=1)
-                nodo = res.json()
-                NODOS_PUERTOS[nodo["name"]] = port
+                res.raise_for_status()  # primero verifica que la respuesta HTTP sea 200 OK
+                nodo = res.json()       # luego parsea el JSON
+                NODOS_PUERTOS[nodo["id"]] = port
                 nodos.append(nodo)
-            except Exception:
+                print(f"Nodos recogidos: {nodos}")
+            except requests.exceptions.RequestException:
+                # cualquier error de conexión, timeout o HTTP
                 pass
+            except ValueError:
+                # JSON inválido
+                pass
+
 
         if not nodos:
             nodos = PREDEFINED_NODES
@@ -308,25 +315,35 @@ def app_open(ROL, PUERTO):
                 })
 
         return jsonify({"nodes": nodos, "links": links})
+    
+    # Endpoint para enviar órdenes a los nodos
     @app.route("/mandate", methods=["POST"])
-    def enviar_instrucciones(nodo_name, instrucciones):
-        if nodo_name not in NODOS_PUERTOS:
-            print(f"No se encontró puerto para nodo {nodo_name}")
-            return
+    def send_mandates():
+        data = request.get_json()  # formato esperado: { nodo_id: [ {accion:..., ...}, ... ], ... }
+        if not isinstance(data, dict):
+            return jsonify({"error": "Formato inválido"}), 400
 
-        puerto = NODOS_PUERTOS[nodo_name]
-        url = f"http://localhost:{puerto}/update"
+        for nodo_id, instrucciones in data.items():
+            print(f"{nodo_id} estará en {NODOS_PUERTOS}")
+            if nodo_id not in NODOS_PUERTOS:
+                print(f"No se encontró puerto para nodo {nodo_id}")
+                continue
 
-        payload = {"instrucciones": instrucciones}
+            puerto = NODOS_PUERTOS[nodo_id]
+            url = f"http://localhost:{puerto}/mandate"  # apuntamos al POST en el nodo
 
-        try:
-            res = requests.post(url, json=payload, timeout=2)
-            if res.status_code == 200:
-                print(f"Instrucciones enviadas a {nodo_name}: {instrucciones}")
-            else:
-                print(f"Error enviando instrucciones a {nodo_name}: {res.status_code}")
-        except Exception as e:
-            print(f"Excepción enviando a {nodo_name}: {e}")
+            # enviamos las instrucciones mediante POST
+            print(f"Instrucciones enviadas a {nodo_id}: {instrucciones}")
+            try:
+                res = requests.post(url, json={nodo_id: instrucciones}, timeout=2)
+                if res.status_code == 200:
+                    print(f"Instrucciones enviadas a {nodo_id}: {instrucciones}")
+                else:
+                    print(f"Error enviando instrucciones a {nodo_id}: {res.status_code}")
+            except Exception as e:
+                print(f"Excepción enviando a {nodo_id}: {e}")
+
+        return jsonify({"status": "ok"})
 
     @app.route("/crear_nodos_simulaqron")
     def crear_nodos_simulaqron():
