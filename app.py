@@ -280,9 +280,11 @@ def app_open(ROL, PUERTO):
                 nodo_info[key] = data[key]
         return jsonify({"status": "ok", "nodo_info": nodo_info})
     NODOS_PUERTOS = {}  # nodo_name -> puerto
+
     @app.route("/actualizar_mapa")
     def actualizar_mapa():
         nodos = []
+        nombres_nodos = []
         for port in range(5000, 5011):
             if port == 5001:
                 continue
@@ -294,15 +296,60 @@ def app_open(ROL, PUERTO):
                 nodos.append(nodo)
                 print(f"Nodos recogidos: {nodos}")
             except requests.exceptions.RequestException:
-                # cualquier error de conexión, timeout o HTTP
                 pass
             except ValueError:
-                # JSON inválido
                 pass
-
 
         if not nodos:
             nodos = PREDEFINED_NODES
+
+        limpiar_historial()
+
+        # Crear la lista de nombres de nodos separados por coma
+        nombres_nodos = ",".join([n["name"] for n in nodos])
+
+        # Arrancar la red con todos los nodos (crea los nodos sin vecinos aún)
+        subprocess.run(
+            ["simulaqron", "start", "--name", "default", "--force", "-n", nombres_nodos],
+            capture_output=True, text=True
+        )
+        print(f"Nodos iniciales agregados: {nombres_nodos}")
+
+        # Construir diccionario de vecinos simétricos
+        vecinos_dict = {n["name"]: set() for n in nodos}
+        for nodo in nodos:
+            nombre = nodo["name"]
+            for vecino in nodo.get("neighbors", []):
+                vecino_nombre = vecino["name"]
+                vecinos_dict[nombre].add(vecino_nombre)
+                vecinos_dict[vecino_nombre].add(nombre)  # asegura simetría
+
+        # Asignar puertos y actualizar vecinos en SimulaQron
+        puerto_actual = 5000
+        for nodo in nodos:
+            nombre_nodo = nodo["name"]
+
+            # Saltar el puerto 5001
+            if puerto_actual == 5001:
+                puerto_actual += 1
+
+            vecinos_ids = list(vecinos_dict[nombre_nodo])
+
+            # Actualizar vecinos solo si hay alguno
+            if vecinos_ids:
+                result = subprocess.run(
+                    ["simulaqron", "nodes", "add", nombre_nodo, "--force", "--neighbors", ",".join(vecinos_ids)],
+                    capture_output=True, text=True
+                )
+                print(f"Nodo {nombre_nodo} actualizado con vecinos: {', '.join(vecinos_ids)}")
+                print(f"  Resultado stdout: {result.stdout.strip()}")
+                print(f"  Resultado stderr: {result.stderr.strip()}")
+            else:
+                print(f"Nodo {nombre_nodo} sin vecinos")
+
+            # Registrar el puerto
+            NODOS_PUERTOS[nombre_nodo] = puerto_actual
+            puerto_actual += 1
 
         # construir links en base a neighbors
         links = []
@@ -314,8 +361,45 @@ def app_open(ROL, PUERTO):
                     "distanciaKm": vecino.get("distanceKm", 0)
                 })
 
+        # Obtener la topología actual
+        topologia = mostrar_topologia()
+        nombres_actuales = {n["name"] for n in nodos}
+
+        # Limpiar nodos que ya no existen directamente en el network.json
+        result = subprocess.run(["simulaqron", "get", "network-config-file"], capture_output=True, text=True)
+        network_file = result.stdout.strip()
+
+        with open(network_file, "r", encoding="utf-8") as f:
+            network_data = json.load(f)
+
+        nodos_a_eliminar = [n for n in network_data["default"]["nodes"].keys() if n not in nombres_actuales]
+        for nodo in nodos_a_eliminar:
+            network_data["default"]["nodes"].pop(nodo, None)
+            network_data["default"]["topology"].pop(nodo, None)
+            print(f"Nodo eliminado del JSON: {nodo}")
+
+        # Filtrar vecinos inexistentes
+        for nodo, vecinos in network_data["default"]["topology"].items():
+            network_data["default"]["topology"][nodo] = [v for v in vecinos if v in nombres_actuales]
+
+        with open(network_file, "w", encoding="utf-8") as f:
+            json.dump(network_data, f, indent=4)
+
+        # Actualizar SimulaQron con vecinos filtrados
+        topologia = mostrar_topologia()
+        for nodo, vecinos in topologia.items():
+            vecinos_filtrados = [v for v in vecinos if v in nombres_actuales]  # Filtrar vecinos inexistentes
+            if set(vecinos) != set(vecinos_filtrados):
+                # Solo actualizar si algo ha cambiado
+                subprocess.run(
+                    ["simulaqron", "nodes", "add", nodo, "--force", "--neighbors", ",".join(vecinos_filtrados)],
+                    capture_output=True, text=True
+                )
+                print(f"Vecinos actualizados para {nodo}: {vecinos_filtrados}")
+
         return jsonify({"nodes": nodos, "links": links})
-    
+
+
     # Endpoint para enviar órdenes a los nodos
     @app.route("/mandate", methods=["POST"])
     def send_mandates():

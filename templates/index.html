@@ -536,7 +536,7 @@
                         console.log("==================");
 
                         if (valid1 && valid2) {
-                            b.textContent = `${n1.dataset.src}<=>${n2.dataset.src}(${helperNode.dataset.src})`;
+                            b.textContent = `${n1.dataset.src.charAt(0)}<=>${n2.dataset.src.charAt(0)}(${helperNode.dataset.src.charAt(0)})`;
                             b.dataset.finalizado = true;
 
                             // Ocultar nodos visualmente
@@ -611,7 +611,7 @@
                         ordersPorNodo[srcId].push({ accion: "purifica", detalle: "dos EPR previos" });
                     }
 
-                } else if (op === "swap") {
+                }else if (op === "swap") {
                     const id1Name = b.dataset.src;
                     const id2Name = b.dataset.dst;
                     const helperName = b.dataset.helper;
@@ -628,10 +628,31 @@
                         orders.push(`ERROR: ${helperName} no tiene EPR previos con ${id1Name} y ${id2Name} para SWAP [pos ${i}]`);
                     } else {
                         orders.push(`SWAP: ${helperName} hace entanglement swapping entre ${id1Name} y ${id2Name} [pos ${i}]`);
+
                         const helperId = nameToId[helperName];
+                        const id1Id = nameToId[id1Name];
+                        const id2Id = nameToId[id2Name];
+
+                        // Acción para el helper
                         if (!ordersPorNodo[helperId]) ordersPorNodo[helperId] = [];
-                        ordersPorNodo[helperId].push({ accion: "swap", con: [nameToId[id1Name], nameToId[id2Name]] });
+                        ordersPorNodo[helperId].push({ accion: "swap", con: [id1Id, id2Id] });
+
+                        // Notificar a id1 y id2 que reciben SWAP
+                        if (!ordersPorNodo[id1Id]) ordersPorNodo[id1Id] = [];
+                        ordersPorNodo[id1Id].push({ 
+                            accion: "swap recibido", 
+                            con: [id2Id],          // con quién se hace el swap
+                            gracias_a: helperId    // gracias a quién se realizó
+                        });
+
+                        if (!ordersPorNodo[id2Id]) ordersPorNodo[id2Id] = [];
+                        ordersPorNodo[id1Id].push({ 
+                            accion: "swap recibido", 
+                            con: [id1Id],          // con quién se hace el swap
+                            gracias_a: helperId    // gracias a quién se realizó
+                        });
                     }
+
 
                 } else if (op === "node") {
                     orders.push(`NODE: ${b.dataset.src} [pos ${i}]`);
