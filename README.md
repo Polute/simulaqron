@@ -15,7 +15,7 @@ La cual simula la red completa en una máquina local(Puerto 8000)
 Para ejecutar individualmente cada nodo, con info que contienen local, ejecuta:
 
 ```bash
-python app.py 
+python nodo.py 
 ```
 
 Realizalo en varias terminales, las cuales se abriran en puertos distintos cada vez que lo ejecutes
@@ -42,5 +42,3 @@ Este borrara el entorno virtual y se te creará de nuevo con los requirements in
 
 
 Ya que se agregarán nuevos paquetes periodicamente y según hagan falta.
-
-Falta logica, agregar nodos a simulaqron, más detalle del pgen y pswap y que cada nodo actue como emisor. 

@@ -62,7 +62,7 @@ def recogerEPR(modo, w_in, i, modo_tiempo, enviados, fidelidades):
                 # Guardar tiempo en archivo indexado
                 with lock:
                     try:
-                        with open("tiempo_recepcion.txt", "r") as f:
+                        with open("pre_docs/tiempo_recepcion.txt", "r") as f:
                             tiempos = f.read().strip().split(",")
                     except FileNotFoundError:
                         tiempos = []
@@ -72,7 +72,7 @@ def recogerEPR(modo, w_in, i, modo_tiempo, enviados, fidelidades):
 
                     tiempos[i] = t_recepcion
 
-                    with open("tiempo_recepcion.txt", "w") as f:
+                    with open("pre_docs/tiempo_recepcion.txt", "w") as f:
                         f.write(",".join(tiempos))
 
                 medicion = str(m)
@@ -86,13 +86,13 @@ def recogerEPR(modo, w_in, i, modo_tiempo, enviados, fidelidades):
     #  Guardar resultados
     with lock:
         try:
-            with open("bob_resultado.txt", "r") as f:
+            with open("pre_docs/bob_resultado.txt", "r") as f:
                 mediciones = f.read().strip().split(",")
         except FileNotFoundError:
             mediciones = []
 
         try:
-            with open("fidelidad_bob.txt", "r") as f:
+            with open("pre_docs/fidelidad_bob.txt", "r") as f:
                 fidelidades_bob = f.read().strip().split(",")
         except FileNotFoundError:
             fidelidades_bob = []
@@ -105,9 +105,9 @@ def recogerEPR(modo, w_in, i, modo_tiempo, enviados, fidelidades):
         mediciones[i] = medicion
         fidelidades_bob[i] = fidelidad_bob
 
-        with open("bob_resultado.txt", "w") as f:
+        with open("pre_docs/bob_resultado.txt", "w") as f:
             f.write(",".join(mediciones))
-        with open("fidelidad_bob.txt", "w") as f:
+        with open("pre_docs/fidelidad_bob.txt", "w") as f:
             f.write(",".join(fidelidades_bob))
 
         print(f"[BOB] Resultado #{i} guardado: medición={medicion}, fidelidad={fidelidad_bob}")
@@ -119,13 +119,13 @@ def run_bob(modo, w_in, num_ParesEPR, modo_tiempo, semaforos):
     """
     with lock:
         try:
-            with open("qubit_enviado.txt", "r") as f:
+            with open("pre_docs/qubit_enviado.txt", "r") as f:
                 enviados = f.read().strip().split(",")
         except FileNotFoundError:
             enviados = []
 
         try:
-            with open("fidelidad_alice.txt", "r") as f:
+            with open("pre_docs/fidelidad_alice.txt", "r") as f:
                 fidelidades = f.read().strip().split(",")
         except FileNotFoundError:
             fidelidades = []

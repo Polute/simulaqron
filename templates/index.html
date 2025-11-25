@@ -723,54 +723,27 @@
 
         // Rol recibido desde Flask
         const rol = "{{ rol }}";
-
-        // Nodos predefinidos
-        const predefinedNodes = [
-            { id: "node_alice", name: "Alice_pre",   x: 100, y: 100, pgen: 0.8, roles: ["emisor","receptor"] },
-            { id: "node_bob",   name: "Bob_pre",     x: 300, y: 100, pgen: 0.7, roles: ["receptor","repeater"] },
-            { id: "node_charlie", name: "Charlie_pre", x: 200, y: 250, pgen: 0.9, roles: ["emisor","repeater"] }
-        ];
-
         let nodes = [];
         let links = [];
+
         if (rol === "master") {
             const nodo_info = JSON.parse('{{ nodo_info|tojson|safe }}');
             console.log("Objeto nodo_info recibido:", nodo_info);
 
             if (nodo_info.nodes && nodo_info.nodes.length > 0) {
-                // Inicializar nodos
+                // Inicializar nodos desde el backend (ya incluye predefinidos si hace falta)
                 nodes = nodo_info.nodes;
-                console.log("Nodos inicializados desde nodo_info:", nodes);
+                console.log("Nodos inicializados:", nodes);
 
                 nodes.forEach(nodo => {
-                    console.log("Procesando nodo:", nodo.name, "con vecinos:", nodo.neighbors);
                     if (Array.isArray(nodo.neighbors)) {
                         nodo.neighbors.forEach(vecino => {
                             const link = {
-                                source: nodo.name,        // o nodo.id si prefieres
-                                target: vecino.name,
+                                source: nodo.id,
+                                target: vecino.id,
                                 distanciaKm: vecino.distanceKm
                             };
                             links.push(link);
-                            console.log("Link añadido:", link);
-                        });
-                    }
-                });
-            } else {
-                // Fallback: usar predefinidos
-                nodes = predefinedNodes;
-                console.log("Usando nodos predefinidos:", nodes);
-                predefinedNodes.forEach(nodo => {
-                    console.log("Procesando nodo predefinido:", nodo.name, "con vecinos:", nodo.neighbors);
-                    if (Array.isArray(nodo.neighbors)) {
-                        nodo.neighbors.forEach(vecino => {
-                            const link = {
-                                source: nodo.name,
-                                target: vecino.name,
-                                distanciaKm: vecino.distanceKm
-                            };
-                            links.push(link);
-                            console.log("Link añadido (predefinido):", link);
                         });
                     }
                 });
@@ -780,6 +753,7 @@
         console.log("Rol actual:", rol);
         console.log("Lista final de Nodes:", nodes);
         console.log("Lista final de Links:", links);
+
 
         // Crear bloques para los nodos detectados
         document.addEventListener("DOMContentLoaded", () => {
@@ -901,19 +875,33 @@
                             }
                         });
 
-                        // Recalcular links
+                        /// Recalcular links consolidando por lastUpdated
                         links.length = 0;
+                        const linksDict = {};
+
                         nodes.forEach(nodo => {
+                            const ts = nodo.lastUpdated || 0;
                             if (Array.isArray(nodo.neighbors)) {
                                 nodo.neighbors.forEach(vecino => {
-                                    links.push({
-                                        source: nodo.name,
-                                        target: vecino.name,
-                                        distanciaKm: vecino.distanceKm
-                                    });
+                                    const par = [nodo.name, vecino.name].sort().join("-");
+                                    const distancia = vecino.distanceKm;
+
+                                    if (!linksDict[par]) {
+                                        linksDict[par] = { source: nodo.name, target: vecino.name, distanciaKm: distancia, lastUpdated: ts };
+                                    } else {
+                                        if (ts > linksDict[par].lastUpdated) {
+                                            linksDict[par] = { source: nodo.name, target: vecino.name, distanciaKm: distancia, lastUpdated: ts };
+                                        }
+                                    }
                                 });
                             }
                         });
+
+                        // convertir a array
+                        Object.values(linksDict).forEach(l => {
+                            links.push({ source: l.source, target: l.target, distanciaKm: l.distanciaKm });
+                        });
+
                         const paleta = document.getElementById("paleta");
                         paleta.querySelectorAll('[data-op="node"]').forEach(b => b.remove());
                         console.log("nodos",nodes);
@@ -926,12 +914,104 @@
                     .catch(err => console.error("Error al recibir info de nodos:", err));
                     // Mostrar aviso al usuario
             });
+            // Recibir información desde el master y actualizar el mapa
+            recibirInfoBtn.addEventListener("click", () => {
+                fetch("/actualizar_mapa")
+                    .then(res => res.json())
+                    .then(data => {
+                        console.log("Datos recibidos de /actualizar_mapa:", data);
+                        
+                        // Detectar nodos vivos
+                        const nodosVivos = new Set(data.nodes.map(n => n.id));
+
+                        // Eliminar nodos muertos del array local
+                        for (let i = nodes.length - 1; i >= 0; i--) {
+                            if (!nodosVivos.has(nodes[i].id)) {
+                                console.log("Nodo desconectado eliminado:", nodes[i].id);
+                                nodes.splice(i, 1);
+                            }
+                        }
+                        // Merge inteligente: no machacar cambios locales si son más recientes
+                        data.nodes.forEach(remoteNode => {
+                            const localNode = nodes.find(n => n.id === remoteNode.id);
+                            if (localNode) {
+                                if (!localNode.lastUpdated || localNode.lastUpdated < remoteNode.lastUpdated) {
+                                    Object.assign(localNode, remoteNode);
+                                } else {
+                                    console.log(`Manteniendo cambios locales en nodo ${localNode.id}`);
+                                }
+                            } else {
+                                nodes.push(remoteNode);
+                            }
+                        });
+
+                        /// Recalcular links consolidando por lastUpdated
+                        links.length = 0;
+                        const linksDict = {};
+
+                        nodes.forEach(nodo => {
+                            const ts = nodo.lastUpdated || 0;
+                            if (Array.isArray(nodo.neighbors)) {
+                                nodo.neighbors.forEach(vecino => {
+                                    const par = [nodo.id, vecino.id].sort().join("-");
+                                    const distancia = vecino.distanceKm;
+
+                                    if (!linksDict[par]) {
+                                        linksDict[par] = { source: nodo.id, target: vecino.id, distanciaKm: distancia, lastUpdated: ts };
+                                    } else {
+                                        if (ts > linksDict[par].lastUpdated) {
+                                            linksDict[par] = { source: nodo.id, target: vecino.id, distanciaKm: distancia, lastUpdated: ts };
+                                        }
+                                    }
+                                });
+                            }
+                        });
+
+                        // convertir a array
+                        Object.values(linksDict).forEach(l => {
+                            links.push({ source: l.source, target: l.target, distanciaKm: l.distanciaKm });
+                        });
+
+                        const paleta = document.getElementById("paleta");
+                        paleta.querySelectorAll('[data-op="node"]').forEach(b => b.remove());
+                        console.log("nodos",nodes);
+                        crearBloquesDinamicos(nodes);
+
+                        draw();
+                        actualizarTablaNodos();
+                        actualizarTablaAristas();
+                    })
+                    .catch(err => console.error("Error al recibir info de nodos:", err));
+            });
+
             // Enviar todos los cambios a cada nodo
             actualizarNodosBtn.addEventListener("click", () => {
                 nodes.forEach(node => {
                     const puerto = obtenerPuertoDesdeId(node.id);
                     if (!puerto) return;
+                    const vecinosSimetricos = [];
+                    console.log(node)
+                    nodes.forEach(other => {
+                        if (other.id !== node.id) {
+                            // Buscar si este nodo ya tiene a "other" como vecino
+                            const esteVecino = node.neighbors.find(v => v.id === other.id);
+                            // Buscar si el otro nodo ya tiene a "node" como vecino
+                            const otroVecino = other.neighbors.find(v => v.id === node.id);
 
+                            // Solo añadimos si alguno conoce la distancia
+                            const distanciaKm = (esteVecino && esteVecino.distanceKm) ||
+                                                (otroVecino && otroVecino.distanceKm);
+
+                            if (distanciaKm !== undefined) {
+                                vecinosSimetricos.push({
+                                    id: other.id,
+                                    distanceKm: distanciaKm
+                                });
+                            }
+                        }
+                    });
+
+                    console.log(vecinosSimetricos)
                     fetch(`http://127.0.0.1:${puerto}/update`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -940,11 +1020,11 @@
                             name: node.name,
                             pgen: node.pgen,
                             roles: node.roles,
-                            neighbors: node.neighbors,
+                            neighbors: vecinosSimetricos,
                             parEPR: node.parEPR,
                             lastUpdated: Date.now() // importante: marcar timestamp
                         })
-                    }).catch(err => console.error(`Error al actualizar nodo ${node.name}:`, err));
+                    }).catch(err => console.error(`Error al actualizar nodo ${node.id}:`, err));
                 });
 
                 // Esperar un momento y luego refrescar el mapa completo desde master
@@ -964,8 +1044,8 @@
                                 if (Array.isArray(nodo.neighbors)) {
                                     nodo.neighbors.forEach(vecino => {
                                         links.push({
-                                            source: nodo.name,
-                                            target: vecino.name,
+                                            source: nodo.id,
+                                            target: vecino.id,
                                             distanciaKm: vecino.distanceKm
                                         });
                                     });
@@ -986,112 +1066,115 @@
                     name: "Nodo_" + Date.now(),       // nombre inicial editable
                     roles: ["emisor","receptor","repeater"], // roles activos
                     x, y,
-                    param: parseFloat(pgenInput.value)
+                    pgen: 0.8,
+                    neighbors: []
                 };
                 nodes.push(node);
                 draw();
-                // Llamada al backend Flask para crear nodo en Simulaqron
-                fetch(`/crear_nodos_simulaqron?nodos=${node.name}`)
+                // Llamada al backend Flask para crear nodo en Simulaqron usando id
+                fetch(`/crear_nodos_simulaqron?nodos=${node.id}`)
                     .then(res => res.json())
                     .then(data => {
                         console.log("Respuesta del servidor:", data);
                     })
                     .catch(err => console.error("Error al crear nodo en Simulaqron:", err));
-
-        }
-
-        function createLink(sourceNode, targetNode) {
-            const existe = links.some(link =>
-                (link.source === sourceNode.name && link.target === targetNode.name) ||
-                (link.source === targetNode.name && link.target === sourceNode.name)
-            );
-            if (existe) return;
-
-            const distanciaKm = 50;
-            const length = Math.hypot(targetNode.x - sourceNode.x, targetNode.y - sourceNode.y);
-
-            links.push({ source: sourceNode.name, target: targetNode.name, length, distanciaKm });
-            draw();
-
-            fetch("/modificar_links", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    links: [{ source: sourceNode.name, target: targetNode.name }]
-                })
-            });
-        }
-
-        function draw() {
-            svg.innerHTML = "";
-            const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-            g.setAttribute("transform", `translate(${transform.x},${transform.y}) scale(${transform.k})`);
-            svg.appendChild(g);
-
-            links.forEach(link => {
-                const sourceNode = nodes.find(n => n.name === link.source);
-                const targetNode = nodes.find(n => n.name === link.target);
-
-                if (!sourceNode) {
-                    console.warn(`Nodo no conectado a la red: ${link.source}`);
-                    return;
-                }
-                if (!targetNode) {
-                    console.warn(`Nodo no conectado a la red: ${link.target}`);
-                    return;
-                }
-
-                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                line.setAttribute("x1", sourceNode.x);
-                line.setAttribute("y1", sourceNode.y);
-                line.setAttribute("x2", targetNode.x);
-                line.setAttribute("y2", targetNode.y);
-                line.setAttribute("class", "link");
-                g.appendChild(line);
-            });
+            }
 
 
-            // Dibujar nodos
-            nodes.forEach(node => {
-                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                circle.setAttribute("cx", node.x);
-                circle.setAttribute("cy", node.y);
-                circle.setAttribute("r", 20);
-                circle.setAttribute("class", "node");
+            function createLink(sourceNode, targetNode) {
+                const existe = links.some(link =>
+                    (link.source === sourceNode.id && link.target === targetNode.id) ||
+                    (link.source === targetNode.id && link.target === sourceNode.id)
+                );
+                if (existe) return;
 
-                circle.addEventListener("mousedown", e => {
-                    if (modoArista) {
-                        if (linkStart && linkStart !== node) {
-                            createLink(linkStart, node);
-                            linkStart = null;
-                        } else {
-                            linkStart = node;
-                        }
-                    } else {
-                        draggingNode = node;
+                const distanciaKm = 50;
+                const length = Math.hypot(targetNode.x - sourceNode.x, targetNode.y - sourceNode.y);
+
+                links.push({ source: sourceNode.id, target: targetNode.id, length, distanciaKm });
+                draw();
+
+                fetch("/modificar_links", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        links: [{ source: sourceNode.id, target: targetNode.id }]
+                    })
+                });
+            }
+            function draw() {
+                svg.innerHTML = "";
+                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                g.setAttribute("transform", `translate(${transform.x},${transform.y}) scale(${transform.k})`);
+                svg.appendChild(g);
+
+                // Dibujar aristas
+                links.forEach(link => {
+                    const sourceNode = nodes.find(n => n.id === link.source);
+                    const targetNode = nodes.find(n => n.id === link.target);
+
+                    if (!sourceNode) {
+                        console.warn(`Nodo no conectado a la red: ${link.source}`);
+                        return;
                     }
+                    if (!targetNode) {
+                        console.warn(`Nodo no conectado a la red: ${link.target}`);
+                        return;
+                    }
+
+                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    line.setAttribute("x1", sourceNode.x);
+                    line.setAttribute("y1", sourceNode.y);
+                    line.setAttribute("x2", targetNode.x);
+                    line.setAttribute("y2", targetNode.y);
+                    line.setAttribute("class", "link");
+                    g.appendChild(line);
+
                 });
 
-                g.appendChild(circle);
+                // Dibujar nodos
+                nodes.forEach(node => {
+                    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    circle.setAttribute("cx", node.x);
+                    circle.setAttribute("cy", node.y);
+                    circle.setAttribute("r", 20);
+                    circle.setAttribute("class", "node");
 
-                const nameLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                nameLabel.setAttribute("x", node.x);
-                nameLabel.setAttribute("y", node.y + 35);
-                nameLabel.setAttribute("class", "label");
-                nameLabel.textContent = node.name;
-                g.appendChild(nameLabel);
+                    circle.addEventListener("mousedown", e => {
+                        if (modoArista) {
+                            if (linkStart && linkStart !== node) {
+                                createLink(linkStart, node);
+                                linkStart = null;
+                            } else {
+                                linkStart = node;
+                            }
+                        } else {
+                            draggingNode = node;
+                        }
+                    });
 
-                const paramLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                paramLabel.setAttribute("x", node.x);
-                paramLabel.setAttribute("y", node.y + 50);
-                paramLabel.setAttribute("class", "label");
-                paramLabel.textContent = "pgen = " + node.pgen;
-                g.appendChild(paramLabel);
-            });
+                    g.appendChild(circle);
 
-            actualizarTablaNodos();
-            actualizarTablaAristas();
-        }
+                    // Mostrar nombre (no id)
+                    const nameLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    nameLabel.setAttribute("x", node.x);
+                    nameLabel.setAttribute("y", node.y + 35);
+                    nameLabel.setAttribute("class", "label");
+                    nameLabel.textContent = node.name;
+                    g.appendChild(nameLabel);
+
+                    const paramLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    paramLabel.setAttribute("x", node.x);
+                    paramLabel.setAttribute("y", node.y + 50);
+                    paramLabel.setAttribute("class", "label");
+                    paramLabel.textContent = "pgen = " + node.pgen;
+                    g.appendChild(paramLabel);
+                });
+
+                actualizarTablaNodos();
+                actualizarTablaAristas();
+            }
+
 
         svg.addEventListener("click", e => {
             if (!modoNodo) return;
@@ -1187,7 +1270,7 @@
 
                     // Actualizar el nombre del nodo
                     node.name = newName;
-
+                    node.label = newName;
                     // Actualizar vecinos que lo referencian
                     nodes.forEach(n => {
                         n.neighbors.forEach(vecino => {
@@ -1261,7 +1344,15 @@
         function actualizarTablaAristas() {
             const tbody = document.querySelector("#tabla-aristas tbody");
             tbody.innerHTML = "";
+
+            const vistos = new Set();
+
             links.forEach(link => {
+                // normalizar par
+                const key = [link.source, link.target].sort().join("-");
+                if (vistos.has(key)) return; // ya mostrado
+                vistos.add(key);
+
                 const fila = document.createElement("tr");
 
                 const origenCell = document.createElement("td");
@@ -1276,25 +1367,39 @@
                 const distInput = document.createElement("input");
                 distInput.type = "number";
                 distInput.value = link.distanciaKm;
+
                 distInput.onchange = () => {
                     const nuevaDistancia = parseFloat(distInput.value);
-                    link.distanciaKm = nuevaDistancia;
 
-                    // 🔑 Actualizar también el neighbors del nodo origen
-                    const origenNode = nodes.find(n => n.name === link.source);
-                    if (origenNode && Array.isArray(origenNode.neighbors)) {
-                        const vecino = origenNode.neighbors.find(v => v.name === link.target);
-                        if (vecino) {
-                            vecino.distanceKm = nuevaDistancia;
+                    // actualizar ambos links simétricos
+                    links.forEach(l => {
+                        const par = [l.source, l.target].sort().join("-");
+                        if (par === key) {
+                            l.distanciaKm = nuevaDistancia;
                         }
+                    });
+
+                    // actualizar vecinos en ambos nodos
+                    const origenNode = nodes.find(n => n.name === link.source);
+                    if (origenNode) {
+                        const vecino = origenNode.neighbors.find(v => v.name === link.target);
+                        if (vecino) vecino.distanceKm = nuevaDistancia;
+                    }
+                    const destinoNode = nodes.find(n => n.name === link.target);
+                    if (destinoNode) {
+                        const vecino = destinoNode.neighbors.find(v => v.name === link.source);
+                        if (vecino) vecino.distanceKm = nuevaDistancia;
                     }
                 };
+
                 distCell.appendChild(distInput);
                 fila.appendChild(distCell);
 
                 tbody.appendChild(fila);
             });
         }
+
+
 
         draw();
     };
@@ -1306,16 +1411,12 @@
         }
 
         const nombres_nodos = nodes.map(n => n.id).join(" ");
-        //fetch(`/crear_nodos_simulaqron?nodos=${nombres_nodos}`);
+        fetch(`/crear_nodos_simulaqron?nodos=${nombres_nodos}`);
 
         function iniciarSimulacion() {
             const modo = document.getElementById("modo").value;
             const num_ParesEPR = document.getElementById("num_ParesEPR").value;
             console.log("Iniciando simulación única");
-
-            const dist_ab = getDistancia("dist_ab");
-            const dist_ac = getDistancia("dist_ac");
-            const dist_cb = getDistancia("dist_cb");
 
             const pgen = document.getElementById("pgen").value;
             const pswap = document.getElementById("pswap").value;

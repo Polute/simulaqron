@@ -7,7 +7,7 @@ import math
 def entanglement_swap(num_ParesEPR, pswap):
     with CQCConnection("Charlie") as repeater:
         try:
-            with open("qubit_enviado.txt", "r") as f:
+            with open("pre_docs/qubit_enviado.txt", "r") as f:
                 enviados = f.read().strip().split(",")
         except FileNotFoundError:
             enviados = []
@@ -29,7 +29,7 @@ def entanglement_swap(num_ParesEPR, pswap):
                     print(f"[SWAP] Error en swapping #{i+1}: {e}")
 
                 try:
-                    with open("fidelidad_alice.txt", "r") as f:
+                    with open("pre_docs/fidelidad_alice.txt", "r") as f:
                         fidelidades = f.read().strip().split(",")
                 except FileNotFoundError:
                     fidelidades = []
@@ -68,15 +68,15 @@ def entanglement_swap(num_ParesEPR, pswap):
                     print(f"w_Alice={w_alice:.3f}, w_Bob={w_bob:.3f}, w_swap={w_swap:.3f}")
                     print(f"C_t={C_t}, w_out={w_final:.3f}")
     
-                    with open("fidelidad_bob.txt", "w") as f_out:
+                    with open("pre_docs/fidelidad_bob.txt", "w") as f_out:
                         f_out.write(",".join([str(w_final)]))
-                    with open("qubit_enviado_rep.txt", "w") as f:
+                    with open("pre_docs/qubit_enviado_rep.txt", "w") as f:
                         f.write(",".join(["ok"]))
                 else:
                     print(f"[SWAP] Swapping fallido (pswap={pswap})")
-                    with open("fidelidad_bob.txt", "w") as f_out:
+                    with open("pre_docs/fidelidad_bob.txt", "w") as f_out:
                         f_out.write(",".join("0.0"))
-                    with open("qubit_enviado.txt", "w") as f:
+                    with open("pre_docs/qubit_enviado.txt", "w") as f:
                         f.write(",".join(["fallo"]))
                 try: 
                     q1.cnot(q2)

@@ -30,7 +30,7 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
                 t_creacion = datetime.now().strftime("%M:%S.%f")[:-3]
                 with lock:
                     try:
-                        with open("tiempo_creacion.txt", "r") as f:
+                        with open("pre_docs/tiempo_creacion.txt", "r") as f:
                             tiempos = f.read().strip().split(",")
                     except FileNotFoundError:
                         tiempos = []
@@ -41,7 +41,7 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
                         t_creacion = "00:00.000"
                     tiempos[i] = t_creacion
 
-                    with open("tiempo_creacion.txt", "w") as f:
+                    with open("pre_docs/tiempo_creacion.txt", "w") as f:
                         f.write(",".join(tiempos))
                 ahora = datetime.now()
                 timestamp = ahora.strftime("%M:%S.%f")[:-3]  # recorta a milésimas
@@ -89,13 +89,13 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
     #  Escritura segura en archivos compartidos
     with lock:
         try:
-            with open("qubit_enviado.txt", "r") as f:
+            with open("pre_docs/qubit_enviado.txt", "r") as f:
                 enviados = f.read().strip().split(",")
         except FileNotFoundError:
             enviados = []
 
         try:
-            with open("fidelidad_alice.txt", "r") as f:
+            with open("pre_docs/fidelidad_alice.txt", "r") as f:
                 fidelidades = f.read().strip().split(",")
         except FileNotFoundError:
             fidelidades = []
@@ -110,9 +110,9 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
         enviados[i] = estado
         fidelidades[i] = f"{w_alice:.3f}" if isinstance(w_alice, float) else "None"
 
-        with open("qubit_enviado.txt", "w") as f:
+        with open("pre_docs/qubit_enviado.txt", "w") as f:
             f.write(",".join(enviados))
-        with open("fidelidad_alice.txt", "w") as f:
+        with open("pre_docs/fidelidad_alice.txt", "w") as f:
             f.write(",".join(fidelidades))
 
         print(f"[ALICE] Resultado #{i+1} guardado: estado={estado}, fidelidad={fidelidades[i]}")

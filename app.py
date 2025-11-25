@@ -62,13 +62,13 @@ def mostrar_topologia():
         print("[ERROR] No se encontró simulaqron/config/network.json")
         return {}
 
-    with open(ruta) as f:
+    with open(ruta, encoding="utf-8") as f:
         data = json.load(f)
     print("[DEBUG] JSON completo:", data)
 
     try:
-        topology = data["default"]["topology"]
-        node_names = list(data["default"]["nodes"].keys())
+        topology = data["default"].get("topology")
+        node_ids = list(data["default"]["nodes"].keys())
     except KeyError:
         print("[ERROR] El archivo no contiene 'default' o 'topology'")
         return {}
@@ -76,16 +76,22 @@ def mostrar_topologia():
     # Si la topología es null, crear pseudo-topología completa
     if topology is None:
         pseudo_topology = {}
-        for nodo in node_names:
-            pseudo_topology[nodo] = [n for n in node_names if n != nodo]
+        for nodo in node_ids:
+            pseudo_topology[nodo] = [n for n in node_ids if n != nodo]
         return pseudo_topology
 
+    # Normalizar topología: solo vecinos válidos y distintos del propio nodo
     resultado = {}
     for nodo, vecinos in topology.items():
-        resultado[nodo] = vecinos
-        print(f"Nodo {nodo} conectado con: {{{', '.join(vecinos)}}}")
+        vecinos_filtrados = [
+            v for v in vecinos
+            if v in node_ids and v != nodo
+        ]
+        resultado[nodo] = vecinos_filtrados
+        print(f"Nodo {nodo} conectado con: {{{', '.join(vecinos_filtrados)}}}")
 
     return resultado
+
     
 def retardo(distancia_km):
     """Calcula el tiempo de transmisión en segundos según la distancia en km."""
@@ -118,11 +124,48 @@ def construir_links_desde_nodos(nodos):
                     "distanciaKm": distancia
                 })
     return links
-
+# Nodos predefinidos (con IDs distintos para no colisionar)
+PREDEFINED_NODES = [
+    {
+        "id": "node_alice_pre",
+        "name": "Alice_pre",
+        "x": 100,
+        "y": 100,
+        "pgen": 0.8,
+        "roles": ["emisor", "receptor"],
+        "neighbors": [],   # Alice no tiene vecinos iniciales
+        "parEPR": []
+    },
+    {
+        "id": "node_bob_pre",
+        "name": "Bob_pre",
+        "x": 300,
+        "y": 100,
+        "pgen": 0.7,
+        "roles": ["receptor", "repeater"],
+        "neighbors": [
+            {"id": "node_alice_pre", "distanceKm": 50}
+        ],
+        "parEPR": []
+    },
+    {
+        "id": "node_charlie_pre",
+        "name": "Charlie_pre",
+        "x": 200,
+        "y": 250,
+        "pgen": 0.9,
+        "roles": ["emisor", "repeater"],
+        "neighbors": [
+            {"id": "node_alice_pre", "distanceKm": 70},
+            {"id": "node_bob_pre", "distanceKm": 40}
+        ],
+        "parEPR": []
+    }
+]
 # Reiniciar SimulaQron al iniciar el servidor
 print("[INIT] Reiniciando SimulaQron...")
 subprocess.run(["simulaqron", "reset", "--force"])
-subprocess.run(["simulaqron", "start", "--name", "default", "--force", "-n", "Alice,Bob,Charlie"])
+subprocess.run(["simulaqron", "start", "--name", "default", "--force", "-n", "node_alice_pre, node_bob_pre, node_charlie_pre"])
 print("[INIT] Inicializando SimulaQron...")
 
 
@@ -148,7 +191,7 @@ def app_open(ROL, PUERTO):
             "pgen": 0.7,
             "roles": ["receptor", "repeater"],
             "neighbors": [
-                {"name": "Alice", "distanceKm": 50}
+                {"id": "node_alice", "distanceKm": 50}
             ]
         },
         5003: {
@@ -159,62 +202,26 @@ def app_open(ROL, PUERTO):
             "pgen": 0.9,
             "roles": ["emisor", "repeater"],
             "neighbors": [
-                {"name": "Alice", "distanceKm": 70},
-                {"name": "Bob", "distanceKm": 40}
+                {"id": "node_alice", "distanceKm": 70},
+                {"id": "node_bob", "distanceKm": 40}
             ]
         }
     }
 
-    # Nodos predefinidos
-    PREDEFINED_NODES = [
-        {
-            "id": "node_alice",
-            "name": "Alice_pre",
-            "x": 100,
-            "y": 100,
-            "pgen": 0.8,
-            "roles": ["emisor", "receptor"],
-            "neighbors": [],   # Alice no tiene vecinos iniciales
-            "parEPR": []
-        },
-        {
-            "id": "node_bob",
-            "name": "Bob_pre",
-            "x": 300,
-            "y": 100,
-            "pgen": 0.7,
-            "roles": ["receptor", "repeater"],
-            "neighbors": [
-                {"name": "Alice_pre", "distanceKm": 50}
-            ],
-            "parEPR": []
-        },
-        {
-            "id": "node_charlie",
-            "name": "Charlie_pre",
-            "x": 200,
-            "y": 250,
-            "pgen": 0.9,
-            "roles": ["emisor", "repeater"],
-            "neighbors": [
-                {"name": "Alice_pre", "distanceKm": 70},
-                {"name": "Bob_pre", "distanceKm": 40}
-            ],
-            "parEPR": []
-        }
-    ]
+    
+
     nodo_info = PORT_NODE_MAP.get(PUERTO, {"id": "node_unknown", "name": "Desconocido", "neighbors": []})
     app = Flask(__name__)
     @app.route("/")
     def index():
         try:
-            with open("bob_resultado.txt", "r") as f:
+            with open("pre_docs/bob_resultado.txt", "r") as f:
                 ultimo_resultado = f.read()
         except FileNotFoundError:
             ultimo_resultado = "Aún no se ha realizado la simulación."
 
         try:
-            with open("historial_resultados.txt", "r") as h:
+            with open("pre_docs/historial_resultados.txt", "r") as h:
                 historial = [line.strip() for line in h.readlines()]
         except FileNotFoundError:
             historial = []
@@ -284,20 +291,17 @@ def app_open(ROL, PUERTO):
     @app.route("/actualizar_mapa")
     def actualizar_mapa():
         nodos = []
-        nombres_nodos = []
         for port in range(5000, 5011):
             if port == 5001:
                 continue
             try:
                 res = requests.get(f"http://localhost:{port}/info", timeout=1)
-                res.raise_for_status()  # primero verifica que la respuesta HTTP sea 200 OK
-                nodo = res.json()       # luego parsea el JSON
+                res.raise_for_status()
+                nodo = res.json()
                 NODOS_PUERTOS[nodo["id"]] = port
                 nodos.append(nodo)
-                print(f"Nodos recogidos: {nodos}")
-            except requests.exceptions.RequestException:
-                pass
-            except ValueError:
+                print(f"Nodo recogido: {nodo}")
+            except (requests.exceptions.RequestException, ValueError):
                 pass
 
         if not nodos:
@@ -305,99 +309,124 @@ def app_open(ROL, PUERTO):
 
         limpiar_historial()
 
-        # Crear la lista de nombres de nodos separados por coma
-        nombres_nodos = ",".join([n["name"] for n in nodos])
+        # Usar id en lugar de name
+        ids_nodos = ",".join([n["id"] for n in nodos])
 
-        # Arrancar la red con todos los nodos (crea los nodos sin vecinos aún)
         subprocess.run(
-            ["simulaqron", "start", "--name", "default", "--force", "-n", nombres_nodos],
+            ["simulaqron", "start", "--name", "default", "--force", "-n", ids_nodos],
             capture_output=True, text=True
         )
-        print(f"Nodos iniciales agregados: {nombres_nodos}")
+        print(f"Nodos iniciales agregados: {ids_nodos}")
 
-        # Construir diccionario de vecinos simétricos
-        vecinos_dict = {n["name"]: set() for n in nodos}
+        # Construir diccionario de vecinos simétricos usando id
+        vecinos_dict = {n["id"]: set() for n in nodos}
         for nodo in nodos:
-            nombre = nodo["name"]
+            nodo_id = nodo["id"]
             for vecino in nodo.get("neighbors", []):
-                vecino_nombre = vecino["name"]
-                vecinos_dict[nombre].add(vecino_nombre)
-                vecinos_dict[vecino_nombre].add(nombre)  # asegura simetría
+                vecino_id = vecino.get("id")
+                if vecino_id and vecino_id != nodo_id:
+                    if vecino_id in vecinos_dict:
+                        vecinos_dict[nodo_id].add(vecino_id)
+                        vecinos_dict[vecino_id].add(nodo_id)
+                    else:
+                        print(f"Vecino {vecino_id} ignorado: no está en nodos actuales")
 
         # Asignar puertos y actualizar vecinos en SimulaQron
         puerto_actual = 5000
         for nodo in nodos:
-            nombre_nodo = nodo["name"]
-
-            # Saltar el puerto 5001
+            nodo_id = nodo["id"]
             if puerto_actual == 5001:
                 puerto_actual += 1
 
-            vecinos_ids = list(vecinos_dict[nombre_nodo])
-
-            # Actualizar vecinos solo si hay alguno
+            vecinos_ids = list(vecinos_dict[nodo_id])
             if vecinos_ids:
-                result = subprocess.run(
-                    ["simulaqron", "nodes", "add", nombre_nodo, "--force", "--neighbors", ",".join(vecinos_ids)],
+                subprocess.run(
+                    ["simulaqron", "nodes", "add", nodo_id, "--force", "--neighbors", ",".join(vecinos_ids)],
                     capture_output=True, text=True
                 )
-                print(f"Nodo {nombre_nodo} actualizado con vecinos: {', '.join(vecinos_ids)}")
-                print(f"  Resultado stdout: {result.stdout.strip()}")
-                print(f"  Resultado stderr: {result.stderr.strip()}")
+                print(f"Nodo {nodo_id} actualizado con vecinos: {', '.join(vecinos_ids)}")
             else:
-                print(f"Nodo {nombre_nodo} sin vecinos")
+                print(f"Nodo {nodo_id} sin vecinos")
 
-            # Registrar el puerto
-            NODOS_PUERTOS[nombre_nodo] = puerto_actual
+            NODOS_PUERTOS[nodo_id] = puerto_actual
             puerto_actual += 1
 
-        # construir links en base a neighbors
-        links = []
+        # Consolidar links en base a neighbors
+        links_dict = {}
         for nodo in nodos:
+            nodo_id = nodo["id"]
+            ts_nodo = nodo.get("lastUpdated", 0)
             for vecino in nodo.get("neighbors", []):
-                links.append({
-                    "source": nodo["name"],
-                    "target": vecino["name"],
-                    "distanciaKm": vecino.get("distanceKm", 0)
-                })
+                vecino_id = vecino.get("id")
+                if vecino_id in vecinos_dict[nodo_id]:
+                    par = tuple(sorted([nodo_id, vecino_id]))
+                    distancia = vecino.get("distanceKm", 0)
 
-        # Obtener la topología actual
-        topologia = mostrar_topologia()
-        nombres_actuales = {n["name"] for n in nodos}
+                    if par not in links_dict:
+                        links_dict[par] = {
+                            "distanciaKm": distancia,
+                            "lastUpdated": ts_nodo
+                        }
+                    else:
+                        if ts_nodo > links_dict[par]["lastUpdated"]:
+                            links_dict[par]["distanciaKm"] = distancia
+                            links_dict[par]["lastUpdated"] = ts_nodo
 
-        # Limpiar nodos que ya no existen directamente en el network.json
+        links = [
+            {"source": par[0], "target": par[1], "distanciaKm": info["distanciaKm"]}
+            for par, info in links_dict.items()
+        ]
+
+        # Limpiar network.json
         result = subprocess.run(["simulaqron", "get", "network-config-file"], capture_output=True, text=True)
         network_file = result.stdout.strip()
 
         with open(network_file, "r", encoding="utf-8") as f:
             network_data = json.load(f)
 
-        nodos_a_eliminar = [n for n in network_data["default"]["nodes"].keys() if n not in nombres_actuales]
-        for nodo in nodos_a_eliminar:
-            network_data["default"]["nodes"].pop(nodo, None)
-            network_data["default"]["topology"].pop(nodo, None)
-            print(f"Nodo eliminado del JSON: {nodo}")
+        ids_actuales = {n["id"] for n in nodos}
+        nodes_json = network_data["default"].get("nodes", {})
 
-        # Filtrar vecinos inexistentes
-        for nodo, vecinos in network_data["default"]["topology"].items():
-            network_data["default"]["topology"][nodo] = [v for v in vecinos if v in nombres_actuales]
+        topology_json = network_data["default"].get("topology")
+        if topology_json is None:
+            topology_json = {}
+            print("Topología era null, inicializada como diccionario vacío")
+
+        # Eliminar nodos que no están en ids_actuales
+        nodos_a_eliminar = [n for n in list(nodes_json.keys()) if n not in ids_actuales]
+        for n in nodos_a_eliminar:
+            nodes_json.pop(n, None)
+            topology_json.pop(n, None)
+            print(f"Nodo eliminado del JSON: {n}")
+
+        # Filtrar vecinos inválidos
+        if isinstance(topology_json, dict):
+            for n, vecinos in list(topology_json.items()):
+                vecinos_filtrados = [
+                    v for v in vecinos
+                    if v and v in nodes_json and v != n
+                ]
+                topology_json[n] = vecinos_filtrados
+
+        network_data["default"]["nodes"] = nodes_json
+        network_data["default"]["topology"] = topology_json
 
         with open(network_file, "w", encoding="utf-8") as f:
             json.dump(network_data, f, indent=4)
 
         # Actualizar SimulaQron con vecinos filtrados
         topologia = mostrar_topologia()
-        for nodo, vecinos in topologia.items():
-            vecinos_filtrados = [v for v in vecinos if v in nombres_actuales]  # Filtrar vecinos inexistentes
+        for nodo_id, vecinos in topologia.items():
+            vecinos_filtrados = [v for v in vecinos if v in ids_actuales and v != nodo_id]
             if set(vecinos) != set(vecinos_filtrados):
-                # Solo actualizar si algo ha cambiado
                 subprocess.run(
-                    ["simulaqron", "nodes", "add", nodo, "--force", "--neighbors", ",".join(vecinos_filtrados)],
+                    ["simulaqron", "nodes", "add", nodo_id, "--force", "--neighbors", ",".join(vecinos_filtrados)],
                     capture_output=True, text=True
                 )
-                print(f"Vecinos actualizados para {nodo}: {vecinos_filtrados}")
+                print(f"Vecinos actualizados para {nodo_id}: {vecinos_filtrados}")
 
         return jsonify({"nodes": nodos, "links": links})
+
 
 
     # Endpoint para enviar órdenes a los nodos
@@ -409,6 +438,7 @@ def app_open(ROL, PUERTO):
 
         for nodo_id, instrucciones in data.items():
             print(f"{nodo_id} estará en {NODOS_PUERTOS}")
+
             if nodo_id not in NODOS_PUERTOS:
                 print(f"No se encontró puerto para nodo {nodo_id}")
                 continue
@@ -435,7 +465,7 @@ def app_open(ROL, PUERTO):
         nodos_raw = request.args.get("nodos", "")
         nodos = [n for n in nodos_raw.split(" ") if n]  # evita strings vacíos
 
-        log_file = "simulaqron_log.txt"
+        log_file = "pre_docs/simulaqron_log.txt"
 
         def log(msg):
             with open(log_file, "a", encoding="utf-8") as f:
@@ -589,15 +619,15 @@ def app_open(ROL, PUERTO):
         contador = 0
         simulacion_en_curso = False
         try:
-            open("fidelidad_alice.txt", "w").close()
-            open("fidelidad_bob.txt", "w").close()
-            open("historial_resultados.txt", "w").close()
-            open("bob_resultado.txt", "w").close()
-            open("qubit_enviado.txt", "w").close()
-            open("tiempo_creacion.txt", "w").close()
-            open("tiempo_recepcion.txt", "w").close()
-            open("qubit_enviado_rep.txt", "w").close()
-            open("simulaqron_log.txt","w").close()
+            open("pre_docs/fidelidad_alice.txt", "w").close()
+            open("pre_docs/fidelidad_bob.txt", "w").close()
+            open("pre_docs/historial_resultados.txt", "w").close()
+            open("pre_docs/bob_resultado.txt", "w").close()
+            open("pre_docs/qubit_enviado.txt", "w").close()
+            open("pre_docs/tiempo_creacion.txt", "w").close()
+            open("pre_docs/tiempo_recepcion.txt", "w").close()
+            open("pre_docs/qubit_enviado_rep.txt", "w").close()
+            open("pre_docs/simulaqron_log.txt","w").close()
             # subprocess.Popen(["python3", "limpiar_qubits.py"]) Preparado para imprevistos de memoria cuantica
             print("[SERVIDOR] Historial y qubits limpiados correctamente.")
         except Exception as e:
@@ -607,14 +637,14 @@ def app_open(ROL, PUERTO):
     @app.route("/limpieza_docs")
     def limpiar_txt():
         try:
-            open("fidelidad_alice.txt", "w").close()
-            open("fidelidad_bob.txt", "w").close()
-            open("bob_resultado.txt", "w").close()
-            open("qubit_enviado.txt", "w").close()
-            open("tiempo_creacion.txt", "w").close()
-            open("tiempo_recepcion.txt", "w").close()
-            open("qubit_enviado_rep.txt", "w").close()
-            open("simulaqron_log.txt","w").close()
+            open("pre_docs/fidelidad_alice.txt", "w").close()
+            open("pre_docs/fidelidad_bob.txt", "w").close()
+            open("pre_docs/bob_resultado.txt", "w").close()
+            open("pre_docs/qubit_enviado.txt", "w").close()
+            open("pre_docs/tiempo_creacion.txt", "w").close()
+            open("pre_docs/tiempo_recepcion.txt", "w").close()
+            open("pre_docs/qubit_enviado_rep.txt", "w").close()
+            open("pre_docs/simulaqron_log.txt","w").close()
             # subprocess.Popen(["python3", "limpiar_qubits.py"]) Preparado para imprevistos de memoria cuantica
             print("[SERVIDOR] Trazas de los qubits y qubits limpiados correctamente.")
         except Exception as e:
@@ -728,7 +758,7 @@ def app_open(ROL, PUERTO):
                         proceso_alice.join()
 
                         # Leer fidelidad generada por Alice
-                        with open("fidelidad_alice.txt", "r") as f:
+                        with open("pre_docs/fidelidad_alice.txt", "r") as f:
                             fidelidades = f.read().strip().split(",")
                             valores = [float(w) for w in fidelidades if w != "None"]
                             w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
@@ -748,7 +778,7 @@ def app_open(ROL, PUERTO):
                         subprocess.run(["python3", "repeater_swap.py", str(num_ParesEPR), str(pswap)])
                         time.sleep(retardo(dist_cb))  # Charlie → Bob
 
-                        with open("fidelidad_alice.txt", "r") as f:
+                        with open("pre_docs/fidelidad_alice.txt", "r") as f:
                             fidelidades = f.read().strip().split(",")
                             valores = [float(w) for w in fidelidades if w != "None"]
                             w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
@@ -771,7 +801,7 @@ def app_open(ROL, PUERTO):
                             time.sleep(retardo(dist_ab))  # Alice → Repeater
 
                             # Leer fidelidad generada por Alice
-                            with open("fidelidad_alice.txt", "r") as f:
+                            with open("pre_docs/fidelidad_alice.txt", "r") as f:
                                 fidelidades = f.read().strip().split(",")
                                 valores = [float(w) for w in fidelidades if w != "None"]
                                 w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
@@ -787,7 +817,7 @@ def app_open(ROL, PUERTO):
                             time.sleep(retardo(dist_cb))  # Charlie → Bob
 
                             # Leer fidelidad generada por Alice
-                            with open("fidelidad_alice.txt", "r") as f:
+                            with open("pre_docs/fidelidad_alice.txt", "r") as f:
                                 fidelidades = f.read().strip().split(",")
                                 valores = [float(w) for w in fidelidades if w != "None"]
                                 w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
@@ -806,10 +836,10 @@ def app_open(ROL, PUERTO):
             L_c = 100.0  # longitud de coherencia en km
 
 
-            with open("tiempo_creacion.txt", "r") as f:
+            with open("pre_docs/tiempo_creacion.txt", "r") as f:
                 t_creacion = f.read().strip().split(",")
 
-            with open("tiempo_recepcion.txt", "r") as f:
+            with open("pre_docs/tiempo_recepcion.txt", "r") as f:
                 t_recepcion = f.read().strip().split(",")
 
             coherencias_temporales = []
@@ -850,10 +880,10 @@ def app_open(ROL, PUERTO):
 
             try:
                 # Leer mediciones y fidelidades originales
-                with open("bob_resultado.txt", "r") as f:
+                with open("pre_docs/bob_resultado.txt", "r") as f:
                     mediciones = f.read().strip().split(",")
 
-                with open("fidelidad_bob.txt", "r") as f:
+                with open("pre_docs/fidelidad_bob.txt", "r") as f:
                     fidelidades = f.read().strip().split(",")
                 # Aplicar corrección de fidelidad si no es modo puro
                 fidelidades_corregidas = []
@@ -889,7 +919,7 @@ def app_open(ROL, PUERTO):
 
                 # Actualizar historial
                 contador += 1
-                with open("historial_resultados.txt", "a") as h:
+                with open("pre_docs/historial_resultados.txt", "a") as h:
                     h.write(
                         f"{contador}: {resultado} "
                         f"(estimado={tiempo_estimado:.6f}s, real={tiempo_real:.6f}s"
@@ -903,7 +933,7 @@ def app_open(ROL, PUERTO):
 
             # Leer historial completo
             try:
-                with open("historial_resultados.txt", "r") as h:
+                with open("pre_docs/historial_resultados.txt", "r") as h:
                     historial = [line.strip() for line in h.readlines()]
             except FileNotFoundError:
                 historial = []

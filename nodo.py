@@ -2,10 +2,11 @@ import socket
 from flask import Flask, render_template, jsonify, request
 import json
 import sys
-from multiprocessing import Process, Manager
+from multiprocessing import Process
 from flask_cors import CORS
 from time import time
-
+import subprocess
+import requests
 
 def puerto_disponible(puerto: int) -> bool:
     """Devuelve True si el puerto está libre en localhost."""
@@ -26,6 +27,7 @@ def seleccionar_puerto(inicio=5000, fin=5010, excluir=None):
             return puerto
     return None
 
+
 ORDERS = []
 
 def app_open(PUERTO):
@@ -40,7 +42,6 @@ def app_open(PUERTO):
             "roles": ["emisor", "receptor"],
             "neighbors": [],   # Alice no tiene vecinos iniciales
             "parEPR": []
-
         },
         5002: {
             "id": "node_bob",
@@ -50,10 +51,9 @@ def app_open(PUERTO):
             "pgen": 0.7,
             "roles": ["receptor", "repeater"],
             "neighbors": [
-                {"name": "Alice", "distanceKm": 50}
+                {"id": "node_alice", "distanceKm": 50}
             ],
             "parEPR": []
-
         },
         5003: {
             "id": "node_charlie",
@@ -63,72 +63,157 @@ def app_open(PUERTO):
             "pgen": 0.9,
             "roles": ["emisor", "repeater"],
             "neighbors": [
-                {"name": "Alice", "distanceKm": 70},
-                {"name": "Bob", "distanceKm": 40}
+                {"id": "node_alice", "distanceKm": 70},
+                {"id": "node_bob", "distanceKm": 40}
             ],
             "parEPR": []
-
         }
     }
     nodo_info = PORT_NODE_MAP.get(PUERTO, {"id": "node_unknown", "name": "Desconocido", "neighbors": []})
-    app = Flask(__name__)
-    CORS(app)  # Esto permite peticiones desde cualquier origen
 
-    # Si quieres restringirlo solo al frontend:
-    # CORS(app, resources={r"/*": {"origins": "http://127.0.0.1:8000"}})
+    # --- Auxiliar: obtener puerto a partir del id ---
+    def get_port_by_id(node_id: str) -> int:
+        for port, info in PORT_NODE_MAP.items():
+            if info["id"] == node_id:
+                return port
+        raise ValueError(f"No se encontró puerto para {node_id}")
+
+    def aplicar_orden(orden, node_info):
+        accion = orden["accion"]
+        origen_id = node_info["id"]
+
+        print("APLICO ORDEN!!!")
+
+        if accion in ["genera EPR", "generar"]:
+            destino_id = orden["destino"]
+            origen_port = get_port_by_id(origen_id)
+            destino_port = get_port_by_id(destino_id)
+            pgen_origen = str(node_info["pgen"])
+
+            print(origen_id, "va a generarEPR con:", destino_id)
+            subprocess.run([
+                "python", "sender.py",
+                origen_id, destino_id,
+                str(origen_port), str(destino_port),
+                pgen_origen
+            ])
+
+        elif accion in ["recibe EPR"]:
+            # Procesa los pares recibidos
+            for epr in node_info.get("parEPR", []):
+                if epr.get("estado") == "ok":
+                    subprocess.run([
+                        "python", "receiver.py",
+                        json.dumps(epr),
+                        json.dumps(node_info)
+                    ])
+                else:
+                    print(f"[RECEIVER] Qubit {epr.get('id')} marcado como fallo, se descarta")
+
+        elif accion in ["purifica", "purificar"]:
+            print(f"[{origen_id}] Ejecutando protocolo de purificación...")
+            subprocess.run([
+                "python", "purify.py",
+                json.dumps(node_info)
+            ])
+
+        elif accion in ["swap", "swapping"]:
+            destinatarios = orden["con"]
+            destinatarios_ports = [str(get_port_by_id(n)) for n in destinatarios]
+            pswap_origen = str(node_info.get("pswap", 0))
+            subprocess.run([
+                "python", "swap.py", pswap_origen
+            ] + destinatarios + destinatarios_ports)
+
+        else:
+            raise ValueError(f"Acción desconocida: {accion}")
+
+    app = Flask(__name__)
+    CORS(app)
 
     @app.route("/")
     def index():
-        return render_template(
-                "nodo.html",
-                nodo_info=nodo_info
-        )
-    # Endpoint JSON del estado del nodo
+        return render_template("nodo.html", nodo_info=nodo_info)
+
     @app.route("/info")
     def info():
         return jsonify(nodo_info)
-    
-    # Añadir un nuevo par EPR
-    @app.route("/add_parEPR", methods=["POST"])
-    def add_parEPR():
-        data = request.get_json()
-        if "vecino" in data and "t_gen" in data and "w_gen" in data:
-            # Asignar ID incremental
-            next_id = max([p["id"] for p in nodo_info["parEPR"]] + [0]) + 1
-            data["id"] = next_id
-            nodo_info["parEPR"].append(data)
-            return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]})
-        return jsonify({"error": "Datos incompletos"}), 400
 
-    # Eliminar un par EPR por ID
-    @app.route("/delete_parEPR/<int:pair_id>", methods=["DELETE"])
-    def delete_parEPR(pair_id):
+    @app.route("/parEPR/add", methods=["POST"])
+    def parEPR_add():
+        data = request.get_json()
+        print("Datos a actualizar/agregar", data)
+        if "vecino" not in data or "t_gen" not in data or "w_gen" not in data:
+            return jsonify({"error": "Datos incompletos"}), 400
+
+        next_id = len(nodo_info.get("parEPR", [])) + 1
+        estado = "fallo" if str(data["w_gen"]).lower() == "fallo" else "ok"
+
+        nodo_info.setdefault("parEPR", []).append({
+            "id": next_id,
+            "vecino": data["vecino"],
+            "t_gen": data["t_gen"],
+            "w_gen": data["w_gen"],
+            "estado": estado
+        })
+        print(nodo_info)
+        return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]})
+
+    @app.route("/parEPR/delete", methods=["POST"])
+    def parEPR_delete():
+        data = request.get_json()
+        pair_id = data.get("id")
+
+        if pair_id is None:
+            return jsonify({"error": "Falta id"}), 400
+
         original = len(nodo_info["parEPR"])
         nodo_info["parEPR"] = [p for p in nodo_info["parEPR"] if p["id"] != pair_id]
+
         if len(nodo_info["parEPR"]) < original:
             return jsonify({"status": "deleted", "parEPR": nodo_info["parEPR"]})
+
         return jsonify({"error": "ID no encontrado"}), 404
-    
-    # Endpoint para actualizar el estado del nodo
+
     @app.route("/update", methods=["POST"])
     def update():
         data = request.get_json()
+
         for key in ["id", "name", "pgen", "pswap", "roles", "neighbors", "parEPR"]:
             if key in data:
                 nodo_info[key] = data[key]
-            # Guardar timestamp de última actualización
+
+        source = data.get("source")
+        target = data.get("target")
+        distancia = data.get("distanciaKm")
+        if source and target and distancia is not None:
+            if nodo_info.get("id") == source:
+                for v in nodo_info.get("neighbors", []):
+                    if v.get("id") == target:
+                        v["distanceKm"] = distancia
+            if nodo_info.get("id") == target:
+                for v in nodo_info.get("neighbors", []):
+                    if v.get("id") == source:
+                        v["distanceKm"] = distancia
+
+            vecino_id = target if nodo_info["id"] == source else source
+            vecino_port = get_port_by_id(vecino_id)
+            try:
+                requests.post(f"http://localhost:{vecino_port}/update", json=data)
+            except Exception as e:
+                print(f"Error propagando actualización a {vecino_id}: {e}")
+
         nodo_info["lastUpdated"] = data.get("lastUpdated", time())
         return jsonify({"status": "ok", "nodo_info": nodo_info})
-    
 
     @app.route("/mandate", methods=["POST"])
     def receive_mandate():
         global ORDERS
+        ORDERS.clear()
         data = request.get_json()
 
         if isinstance(data, dict):
             for nodo_id, instrucciones in data.items():
-                # asegurarse de que instrucciones sea iterable de dicts
                 if isinstance(instrucciones, list):
                     for instr in instrucciones:
                         ORDERS.append(instr)
@@ -142,28 +227,40 @@ def app_open(PUERTO):
 
         return jsonify({"status": "ok", "ORDERS": ORDERS})
 
-
-
-    # Consultar órdenes pendientes (GET)
     @app.route("/orders", methods=["GET"])
     def get_orders():
         global ORDERS
         return jsonify(ORDERS)
 
+    @app.route("/operations", methods=["POST"])
+    def operations():
+        data = request.get_json()
+        print(">>> Orden recibida en /operations:", data)
 
-    
+        if not isinstance(data, dict):
+            return jsonify({"error": "Formato inválido"}), 400
+        if "accion" not in data:
+            return jsonify({"error": "Falta 'accion'"}), 400
+
+        try:
+            aplicar_orden(data, nodo_info)
+            print(">>> Orden aplicada correctamente")
+            return jsonify({"status": "ok", "nodo_info": nodo_info})
+        except Exception as e:
+            print(">>> Excepción en aplicar_orden:", repr(e))
+            return jsonify({"error": str(e)}), 500
+
     print(f"[SERVIDOR] Inicializando nodo en el puerto {PUERTO}...")
-    app.run(host="127.0.0.1", port=PUERTO, debug=True, use_reloader=False) #Quitar debug=True si no estoy en produccion
+    app.run(host="127.0.0.1", port=PUERTO, debug=True, use_reloader=False)
 
-    
+
 if __name__ == "__main__":
-    # Alice en cualquier puerto libre del rango, excepto 5001
+    # Seleccionar un puerto libre en el rango, excepto 5001
     PUERTO = seleccionar_puerto(5000, 5010, excluir=[5001])
     if PUERTO is None:
-        print("[ERROR] No hay puertos disponibles para Alice.")
+        print("[ERROR] No hay puertos disponibles.")
         sys.exit(1)
 
-    
     proceso = Process(target=app_open, args=(PUERTO,))
     proceso.start()
     proceso.join()

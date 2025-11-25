@@ -155,8 +155,8 @@
             <tbody>
                 {% for vecino in nodo_info.get("neighbors", []) %}
                 <tr>
-                    <td>{{ nodo_info.name }}</td>
-                    <td>{{ vecino.name }}</td>
+                    <td>{{ nodo_info.id }}</td>
+                    <td>{{ vecino.id }}</td>
                     <td><input type="number" class="distInput" value="{{ vecino.distanceKm }}"></td>
                 </tr>
                 {% endfor %}
@@ -174,6 +174,68 @@ window.onload = function () {
     const nodo_id = nodo.id;
     const svg = document.getElementById("canvas");
     const ns = "http://www.w3.org/2000/svg";
+
+    function actualizarNodo() {
+        fetch("/info")
+            .then(res => res.json())
+            .then(data => {
+                console.log("Datos recibidos de /info:", data);
+                // actualizar nodo global
+                Object.assign(nodo, data);
+
+                // actualizar inputs
+                document.getElementById("nameInput").value = data.name;
+                document.getElementById("pgenInput").value = data.pgen;
+                document.getElementById("pswapInput").value = data.pswap || 0;
+                document.querySelectorAll(".roleChk").forEach(chk => {
+                    chk.checked = data.roles.includes(chk.value);
+                });
+
+                // actualizar tabla vecinos
+                const tbody = document.querySelector("#tabla-aristas tbody");
+                tbody.innerHTML = "";
+                data.neighbors.forEach((vecino, idx) => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${data.id}</td>
+                        <td>${vecino.name || vecino.id}</td>
+                        <td><input type="number" class="distInput" value="${vecino.distanceKm}"></td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    // seleccionar el input recién creado
+                    const input = tr.querySelector(".distInput");
+
+                    // enganchar eventos al input
+                    input.addEventListener("focus", pausarActualizaciones);
+                    input.addEventListener("blur", reanudarActualizaciones);
+                    input.addEventListener("change", e => {
+                        const nuevaDistancia = parseFloat(e.target.value);
+                        nodo.neighbors[idx].distanceKm = nuevaDistancia;
+
+                        const vecinoid = nodo.neighbors[idx].id;
+
+                        // enviar actualización al backend
+                        fetch("/update", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                source: nodo.id,
+                                target: vecinoid,
+                                distanciaKm: nuevaDistancia,
+                                lastUpdated: Date.now()
+                            })
+                        });
+                    });
+                });
+
+                drawMapa();
+            })
+            .catch(console.error);
+    }
+
+
+
 
     // Actualizar nombre del nodo
     document.getElementById("nameInput").addEventListener("change", e => {
@@ -216,18 +278,6 @@ window.onload = function () {
         });
     });
 
-    // Actualizar distancias vecinos
-    document.querySelectorAll(".distInput").forEach((input, idx) => {
-        input.addEventListener("change", e => {
-            nodo.neighbors[idx].distanceKm = parseFloat(e.target.value);
-            fetch("/update", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ neighbors: nodo.neighbors, lastUpdated: Date.now() })
-            });
-        });
-    });
-
     // Preparar vecinos con posiciones iniciales
     const vecinos = nodo.neighbors.map((vecino, i) => {
         const angle = (2 * Math.PI * i) / nodo.neighbors.length;
@@ -240,6 +290,16 @@ window.onload = function () {
 
     function drawMapa() {
         svg.innerHTML = "";
+
+        // Recalcular posiciones de vecinos en cada redibujo
+        const vecinos = nodo.neighbors.map((vecino, i) => {
+            const angle = (2 * Math.PI * i) / nodo.neighbors.length;
+            return {
+                ...vecino,
+                x: nodo.x + 100 * Math.cos(angle),
+                y: nodo.y + 100 * Math.sin(angle)
+            };
+        });
 
         // Nodo central
         const centralCircle = document.createElementNS(ns, "circle");
@@ -254,7 +314,7 @@ window.onload = function () {
         centralLabel.setAttribute("x", nodo.x);
         centralLabel.setAttribute("y", nodo.y + 40);
         centralLabel.setAttribute("text-anchor", "middle");
-        centralLabel.textContent = nodo.name;
+        centralLabel.textContent = nodo.id;
         svg.appendChild(centralLabel);
 
         // Vecinos y enlaces
@@ -280,7 +340,7 @@ window.onload = function () {
             vLabel.setAttribute("x", vecino.x);
             vLabel.setAttribute("y", vecino.y + 25);
             vLabel.setAttribute("text-anchor", "middle");
-            vLabel.textContent = vecino.name;
+            vLabel.textContent = vecino.id;
             svg.appendChild(vLabel);
         });
 
@@ -298,7 +358,7 @@ window.onload = function () {
             if (draggingCentral) {
                 nodo.x = e.offsetX - offsetX;
                 nodo.y = e.offsetY - offsetY;
-                drawMapa();
+                drawMapa(); // redibuja con nuevas posiciones
             }
         });
 
@@ -340,21 +400,43 @@ window.onload = function () {
         });
     }
 
+
     drawMapa();
 
     const preOrdenes = document.getElementById("ordenesNodo");
+    let ultimasOrdenes = [];  // cache local de las últimas órdenes
 
-    // Función para actualizar la lista de órdenes desde el servidor
     function actualizarOrdenes() {
         fetch("/orders")
             .then(res => res.json())
             .then(data => {
                 if (!data || data.length === 0) {
                     preOrdenes.textContent = "No hay órdenes aún.";
+                    return;
+                }
+
+                // Mostrar las órdenes
+                preOrdenes.textContent = data
+                    .map((o, i) => `${i + 1}. ${JSON.stringify(o)}`)
+                    .join("\n");
+
+                // Comparar con las últimas
+                const nuevasOrdenes = JSON.stringify(data);
+                const anterioresOrdenes = JSON.stringify(ultimasOrdenes);
+
+                if (nuevasOrdenes !== anterioresOrdenes) {
+                    console.log("Órdenes nuevas detectadas, aplicando...");
+                    data.forEach(orden => {
+                        fetch("/operations", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(orden)
+                        }).catch(err => console.error("Error aplicando orden:", err));
+                    });
+                    // Actualizar cache
+                    ultimasOrdenes = data;
                 } else {
-                    preOrdenes.textContent = data
-                        .map((o, i) => `${i + 1}. ${JSON.stringify(o)}`)
-                        .join("\n");
+                    console.log("Órdenes iguales, no se reenvían");
                 }
             })
             .catch(err => {
@@ -363,11 +445,36 @@ window.onload = function () {
             });
     }
 
+
+
+
     // Llamada inicial
     actualizarOrdenes();
+    actualizarNodo();
 
-    // Refrescar automáticamente cada 1 segundo
-    setInterval(actualizarOrdenes, 10000);
+    // Guardar los IDs de los intervalos
+    let nodoInterval = setInterval(actualizarNodo, 2000);
+    let ordenesInterval = setInterval(actualizarOrdenes, 2000);
+
+    // Funciones para pausar y reanudar
+    function pausarActualizaciones() {
+        clearInterval(nodoInterval);
+        clearInterval(ordenesInterval);
+        console.log("Actualizaciones pausadas");
+    }
+
+    function reanudarActualizaciones() {
+        nodoInterval = setInterval(actualizarNodo, 10000);
+        ordenesInterval = setInterval(actualizarOrdenes, 10000);
+        console.log("Actualizaciones reanudadas");
+    }
+
+    // Detectar cuando el usuario escribe en un input
+    document.querySelectorAll("input, textarea").forEach(el => {
+        el.addEventListener("focus", pausarActualizaciones);
+        el.addEventListener("blur", reanudarActualizaciones);
+    });
+
 
     };
 </script>
