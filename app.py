@@ -446,6 +446,27 @@ def app_open(ROL, PUERTO):
                 print(f"Excepción enviando a {nodo_id}: {e}")
 
         return jsonify({"status": "ok"})
+    
+    MASTER_PAR_EPR = {}
+
+    @app.route("/master/parEPR", methods=["GET", "POST"])
+    def master_parEPR():
+        if request.method == "POST":
+            data = request.get_json()
+            if not isinstance(data, dict):
+                return jsonify({"error": "Formato inválido"}), 400
+
+            for nodo_id, historial in data.items():
+                for epr in historial:
+                    clave = f"{nodo_id}-{epr['vecino']}"
+                    if clave not in MASTER_PAR_EPR:
+                        MASTER_PAR_EPR[clave] = []
+                    MASTER_PAR_EPR[clave].append(epr)
+                    print(f"[MASTER] Historial actualizado para {clave}: {epr}")
+
+        # Tanto GET como POST devuelven el estado actual
+        return jsonify({"status": "ok", "MASTER_PAR_EPR": MASTER_PAR_EPR})
+
 
     @app.route("/crear_nodos_simulaqron")
     def crear_nodos_simulaqron():
@@ -606,6 +627,8 @@ def app_open(ROL, PUERTO):
         global contador, simulacion_en_curso
         contador = 0
         simulacion_en_curso = False
+        MASTER_PAR_EPR = {}
+
         try:
             open("pre_docs/fidelidad_alice.txt", "w").close()
             open("pre_docs/fidelidad_bob.txt", "w").close()

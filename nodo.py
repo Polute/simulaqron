@@ -162,6 +162,7 @@ def app_open(PUERTO):
             "estado": estado
         })
         print(nodo_info)
+        notificar_master_parEPR(nodo_info)
         return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]})
 
     @app.route("/parEPR/delete", methods=["POST"])
@@ -179,6 +180,18 @@ def app_open(PUERTO):
             return jsonify({"status": "deleted", "parEPR": nodo_info["parEPR"]})
 
         return jsonify({"error": "ID no encontrado"}), 404
+    import requests
+
+    def notificar_master_parEPR(nodo_info):
+        try:
+            res = requests.post(
+                "http://localhost:8000/master/parEPR",  # puerto donde corre el master
+                json={nodo_info["id"]: nodo_info.get("parEPR", [])},
+                timeout=2
+            )
+            print("[DEBUG] Historial parEPR enviado al master:", res.status_code)
+        except Exception as e:
+            print("[DEBUG] Error notificando al master:", e)
 
     @app.route("/update", methods=["POST"])
     def update():

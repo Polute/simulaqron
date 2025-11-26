@@ -199,21 +199,22 @@
             </div>
             <!-- Columna derecha: historial -->
             <div class="columna-derecha">
-                <h2>Historial de Resultados</h2>
+                <h2>Historial</h2>
+                <select id="modoHistorial" onchange="cargarHistorial()">
+                    <option value="resultados">Resultados</option>
+                    <option value="epr">Pares EPR</option>
+                </select>
                 <table id="tabla-resultados">
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>Resultado</th>
+                            <th>Detalle</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- Se llenará dinámicamente -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
                 <button class="boton" onclick="limpiarHistorial()">Limpiar historial</button>
             </div>
-           </div> 
     </div>
     <script>
         // --- DRAG DESDE LA PALETA ---
@@ -1462,6 +1463,35 @@
             document.getElementById("loading").style.display = "none";
         }
 
+        const historial = JSON.parse('{{ historial|tojson|safe }}');
+        document.addEventListener("DOMContentLoaded", () => {
+            cargarHistorial({historial});
+        });
+        function cargarHistorial(historial) {
+            const modo = document.getElementById("modoHistorial").value;
+            if (modo === "resultados") {
+                actualizarTabla(historial);
+            } else if (modo === "epr") {
+                console.log("Recibo los EPRS");
+                fetch("/master/parEPR")
+                    .then(res => res.json())
+                    .then(data => {
+                        // Usamos un Map para deduplicar por id y quedarnos con el último (Bob)
+                        const mapa = new Map();
+                        for (const [clave, lista] of Object.entries(data.MASTER_PAR_EPR || {})) {
+                            lista.forEach(epr => {
+                                // añadimos la clave nodo-vecino como campo "enlace"
+                                mapa.set(epr.id, { ...epr, enlace: clave });
+                            });
+                        }
+                        const unicos = Array.from(mapa.values());
+                        actualizarTablaEPR(unicos);
+                    })
+                    .catch(err => console.error("Error cargando EPR:", err));
+            }
+        }
+
+
 
         function actualizarTabla(historial) {
             const tbody = document.querySelector("#tabla-resultados tbody");
@@ -1473,6 +1503,25 @@
                 tbody.appendChild(fila);
             });
         }
+
+        function actualizarTablaEPR(historial) {
+            console.log(historial);
+            const tbody = document.querySelector("#tabla-resultados tbody");
+            tbody.innerHTML = "";
+            historial.forEach(epr => {
+                const fila = document.createElement("tr");
+                fila.innerHTML = `
+                    <td>${epr.id}</td>
+                    <td>Enlace: ${epr.enlace}</td>
+                    <td>Vecino: ${epr.vecino}</td>
+                    <td>Estado: ${epr.estado}</td>
+                    <td>Fidelidad: ${epr.w_gen}</td>
+                    <td>Tiempo: ${epr.t_gen}</td>
+                `;
+                tbody.appendChild(fila);
+            });
+        }
+
         function limpiarHistorial() {
             fetch("/limpiar_historial")
                 .then(response => response.json())
@@ -1484,6 +1533,7 @@
                     document.getElementById("contador").innerHTML =
                         "<strong>Simulaciones realizadas:</strong> 0";
                     actualizarTabla([]);
+                    actualizarTablaEPR([]);
                 });
         }
         let modoAnterior = document.getElementById("modo").value;
