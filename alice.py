@@ -25,7 +25,7 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
         if estado == "fallo":
             print(f"[ALICE] Fallo probabilístico en generación de EPR #{i+1} (pgen={pgen})")
         else:
-            with CQCConnection("Alice") as alice:
+            with CQCConnection("node_alice_pre") as alice:
                 #Calculo el tiempo de ejecucion inicial de la generacion del par EPR
                 t_creacion = datetime.now().strftime("%M:%S.%f")[:-3]
                 with lock:
@@ -47,7 +47,7 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
                 timestamp = ahora.strftime("%M:%S.%f")[:-3]  # recorta a milésimas
                 print(f"[TIEMPO GEN] {timestamp}")
                 if modo == "puro":
-                    q = alice.createEPR("Bob")
+                    q = alice.createEPR("node_bob_pre")
                     q1_ID = q.get_entInfo().id_AB
                     ahora = datetime.now()
                     timestamp = ahora.strftime("%M:%S.%f")[:-3]  # recorta a milésimas
@@ -56,14 +56,14 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
                     w_alice = 1.00
                     print(f"[ALICE] EPR #{i+1} creado con Bob (modo puro).")
                 elif modo == "werner":
-                    q = alice.createEPR("Bob")
+                    q = alice.createEPR("node_bob_pre")
                     print(f"[TIEMPO] {timestamp}")
                     q1_ID = q.get_entInfo().id_AB
                     print(f"[ALICE] EPR generado con id:{q1_ID}")
                     w_alice = 0.90
                     print(f"[ALICE] EPR #{i+1} creado con Bob (modo werner).")
                 elif modo == "swap":
-                    q = alice.createEPR("Charlie")
+                    q = alice.createEPR("node_charlie_pre")
                     print(f"[TIEMPO] {timestamp}")
                     q1_ID = q.get_entInfo().id_AB
                     print(f"[ALICE] EPR generado con id:{q1_ID}")

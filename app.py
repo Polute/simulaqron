@@ -16,6 +16,14 @@ import importlib.resources
 import socket
 from flask_cors import CORS
 
+import socket
+
+def puerto_activo(host, port):
+    try:
+        with socket.create_connection((host, port), timeout=1):
+            return True
+    except OSError:
+        return False
 
 
 
@@ -165,7 +173,7 @@ PREDEFINED_NODES = [
 # Reiniciar SimulaQron al iniciar el servidor
 print("[INIT] Reiniciando SimulaQron...")
 subprocess.run(["simulaqron", "reset", "--force"])
-subprocess.run(["simulaqron", "start", "--name", "default", "--force", "-n", "node_alice_pre, node_bob_pre, node_charlie_pre"])
+subprocess.run(["simulaqron", "start", "--name", "default", "--force", "-n", "node_alice_pre,node_bob_pre,node_charlie_pre"])
 print("[INIT] Inicializando SimulaQron...")
 
 
@@ -308,17 +316,60 @@ def app_open(ROL, PUERTO):
             nodos = PREDEFINED_NODES
 
         limpiar_historial()
+        antes_start = time.time()
+        subprocess.run(["simulaqron", "reset", "--force"], capture_output=True, text=True)
 
-        # Usar id en lugar de name
-        ids_nodos = ",".join([n["id"] for n in nodos])
+        ids_actuales = [n["id"] for n in nodos]
 
-        subprocess.run(
-            ["simulaqron", "start", "--name", "default", "--force", "-n", ids_nodos],
-            capture_output=True, text=True
+        # Arrancar nodos según cantidad
+        if len(ids_actuales) < 4:
+            # Arrancar todos los nodos juntos con sus IDs reales
+            proc = subprocess.Popen(
+                ["simulaqron", "start", "--name", "default", "--force", "-n", ",".join(ids_actuales)]
+            )
+        elif len(ids_actuales) == 4:
+            # Arrancar los 4 nodos en línea, usando sus IDs reales
+            proc = subprocess.Popen(
+                ["simulaqron", "start", "--name", "default", "--force", "-n", ",".join(ids_actuales), "-t", "line"]
+            )
+        else:
+            # Más de 4: extender como línea, también con IDs reales
+            proc = subprocess.Popen(
+                ["simulaqron", "start", "--name", "default", "--force", "-n", ",".join(ids_actuales), "-t", "line"]
+            )
+
+        time.sleep(2)  # espera a que arranquen los sockets
+
+        primer_nodo = ids_actuales[0]
+        duracion_start = time.time() - antes_start
+        print(f"Start tardó: {duracion_start:.3f} segundos")
+        print(f"Nodo inicial arrancado: {primer_nodo}")
+
+        # Comprobación de conexión CQC con el primer nodo
+        from cqc.pythonLib import CQCConnection
+        try:
+            with CQCConnection(primer_nodo) as conn:
+                print(f"[DEBUG] Conexión CQC abierta correctamente con {primer_nodo}")
+                print(f"[DEBUG] Objeto conexión: {conn}")
+                print(f"[DEBUG] __dict__ de la conexión: {conn.__dict__}")
+                sock = conn._s
+                print(f"[DEBUG] Socket local: {sock.getsockname()}")
+                print(f"[DEBUG] Socket remoto: {sock.getpeername()}")
+        except Exception as e:
+            print(f"[DEBUG] Error al abrir CQCConnection con {primer_nodo}: {e}")
+
+        # Ejecutar prueba.py para comprobar CQCConnection
+        print("[DEBUG] Lanzando prueba.py para comprobar conexión CQC...")
+        result = subprocess.run(
+            ["python", "prueba.py"],
+            capture_output=True,
+            text=True
         )
-        print(f"Nodos iniciales agregados: {ids_nodos}")
+        print("[DEBUG] Salida de prueba.py:\n", result.stdout)
+        if result.stderr:
+            print("[DEBUG] Errores de prueba.py:\n", result.stderr)
 
-        # Construir diccionario de vecinos simétricos usando id
+        # Construir diccionario de vecinos simétricos
         vecinos_dict = {n["id"]: set() for n in nodos}
         for nodo in nodos:
             nodo_id = nodo["id"]
@@ -331,27 +382,8 @@ def app_open(ROL, PUERTO):
                     else:
                         print(f"Vecino {vecino_id} ignorado: no está en nodos actuales")
 
-        # Asignar puertos y actualizar vecinos en SimulaQron
-        puerto_actual = 5000
-        for nodo in nodos:
-            nodo_id = nodo["id"]
-            if puerto_actual == 5001:
-                puerto_actual += 1
 
-            vecinos_ids = list(vecinos_dict[nodo_id])
-            if vecinos_ids:
-                subprocess.run(
-                    ["simulaqron", "nodes", "add", nodo_id, "--force", "--neighbors", ",".join(vecinos_ids)],
-                    capture_output=True, text=True
-                )
-                print(f"Nodo {nodo_id} actualizado con vecinos: {', '.join(vecinos_ids)}")
-            else:
-                print(f"Nodo {nodo_id} sin vecinos")
-
-            NODOS_PUERTOS[nodo_id] = puerto_actual
-            puerto_actual += 1
-
-        # Consolidar links en base a neighbors
+        # Consolidar links
         links_dict = {}
         for nodo in nodos:
             nodo_id = nodo["id"]
@@ -361,12 +393,8 @@ def app_open(ROL, PUERTO):
                 if vecino_id in vecinos_dict[nodo_id]:
                     par = tuple(sorted([nodo_id, vecino_id]))
                     distancia = vecino.get("distanceKm", 0)
-
                     if par not in links_dict:
-                        links_dict[par] = {
-                            "distanciaKm": distancia,
-                            "lastUpdated": ts_nodo
-                        }
+                        links_dict[par] = {"distanciaKm": distancia, "lastUpdated": ts_nodo}
                     else:
                         if ts_nodo > links_dict[par]["lastUpdated"]:
                             links_dict[par]["distanciaKm"] = distancia
@@ -376,58 +404,20 @@ def app_open(ROL, PUERTO):
             {"source": par[0], "target": par[1], "distanciaKm": info["distanciaKm"]}
             for par, info in links_dict.items()
         ]
+        
 
-        # Limpiar network.json
-        result = subprocess.run(["simulaqron", "get", "network-config-file"], capture_output=True, text=True)
-        network_file = result.stdout.strip()
 
-        with open(network_file, "r", encoding="utf-8") as f:
-            network_data = json.load(f)
-
-        ids_actuales = {n["id"] for n in nodos}
-        nodes_json = network_data["default"].get("nodes", {})
-
-        topology_json = network_data["default"].get("topology")
-        if topology_json is None:
-            topology_json = {}
-            print("Topología era null, inicializada como diccionario vacío")
-
-        # Eliminar nodos que no están en ids_actuales
-        nodos_a_eliminar = [n for n in list(nodes_json.keys()) if n not in ids_actuales]
-        for n in nodos_a_eliminar:
-            nodes_json.pop(n, None)
-            topology_json.pop(n, None)
-            print(f"Nodo eliminado del JSON: {n}")
-
-        # Filtrar vecinos inválidos
-        if isinstance(topology_json, dict):
-            for n, vecinos in list(topology_json.items()):
-                vecinos_filtrados = [
-                    v for v in vecinos
-                    if v and v in nodes_json and v != n
-                ]
-                topology_json[n] = vecinos_filtrados
-
-        network_data["default"]["nodes"] = nodes_json
-        network_data["default"]["topology"] = topology_json
-
-        with open(network_file, "w", encoding="utf-8") as f:
-            json.dump(network_data, f, indent=4)
-
-        # Actualizar SimulaQron con vecinos filtrados
-        topologia = mostrar_topologia()
-        for nodo_id, vecinos in topologia.items():
-            vecinos_filtrados = [v for v in vecinos if v in ids_actuales and v != nodo_id]
-            if set(vecinos) != set(vecinos_filtrados):
-                subprocess.run(
-                    ["simulaqron", "nodes", "add", nodo_id, "--force", "--neighbors", ",".join(vecinos_filtrados)],
-                    capture_output=True, text=True
-                )
-                print(f"Vecinos actualizados para {nodo_id}: {vecinos_filtrados}")
-
+        # Ejecutar prueba.py para comprobar CQCConnection
+        print("[DEBUG] Lanzando prueba.py 2º para comprobar conexión CQC...")
+        result = subprocess.run(
+            ["python", "prueba.py"],
+            capture_output=True,
+            text=True
+        )
+        print("[DEBUG] Salida de prueba.py 2º:\n", result.stdout)
+        if result.stderr:
+            print("[DEBUG] Errores de prueba.py 2º:\n", result.stderr)
         return jsonify({"nodes": nodos, "links": links})
-
-
 
     # Endpoint para enviar órdenes a los nodos
     @app.route("/mandate", methods=["POST"])
@@ -446,8 +436,6 @@ def app_open(ROL, PUERTO):
             puerto = NODOS_PUERTOS[nodo_id]
             url = f"http://localhost:{puerto}/mandate"  # apuntamos al POST en el nodo
 
-            # enviamos las instrucciones mediante POST
-            print(f"Instrucciones enviadas a {nodo_id}: {instrucciones}")
             try:
                 res = requests.post(url, json={nodo_id: instrucciones}, timeout=2)
                 if res.status_code == 200:

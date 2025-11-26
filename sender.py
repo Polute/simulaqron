@@ -34,7 +34,14 @@ def generar_epr(emisor, receptor, emisor_port, receptor_port, pgen):
         return
 
     try:
+        print("en sender.py tras pasar pgen")
+        print("Emite: ")
+        print(emisor)
+        print("Recibe")
+        print(receptor)
         with CQCConnection(emisor) as conn:
+            print("[DEBUG] Conexión abierta correctamente con", emisor)
+            print("[DEBUG] Objeto conexión:", conn)
             q = conn.createEPR(receptor)
             q_id = q.get_entInfo().id_AB
             print(f"[SENDER] EPR created id={q_id}")
@@ -70,7 +77,7 @@ def generar_epr(emisor, receptor, emisor_port, receptor_port, pgen):
         send_info(f"http://localhost:{receptor_port}/parEPR/add", payload1)
         send_info(f"http://localhost:{emisor_port}/parEPR/add", payload2)
         return
-
+    print("en sender.py tras pasar pgen y generarlo")
     # Success payload
     payload1 = {
         "vecino": emisor,
@@ -93,5 +100,5 @@ if __name__ == "__main__":
     emisor_port = int(sys.argv[3])
     receptor_port = int(sys.argv[4])
     pgen = float(sys.argv[5])   # probability of generation
-
+    print("en sender.py")
     generar_epr(emisor, receptor, emisor_port, receptor_port, pgen)

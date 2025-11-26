@@ -5,7 +5,7 @@ import time
 import math
 
 def entanglement_swap(num_ParesEPR, pswap):
-    with CQCConnection("Charlie") as repeater:
+    with CQCConnection("node_charlie_pre") as repeater:
         try:
             with open("pre_docs/qubit_enviado.txt", "r") as f:
                 enviados = f.read().strip().split(",")
@@ -21,7 +21,7 @@ def entanglement_swap(num_ParesEPR, pswap):
                     q1 = repeater.recvEPR()
                     print(f"[SWAP] Qubit #{i+1} de Alice recibido.")
                     print("despues")
-                    q2 = repeater.createEPR("Bob")
+                    q2 = repeater.createEPR("node_bob_pre")
                     print("despues")
                     print(f"[SWAP] EPR #{i+1} con Bob creado.")
                 except Exception as e:

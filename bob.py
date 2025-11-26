@@ -31,7 +31,7 @@ def recogerEPR(modo, w_in, i, modo_tiempo, enviados, fidelidades):
     medicion = "no recibido"
     fidelidad_bob = "None"
 
-    with CQCConnection("Bob") as bob:
+    with CQCConnection("node_bob_pre") as bob:
         if estado != "ok":
             print(f"[BOB] Qubit #{i} no recibido (fallo en pgen o pswap)")
         else:

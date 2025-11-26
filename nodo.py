@@ -96,7 +96,7 @@ def app_open(PUERTO):
                 origen_id, destino_id,
                 str(origen_port), str(destino_port),
                 pgen_origen
-            ])
+            ], check=True)
 
         elif accion in ["recibe EPR"]:
             # Procesa los pares recibidos
@@ -146,7 +146,12 @@ def app_open(PUERTO):
         if "vecino" not in data or "t_gen" not in data or "w_gen" not in data:
             return jsonify({"error": "Datos incompletos"}), 400
 
-        next_id = len(nodo_info.get("parEPR", [])) + 1
+        pares = nodo_info.setdefault("parEPR", [])
+        if pares:
+            next_id = max(p["id"] for p in pares) + 1
+        else:
+            next_id = 1
+
         estado = "fallo" if str(data["w_gen"]).lower() == "fallo" else "ok"
 
         nodo_info.setdefault("parEPR", []).append({

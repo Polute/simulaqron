@@ -552,6 +552,9 @@
                 }
             });
         }
+        function generarIdUnico() {
+            return Math.random().toString(36).substr(2, 9); 
+        }
 
 
        // Exportar órdenes usando el mismo historial
@@ -589,10 +592,10 @@
                     const dstId = nameToId[dstName];
 
                     if (!ordersPorNodo[srcId]) ordersPorNodo[srcId] = [];
-                    ordersPorNodo[srcId].push({ accion: "genera EPR", destino: dstId });
+                    ordersPorNodo[srcId].push({ id: generarIdUnico(), accion: "genera EPR", destino: dstId });
 
                     if (!ordersPorNodo[dstId]) ordersPorNodo[dstId] = [];
-                    ordersPorNodo[dstId].push({ accion: "recibe EPR", origen: srcId });
+                    ordersPorNodo[dstId].push({ id: generarIdUnico(), accion: "recibe EPR", origen: srcId });
 
                 } else if (op === "pur") {
                     const srcName = b.dataset.src;
@@ -608,7 +611,7 @@
                         orders.push(`PURIFICACIÓN: ${srcName} purifica dos EPR previos [pos ${i}]`);
                         const srcId = nameToId[srcName];
                         if (!ordersPorNodo[srcId]) ordersPorNodo[srcId] = [];
-                        ordersPorNodo[srcId].push({ accion: "purifica", detalle: "dos EPR previos" });
+                        ordersPorNodo[srcId].push({ id: generarIdUnico(), accion: "purifica", detalle: "dos EPR previos" });
                     }
 
                 }else if (op === "swap") {
@@ -635,11 +638,12 @@
 
                         // Acción para el helper
                         if (!ordersPorNodo[helperId]) ordersPorNodo[helperId] = [];
-                        ordersPorNodo[helperId].push({ accion: "swap", con: [id1Id, id2Id] });
+                        ordersPorNodo[helperId].push({ id: generarIdUnico(), accion: "swap", con: [id1Id, id2Id] });
 
                         // Notificar a id1 y id2 que reciben SWAP
                         if (!ordersPorNodo[id1Id]) ordersPorNodo[id1Id] = [];
                         ordersPorNodo[id1Id].push({ 
+                            id: generarIdUnico(), 
                             accion: "swap recibido", 
                             con: [id2Id],          // con quién se hace el swap
                             gracias_a: helperId    // gracias a quién se realizó
@@ -647,6 +651,7 @@
 
                         if (!ordersPorNodo[id2Id]) ordersPorNodo[id2Id] = [];
                         ordersPorNodo[id1Id].push({ 
+                            id: generarIdUnico(), 
                             accion: "swap recibido", 
                             con: [id1Id],          // con quién se hace el swap
                             gracias_a: helperId    // gracias a quién se realizó
