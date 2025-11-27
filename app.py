@@ -329,45 +329,15 @@ def app_open(ROL, PUERTO):
             )
         elif len(ids_actuales) == 4:
             # Arrancar los 4 nodos en línea, usando sus IDs reales
+            print("Con 4 nodos: ", ids_actuales)
             proc = subprocess.Popen(
-                ["simulaqron", "start", "--name", "default", "--force", "-n", ",".join(ids_actuales), "-t", "line"]
+                ["simulaqron", "start", "--name", "default", "--force", "-n", ",".join(ids_actuales), "-t", "path"]
             )
         else:
             # Más de 4: extender como línea, también con IDs reales
             proc = subprocess.Popen(
-                ["simulaqron", "start", "--name", "default", "--force", "-n", ",".join(ids_actuales), "-t", "line"]
+                ["simulaqron", "start", "--name", "default", "--force", "-n", ",".join(ids_actuales), "-t", "path"]
             )
-
-        time.sleep(2)  # espera a que arranquen los sockets
-
-        primer_nodo = ids_actuales[0]
-        duracion_start = time.time() - antes_start
-        print(f"Start tardó: {duracion_start:.3f} segundos")
-        print(f"Nodo inicial arrancado: {primer_nodo}")
-
-        # Comprobación de conexión CQC con el primer nodo
-        from cqc.pythonLib import CQCConnection
-        try:
-            with CQCConnection(primer_nodo) as conn:
-                print(f"[DEBUG] Conexión CQC abierta correctamente con {primer_nodo}")
-                print(f"[DEBUG] Objeto conexión: {conn}")
-                print(f"[DEBUG] __dict__ de la conexión: {conn.__dict__}")
-                sock = conn._s
-                print(f"[DEBUG] Socket local: {sock.getsockname()}")
-                print(f"[DEBUG] Socket remoto: {sock.getpeername()}")
-        except Exception as e:
-            print(f"[DEBUG] Error al abrir CQCConnection con {primer_nodo}: {e}")
-
-        # Ejecutar prueba.py para comprobar CQCConnection
-        print("[DEBUG] Lanzando prueba.py para comprobar conexión CQC...")
-        result = subprocess.run(
-            ["python", "prueba.py"],
-            capture_output=True,
-            text=True
-        )
-        print("[DEBUG] Salida de prueba.py:\n", result.stdout)
-        if result.stderr:
-            print("[DEBUG] Errores de prueba.py:\n", result.stderr)
 
         # Construir diccionario de vecinos simétricos
         vecinos_dict = {n["id"]: set() for n in nodos}
@@ -405,18 +375,6 @@ def app_open(ROL, PUERTO):
             for par, info in links_dict.items()
         ]
         
-
-
-        # Ejecutar prueba.py para comprobar CQCConnection
-        print("[DEBUG] Lanzando prueba.py 2º para comprobar conexión CQC...")
-        result = subprocess.run(
-            ["python", "prueba.py"],
-            capture_output=True,
-            text=True
-        )
-        print("[DEBUG] Salida de prueba.py 2º:\n", result.stdout)
-        if result.stderr:
-            print("[DEBUG] Errores de prueba.py 2º:\n", result.stderr)
         return jsonify({"nodes": nodos, "links": links})
 
     # Endpoint para enviar órdenes a los nodos
@@ -461,11 +419,26 @@ def app_open(ROL, PUERTO):
                     clave = f"{nodo_id}-{epr['vecino']}"
                     if clave not in MASTER_PAR_EPR:
                         MASTER_PAR_EPR[clave] = []
-                    MASTER_PAR_EPR[clave].append(epr)
+                    # buscar si ya existe ese id y actualizar
+                    updated = False
+                    for i, existente in enumerate(MASTER_PAR_EPR[clave]):
+                        if str(existente.get("id")) == str(epr.get("id")):
+                            existente.update(epr)
+                            MASTER_PAR_EPR[clave][i] = existente
+                            updated = True
+                            break
+                    if not updated:
+                        MASTER_PAR_EPR[clave].append(epr)
                     print(f"[MASTER] Historial actualizado para {clave}: {epr}")
 
         # Tanto GET como POST devuelven el estado actual
         return jsonify({"status": "ok", "MASTER_PAR_EPR": MASTER_PAR_EPR})
+
+    
+    @app.route("/master/parEPR/clear", methods=["POST"])
+    def master_parEPR_clear():
+        MASTER_PAR_EPR.clear()
+        return jsonify({"status": "cleared"})
 
 
     @app.route("/crear_nodos_simulaqron")
@@ -627,7 +600,26 @@ def app_open(ROL, PUERTO):
         global contador, simulacion_en_curso
         contador = 0
         simulacion_en_curso = False
-        MASTER_PAR_EPR = {}
+        MASTER_PAR_EPR.clear()
+        # Avisar a todos los nodos conectados
+        for nodo_id, puerto in NODOS_PUERTOS.items():
+            url = f"http://localhost:{puerto}/update"
+            try:
+                res = requests.post(
+                    url,
+                    json={
+                        "id": nodo_id,
+                        "parEPR": [],          # <-- vaciar historial de EPR
+                        "lastUpdated": int(time.time() * 1000)
+                    },
+                    timeout=2
+                )
+                if res.status_code == 200:
+                    print(f"[INFO] Historial EPR limpiado en nodo {nodo_id}")
+                else:
+                    print(f"[WARN] Error limpiando nodo {nodo_id}: {res.status_code}")
+            except Exception as e:
+                print(f"[ERROR] Excepción limpiando nodo {nodo_id}: {e}")
 
         try:
             open("pre_docs/fidelidad_alice.txt", "w").close()

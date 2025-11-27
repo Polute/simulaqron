@@ -1,0 +1,4 @@
+[SERVIDOR] Nodos existentes: ['node_alice', 'node_bob']
+[SERVIDOR] Nodos creados en esta petición: []
+--------------------------------------------------
+[SERVIDOR] Nodos existentes tras operacion: ['node_alice', 'node_bob']

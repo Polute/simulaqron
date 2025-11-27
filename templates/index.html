@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Simulación Cuántica</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_index.css') }}?v=8">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_index.css') }}?v=9">
 </head>
 <body>
     <div class="container-flex">
@@ -46,7 +46,7 @@
                 <div style="display: flex; align-items: flex-start; gap: 40px;">
                     <div>
                         <label for="pswap">pswap (0.0 - 1.0):</label>
-                        <input type="number" id="pswap" name="pswap" min="0" max="1" step="0.01" value="0.9">
+                        <input type="number" id="pswapInput" name="pswap" min="0" max="1" step="0.01" value="0.9">
                     </div>
 
                     <div>
@@ -104,6 +104,7 @@
                             <th>Nombre</th>
                             <th>Roles</th>
                             <th>pgen</th>
+                            <th>pswap</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -123,53 +124,55 @@
 
             <!-- Columna central: simulación -->
             <div class="columna-centro">
-                <h1>Simulación Cuántica</h1>
-                <p>Este experimento simula el envío de <strong>2 qubits EPR</strong> desde Alice a Bob, con opción de entrelazamiento puro o con ruido (estado de Werner usando un nodo Repeater).</p>
+                <div id="simulacion-header">
+                    <h1>Simulación Cuántica</h1>
+                    <p>Este experimento simula el envío de <strong>2 qubits EPR</strong> desde Alice a Bob, con opción de entrelazamiento puro o con ruido (estado de Werner usando un nodo Repeater).</p>
 
-                <div class="resultado" id="resultado">
-                    <strong>Resultado de la medición en Bob:</strong><br>
-                    {{ resultado }}
-                </div>
-
-                <div class="estado" id="estado">
-                    <strong>Estado:</strong> Esperando simulación...
-                </div>
-
-                <div class="contador" id="contador">
-                    <strong>Simulaciones realizadas:</strong> {{ contador }}
-                </div>
-
-                <div id="loading">Ejecutando simulación... por favor espera.</div>
-                <div id="cuenta"></div>
-
-                <div style="margin-top: 1em;">
-                    <label for="modo">Modo de envío:</label>
-                    <select id="modo">
-                        <option value="puro">Entrelazamiento puro (Alice → Bob)</option>
-                        <option value="werner">Entrelazamiento con ruido (Alice → Bob)</option>
-                        <option value="swap">Entanglement Swap (Alice → Charlie ←→ Bob)</option>
-                    </select>
-                </div>
-                <div style="margin-top: 1em; display: flex; align-items: center; gap: 1em;">
-                    <div>
-                        <label for="num_ParesEPR">Número de pares generados:</label><br>
-                        <input type="number" id="num_ParesEPR" name="num_ParesEPR" min="1" max="10" value="2">
+                    <div class="resultado" id="resultado">
+                        <strong>Resultado de la medición en Bob:</strong><br>
+                        {{ resultado }}
                     </div>
 
-                    <div>
-                        <label for="modo_tiempo">Generación:</label><br>
-                        <select id="modo_tiempo" name="modo_tiempo">
-                            <option value="secuencial">Secuencial</option>
-                            <option value="simultaneo">Simultáneo</option>
+                    <div class="estado" id="estado">
+                        <strong>Estado:</strong> Esperando simulación...
+                    </div>
+
+                    <div class="contador" id="contador">
+                        <strong>Simulaciones realizadas:</strong> {{ contador }}
+                    </div>
+
+                    <div id="loading">Ejecutando simulación... por favor espera.</div>
+                    <div id="cuenta"></div>
+
+                    <div style="margin-top: 1em;">
+                        <label for="modo">Modo de envío:</label>
+                        <select id="modo">
+                            <option value="puro">Entrelazamiento puro (Alice → Bob)</option>
+                            <option value="werner">Entrelazamiento con ruido (Alice → Bob)</option>
+                            <option value="swap">Entanglement Swap (Alice → Charlie ←→ Bob)</option>
                         </select>
-                        <div id="decoherenciaInfo" style="margin-top: 0.5em; color: #555; display: none;">
-                            En modo <strong>simultáneo</strong>, el tiempo de decoherencia de los pares EPR puede diferir debido a la computación paralela.
+                    </div>
+                    <div style="margin-top: 1em; display: flex; align-items: center; gap: 1em;">
+                        <div>
+                            <label for="num_ParesEPR">Número de pares generados:</label><br>
+                            <input type="number" id="num_ParesEPR" name="num_ParesEPR" min="1" max="10" value="2">
+                        </div>
+
+                        <div>
+                            <label for="modo_tiempo">Generación:</label><br>
+                            <select id="modo_tiempo" name="modo_tiempo">
+                                <option value="secuencial">Secuencial</option>
+                                <option value="simultaneo">Simultáneo</option>
+                            </select>
+                            <div id="decoherenciaInfo" style="margin-top: 0.5em; color: #555; display: none;">
+                                En modo <strong>simultáneo</strong>, el tiempo de decoherencia de los pares EPR puede diferir debido a la computación paralela.
+                            </div>
                         </div>
                     </div>
-                </div>
 
 
-                <button class="boton" onclick="iniciarSimulacion()">Iniciar Simulación</button>
+                    <button class="boton" onclick="iniciarSimulacion()">Iniciar Simulación</button>
+                </div>    
                  
                 <!-- Sección de operaciones más pequeña -->
                 <div class="columna-operaciones">
@@ -565,6 +568,7 @@
             const eprHistory = [];
             const ordersPorNodo = {}; // objeto donde agrupamos órdenes por nodo
 
+
             // Construir un mapeo name -> id
             const nameToId = {};
             nodes.forEach(n => { 
@@ -592,11 +596,14 @@
                     const srcId = nameToId[srcName];
                     const dstId = nameToId[dstName];
 
+                    // generar un único id para ambos
+                    const eprId = generarIdUnico();
+
                     if (!ordersPorNodo[srcId]) ordersPorNodo[srcId] = [];
-                    ordersPorNodo[srcId].push({ id: generarIdUnico(), accion: "genera EPR", destino: dstId });
+                    ordersPorNodo[srcId].push({ id: eprId, accion: "genera EPR", destino: dstId });
 
                     if (!ordersPorNodo[dstId]) ordersPorNodo[dstId] = [];
-                    ordersPorNodo[dstId].push({ id: generarIdUnico(), accion: "recibe EPR", origen: srcId });
+                    ordersPorNodo[dstId].push({ id: eprId, accion: "recibe EPR", origen: srcId });
 
                 } else if (op === "pur") {
                     const srcName = b.dataset.src;
@@ -611,8 +618,9 @@
                     } else {
                         orders.push(`PURIFICACIÓN: ${srcName} purifica dos EPR previos [pos ${i}]`);
                         const srcId = nameToId[srcName];
+                        const purId = generarIdUnico();
                         if (!ordersPorNodo[srcId]) ordersPorNodo[srcId] = [];
-                        ordersPorNodo[srcId].push({ id: generarIdUnico(), accion: "purifica", detalle: "dos EPR previos" });
+                        ordersPorNodo[srcId].push({ id: purId, accion: "purifica", detalle: "dos EPR previos" });
                     }
 
                 }else if (op === "swap") {
@@ -636,15 +644,15 @@
                         const helperId = nameToId[helperName];
                         const id1Id = nameToId[id1Name];
                         const id2Id = nameToId[id2Name];
-
+                        const swapId = generarIdUnico();
                         // Acción para el helper
                         if (!ordersPorNodo[helperId]) ordersPorNodo[helperId] = [];
-                        ordersPorNodo[helperId].push({ id: generarIdUnico(), accion: "swap", con: [id1Id, id2Id] });
+                        ordersPorNodo[helperId].push({ id: swapId, accion: "swap", con: [id1Id, id2Id] });
 
                         // Notificar a id1 y id2 que reciben SWAP
                         if (!ordersPorNodo[id1Id]) ordersPorNodo[id1Id] = [];
                         ordersPorNodo[id1Id].push({ 
-                            id: generarIdUnico(), 
+                            id: swapId, 
                             accion: "swap recibido", 
                             con: [id2Id],          // con quién se hace el swap
                             gracias_a: helperId    // gracias a quién se realizó
@@ -652,7 +660,7 @@
 
                         if (!ordersPorNodo[id2Id]) ordersPorNodo[id2Id] = [];
                         ordersPorNodo[id1Id].push({ 
-                            id: generarIdUnico(), 
+                            id: swapId, 
                             accion: "swap recibido", 
                             con: [id1Id],          // con quién se hace el swap
                             gracias_a: helperId    // gracias a quién se realizó
@@ -725,6 +733,31 @@
                 paleta.appendChild(block);
             });
         }
+        function ajustarColumnasSegunNodos(nodo_info) {
+            if (Array.isArray(nodo_info.nodes) && nodo_info.nodes.length > 0) {
+                // comprobar si todos los ids terminan en "pre"
+                const todosPre = nodo_info.nodes.every(n => n.id.endsWith("pre"));
+
+                if (todosPre) {
+                    // mostrar la cabecera normalmente
+                    const header = document.getElementById("simulacion-header");
+                    if (header) header.style.display = "block";
+
+                    // restaurar tamaño normal de la derecha
+                    const derecha = document.querySelector(".columna-derecha");
+                    if (derecha) derecha.style.flex = "1.5";
+                } else {
+                    // ocultar la cabecera de simulación
+                    const header = document.getElementById("simulacion-header");
+                    if (header) header.style.display = "none";
+
+                    // expandir la columna derecha
+                    const derecha = document.querySelector(".columna-derecha");
+                    if (derecha) derecha.style.flex = "2";
+                }
+            }
+        }
+
 
 
         // Rol recibido desde Flask
@@ -740,6 +773,9 @@
                 // Inicializar nodos desde el backend (ya incluye predefinidos si hace falta)
                 nodes = nodo_info.nodes;
                 console.log("Nodos inicializados:", nodes);
+
+                // aplicar ajuste de columnas
+                ajustarColumnasSegunNodos(nodo_info);
 
                 nodes.forEach(nodo => {
                     if (Array.isArray(nodo.neighbors)) {
@@ -797,6 +833,16 @@
         });
     </script>
     <script>
+        function obtenerPuertoDesdeId(id) {
+            const mapa = {
+                "node_alice": 5000,
+                "node_bob": 5002,
+                "node_charlie": 5003,
+                "node_eve": 5004
+                // Agrega más si tienes más nodos
+            };
+            return mapa[id];
+        }
         //-----------------------------------------MAPA-----------------------------------------------
         window.onload = function () {
             const svg = document.getElementById("canvas");
@@ -1025,6 +1071,7 @@
                             id: node.id,
                             name: node.name,
                             pgen: node.pgen,
+                            pswap: node.pswap,
                             roles: node.roles,
                             neighbors: vecinosSimetricos,
                             parEPR: node.parEPR,
@@ -1073,6 +1120,7 @@
                     roles: ["emisor","receptor","repeater"], // roles activos
                     x, y,
                     pgen: 0.8,
+                    pswap: 0.8,
                     neighbors: []
                 };
                 nodes.push(node);
@@ -1245,15 +1293,6 @@
                 y: (e.clientY - rect.top - transform.y) / transform.k
             };
         }
-        function obtenerPuertoDesdeId(id) {
-            const mapa = {
-                "node_alice": 5000,
-                "node_bob": 5002,
-                "node_charlie": 5003
-                // Agrega más si tienes más nodos
-            };
-            return mapa[id];
-        }
         function actualizarTablaNodos() {
             const tbody = document.querySelector("#tabla-nodos tbody");
             tbody.innerHTML = "";
@@ -1328,7 +1367,7 @@
                 });
                 fila.appendChild(rolesCell);
 
-                // Param
+                // PGEN
                 const pgenCell = document.createElement("td");
                 const pgenInput = document.createElement("input");
                 pgenInput.type = "number";
@@ -1344,6 +1383,22 @@
                 fila.appendChild(pgenCell);
 
                 tbody.appendChild(fila);
+                // Param pswap
+                const pswapCell = document.createElement("td");
+                const pswapInput = document.createElement("input");
+                pswapInput.type = "number";
+                pswapInput.step = "0.01";
+                pswapInput.min = "0";
+                pswapInput.max = "1";
+                pswapInput.value = node.pswap || 0.9;
+                pswapInput.onchange = () => {
+                    node.pswap = parseFloat(pswapInput.value);
+                    draw();
+                };
+                pswapCell.appendChild(pswapInput);
+                fila.appendChild(pswapCell);
+
+                            
             });
         }
 
@@ -1425,7 +1480,7 @@
             console.log("Iniciando simulación única");
 
             const pgen = document.getElementById("pgen").value;
-            const pswap = document.getElementById("pswap").value;
+            const pswap = document.getElementById("pswapInput").value;
 
             // Nodos con su pgen
             const pgen_nodos = nodes.map(n => `${n.name}:${n.pgen}`).join(",");
@@ -1467,42 +1522,76 @@
         document.addEventListener("DOMContentLoaded", () => {
             cargarHistorial({historial});
         });
+        // variable global para guardar el id del intervalo
+        let eprIntervalId = null;
+
         function cargarHistorial(historial) {
             const modo = document.getElementById("modoHistorial").value;
+
+            // Si venías de EPR y cambias a otro modo, parar el intervalo
+            if (modo !== "epr" && eprIntervalId !== null) {
+                clearInterval(eprIntervalId);
+                eprIntervalId = null;
+            }
+
             if (modo === "resultados") {
                 actualizarTabla(historial);
             } else if (modo === "epr") {
                 console.log("Recibo los EPRS");
-                fetch("/master/parEPR")
-                    .then(res => res.json())
-                    .then(data => {
-                        // Usamos un Map para deduplicar por id y quedarnos con el último (Bob)
-                        const mapa = new Map();
-                        for (const [clave, lista] of Object.entries(data.MASTER_PAR_EPR || {})) {
-                            lista.forEach(epr => {
-                                // añadimos la clave nodo-vecino como campo "enlace"
-                                mapa.set(epr.id, { ...epr, enlace: clave });
-                            });
-                        }
-                        const unicos = Array.from(mapa.values());
-                        actualizarTablaEPR(unicos);
-                    })
-                    .catch(err => console.error("Error cargando EPR:", err));
+
+                const cargarEPR = () => {
+                    fetch("/master/parEPR")
+                        .then(res => res.json())
+                        .then(data => {
+                            const mapa = new Map();
+                            for (const [clave, lista] of Object.entries(data.MASTER_PAR_EPR || {})) {
+                                lista.forEach(epr => {
+                                    if (mapa.has(epr.id)) {
+                                        // fusionar con lo que ya había
+                                        const existente = mapa.get(epr.id);
+                                        mapa.set(epr.id, { ...existente, ...epr, enlace: clave });
+                                    } else {
+                                        mapa.set(epr.id, { ...epr, enlace: clave });
+                                    }
+                                });
+                            }
+                            actualizarTablaEPR(Array.from(mapa.values()));
+                        })
+                        .catch(err => console.error("Error cargando EPR:", err));
+                };
+
+                // primera carga
+                cargarEPR();
+
+                // arrancar intervalo solo si no está ya activo
+                if (eprIntervalId === null) {
+                    eprIntervalId = setInterval(cargarEPR, 2000);
+                }
             }
         }
-
-
 
         function actualizarTabla(historial) {
             const tbody = document.querySelector("#tabla-resultados tbody");
             tbody.innerHTML = "";
-            historial.forEach(linea => {
+
+            if (Array.isArray(historial) && historial.length > 0) {
+                historial.forEach(linea => {
+                    const fila = document.createElement("tr");
+                    const partes = linea.split(":");
+                    fila.innerHTML = `
+                        <td>${partes[0].trim()}</td>
+                        <td>${partes[1]?.trim() ?? ""}</td>
+                    `;
+                    tbody.appendChild(fila);
+                });
+            } else {
+                // opcional: mostrar mensaje cuando no hay historial
                 const fila = document.createElement("tr");
-                const partes = linea.split(":");
-                fila.innerHTML = `<td>${partes[0].trim()}</td><td>${partes[1].trim()}</td>`;
+                fila.innerHTML = `<td colspan="2">Sin operaciones todavía</td>`;
                 tbody.appendChild(fila);
-            });
+            }
         }
+
 
         function actualizarTablaEPR(historial) {
             console.log(historial);
@@ -1513,50 +1602,59 @@
                 fila.innerHTML = `
                     <td>${epr.id}</td>
                     <td>Enlace: ${epr.enlace}</td>
-                    <td>Vecino: ${epr.vecino}</td>
                     <td>Estado: ${epr.estado}</td>
-                    <td>Fidelidad: ${epr.w_gen}</td>
-                    <td>Tiempo: ${epr.t_gen}</td>
+                    <td>Fidelidad inicial (w_gen): ${epr.w_gen}</td>
+                    <td>Fidelidad final (w_out): ${epr.w_out ?? "-"}</td>
+                    <td>t_gen: ${epr.t_gen}</td>
+                    <td>t_recv: ${epr.t_recv ?? "-"}</td>
+                    <td>t_diff: ${epr.t_diff ?? "-"}</td>
+                    <td>Medición: ${epr.medicion ?? "-"}</td>
                 `;
                 tbody.appendChild(fila);
             });
         }
+        
 
         function limpiarHistorial() {
-            fetch("/limpiar_historial")
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById("resultado").innerHTML =
-                        "<strong>Resultado de la medición en Bob:</strong><br>Historial borrado.";
-                    document.getElementById("estado").innerHTML =
-                        "<strong>Estado:</strong> Historial limpiado correctamente.";
-                    document.getElementById("contador").innerHTML =
-                        "<strong>Simulaciones realizadas:</strong> 0";
-                    actualizarTabla([]);
-                    actualizarTablaEPR([]);
-                });
-        }
-        let modoAnterior = document.getElementById("modo").value;
+            // recorrer todos los puertos del 5000 al 5010, saltando el 5001
+            (async () => {
+                for (let puerto = 5000; puerto <= 5010; puerto++) {
+                    if (puerto === 5001) continue; // saltar el 5001
 
-        document.getElementById("modo").addEventListener("change", () => {
-            const nuevoModo = document.getElementById("modo").value;
-            if (nuevoModo !== modoAnterior) {
-                fetch("/limpieza_docs")
+                    try {
+                        const res = await fetch(`http://localhost:${puerto}/update`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ parEPR: [] })
+                        });
+
+                        if (!res.ok) {
+                            console.warn(`Nodo en puerto ${puerto} no respondió correctamente`);
+                            break; // parar el bucle si no responde bien
+                        }
+                    } catch (err) {
+                        console.warn(`No se pudo conectar al nodo en puerto ${puerto}:`, err);
+                        break; // parar el bucle si no conecta
+                    }
+                }
+
+                // limpiar historial en el master solo si se completó el bucle
+                fetch("/limpiar_historial")
                     .then(response => response.json())
                     .then(data => {
-                        if (data.status === "ok") {
-                            document.getElementById("estado").innerHTML =
-                                "<strong>Estado:</strong> Qubits limpiados al cambiar de modo.";
-                            console.log("Qubits limpiados correctamente.");
-                        } else {
-                            document.getElementById("estado").innerHTML =
-                                "<strong>Estado:</strong> Error al limpiar qubits.";
-                            console.warn("Error al limpiar qubits.");
-                        }
-                        modoAnterior = nuevoModo;
-                    });
-            }
-        });
+                        document.getElementById("resultado").innerHTML =
+                            "<strong>Resultado de la medición en Bob:</strong><br>Historial borrado.";
+                        document.getElementById("estado").innerHTML =
+                            "<strong>Estado:</strong> Historial limpiado correctamente.";
+                        document.getElementById("contador").innerHTML =
+                            "<strong>Simulaciones realizadas:</strong> 0";
+                        actualizarTabla([]);
+                        actualizarTablaEPR([]);
+                    })
+                    .catch(err => console.error("Error limpiando historial master:", err));
+            })();
+        }
+
         document.getElementById("num_ParesEPR").addEventListener("change", () => {
             const nuevoModo = document.getElementById("num_ParesEPR").value;
             if (nuevoModo !== modoAnterior) {

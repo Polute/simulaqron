@@ -4,7 +4,7 @@ import json
 import sys
 from multiprocessing import Process
 from flask_cors import CORS
-from time import time
+from time import time, sleep
 import subprocess
 import requests
 
@@ -61,10 +61,22 @@ def app_open(PUERTO):
             "x": 200,
             "y": 250,
             "pgen": 0.9,
-            "roles": ["emisor", "repeater"],
+            "roles": ["emisor", "repeater", "receptor"],
             "neighbors": [
                 {"id": "node_alice", "distanceKm": 70},
                 {"id": "node_bob", "distanceKm": 40}
+            ],
+            "parEPR": []
+        },
+        5004: {
+            "id": "node_eve",
+            "name": "Eve",
+            "x": 300,
+            "y": 250,
+            "pgen": 0.9,
+            "roles": ["emisor", "repeater", "receptor"],
+            "neighbors": [
+                {"id": "node_charlie", "distanceKm": 70},
             ],
             "parEPR": []
         }
@@ -81,8 +93,10 @@ def app_open(PUERTO):
     def aplicar_orden(orden, node_info):
         accion = orden["accion"]
         origen_id = node_info["id"]
+        epr_id = orden.get("id")
 
         print("APLICO ORDEN!!!")
+        print("La cual tiene de node info: ",node_info)
 
         if accion in ["genera EPR", "generar"]:
             destino_id = orden["destino"]
@@ -95,26 +109,47 @@ def app_open(PUERTO):
                 "python", "sender.py",
                 origen_id, destino_id,
                 str(origen_port), str(destino_port),
-                pgen_origen
+                pgen_origen,
+                str(epr_id)
             ], check=True)
 
-        elif accion in ["recibe EPR"]:
-            # Procesa los pares recibidos
-            for epr in node_info.get("parEPR", []):
-                if epr.get("estado") == "ok":
-                    subprocess.run([
-                        "python", "receiver.py",
-                        json.dumps(epr),
-                        json.dumps(node_info)
-                    ])
-                else:
-                    print(f"[RECEIVER] Qubit {epr.get('id')} marcado como fallo, se descarta")
+        elif accion == "recibe EPR":
+            epr_id = orden["id"]  # id del EPR que viene en la orden
+
+            # acceder directamente a node_info["parEPR"] y buscar el objeto con ese id
+            epr_list = node_info["parEPR"]
+            for _ in range(5):  # hasta 5 intentos
+                epr_obj = next((e for e in node_info["parEPR"] if e["id"] == epr_id), None)
+                if epr_obj:
+                    break
+                sleep(0.2)  # espera 200 ms
+
+            if epr_obj is None:
+                print(f"[RECEIVER] No se encontró EPR con id {epr_id}")
+                return
+
+            my_port = get_port_by_id(node_info["id"])
+            emisor_port = get_port_by_id(orden["origen"])
+
+            print(f"[RECEIVER] Procesando EPR {epr_id} entre {node_info['id']}:{my_port} y {orden['origen']}:{emisor_port}")
+
+            subprocess.run([
+                "python", "receiver.py",
+                json.dumps(epr_obj),      # este es el payload que espera receiver.py
+                json.dumps(node_info),    # info completa del nodo receptor
+                str(my_port),
+                str(emisor_port)
+            ], check=True)
+
+
+
 
         elif accion in ["purifica", "purificar"]:
             print(f"[{origen_id}] Ejecutando protocolo de purificación...")
             subprocess.run([
                 "python", "purify.py",
-                json.dumps(node_info)
+                json.dumps(node_info),
+                str(epr_id)
             ])
 
         elif accion in ["swap", "swapping"]:
@@ -122,7 +157,7 @@ def app_open(PUERTO):
             destinatarios_ports = [str(get_port_by_id(n)) for n in destinatarios]
             pswap_origen = str(node_info.get("pswap", 0))
             subprocess.run([
-                "python", "swap.py", pswap_origen
+                "python", "swap.py", pswap_origen, str(epr_id)
             ] + destinatarios + destinatarios_ports)
 
         else:
@@ -142,28 +177,54 @@ def app_open(PUERTO):
     @app.route("/parEPR/add", methods=["POST"])
     def parEPR_add():
         data = request.get_json()
-        print("Datos a actualizar/agregar", data)
-        if "vecino" not in data or "t_gen" not in data or "w_gen" not in data:
-            return jsonify({"error": "Datos incompletos"}), 400
-
         pares = nodo_info.setdefault("parEPR", [])
-        if pares:
-            next_id = max(p["id"] for p in pares) + 1
-        else:
-            next_id = 1
+        epr_id = data.get("id") or (max((p["id"] for p in pares), default=0) + 1)
 
         estado = "fallo" if str(data["w_gen"]).lower() == "fallo" else "ok"
 
-        nodo_info.setdefault("parEPR", []).append({
-            "id": next_id,
+        nuevo_epr = {
+            "id": epr_id,
             "vecino": data["vecino"],
             "t_gen": data["t_gen"],
             "w_gen": data["w_gen"],
             "estado": estado
-        })
-        print(nodo_info)
-        notificar_master_parEPR(nodo_info)
+        }
+
+        updated = False
+        for i, epr in enumerate(pares):
+            if str(epr.get("id")) == str(epr_id):
+                epr.update(nuevo_epr)
+                pares[i] = epr
+                updated = True
+                break
+        if not updated:
+            pares.append(nuevo_epr)
+
+        nodo_info["parEPR"] = pares
+        #notificar_master_parEPR(nodo_info)
         return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]})
+
+
+    @app.route("/parEPR/recv", methods=["POST"])
+    def parEPR_recv():
+        data = request.get_json()
+        pares = nodo_info.setdefault("parEPR", [])
+        updated = False
+        for i, epr in enumerate(pares):
+            if str(epr.get("id")) == str(data.get("id")):
+                epr.update(data)   # <-- aquí se fusionan los campos nuevos
+                pares[i] = epr
+                updated = True
+                break
+        if not updated:
+            pares.append(data)
+        nodo_info["parEPR"] = pares
+        print("Enviando a Emisor y a Master: ",nodo_info)
+        notificar_master_parEPR(nodo_info)
+        return jsonify({"status": "updated", "parEPR": nodo_info["parEPR"]})
+
+
+
 
     @app.route("/parEPR/delete", methods=["POST"])
     def parEPR_delete():
@@ -188,8 +249,10 @@ def app_open(PUERTO):
                 "http://localhost:8000/master/parEPR",  # puerto donde corre el master
                 json={nodo_info["id"]: nodo_info.get("parEPR", [])},
                 timeout=2
+
             )
             print("[DEBUG] Historial parEPR enviado al master:", res.status_code)
+            print("[DEBUG] Master recibio esto:", nodo_info)
         except Exception as e:
             print("[DEBUG] Error notificando al master:", e)
 
