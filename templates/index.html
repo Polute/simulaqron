@@ -735,25 +735,24 @@
         }
         function ajustarColumnasSegunNodos(nodo_info) {
             if (Array.isArray(nodo_info.nodes) && nodo_info.nodes.length > 0) {
-                // comprobar si todos los ids terminan en "pre"
                 const todosPre = nodo_info.nodes.every(n => n.id.endsWith("pre"));
 
+                const header = document.getElementById("simulacion-header");
+                const derecha = document.querySelector(".columna-derecha");
+                const operaciones = document.querySelector(".columna-operaciones");
+
                 if (todosPre) {
-                    // mostrar la cabecera normalmente
-                    const header = document.getElementById("simulacion-header");
+                    // mostrar cabecera normalmente
                     if (header) header.style.display = "block";
-
-                    // restaurar tamaño normal de la derecha
-                    const derecha = document.querySelector(".columna-derecha");
                     if (derecha) derecha.style.flex = "1.5";
+                    // mostrar también las órdenes cuánticas
+                    if (operaciones) operaciones.style.display = "none";
                 } else {
-                    // ocultar la cabecera de simulación
-                    const header = document.getElementById("simulacion-header");
+                    // ocultar cabecera de simulación
                     if (header) header.style.display = "none";
-
-                    // expandir la columna derecha
-                    const derecha = document.querySelector(".columna-derecha");
                     if (derecha) derecha.style.flex = "2";
+                    // ocultar las órdenes cuánticas
+                    if (operaciones) operaciones.style.display = "block";
                 }
             }
         }
@@ -1527,7 +1526,7 @@
 
         function cargarHistorial(historial) {
             const modo = document.getElementById("modoHistorial").value;
-
+            const tabla = document.getElementById("tabla-resultados");
             // Si venías de EPR y cambias a otro modo, parar el intervalo
             if (modo !== "epr" && eprIntervalId !== null) {
                 clearInterval(eprIntervalId);
@@ -1535,10 +1534,11 @@
             }
 
             if (modo === "resultados") {
+                tabla.classList.add("modo-resultados");
                 actualizarTabla(historial);
             } else if (modo === "epr") {
                 console.log("Recibo los EPRS");
-
+                tabla.classList.remove("modo-resultados");
                 const cargarEPR = () => {
                     fetch("/master/parEPR")
                         .then(res => res.json())

@@ -10,6 +10,8 @@ C = 3e5  # km/s
 
 def recibir_epr(payload, node_info, my_port, emisor_port):
     idx = payload.get("id", 0)
+    print(f"[RECEIVER] Obtuvo este payload: {payload}")
+    print(f"[RECEIVER] Posee este node_info {node_info}")
     estado = payload.get("estado", "fallo")
 
     resultado = {
@@ -21,7 +23,8 @@ def recibir_epr(payload, node_info, my_port, emisor_port):
         "w_gen": payload.get("w_gen"),
         "w_out": None,           
         "estado": estado,
-        "medicion": None
+        "medicion": None, 
+        "distancia_nodos": None
     }
 
     if estado == "ok":
@@ -30,6 +33,7 @@ def recibir_epr(payload, node_info, my_port, emisor_port):
                 q = conn.recvEPR()
                 w_in = float(payload.get("w_gen", 1.0))
                 # Parsear t_gen en formato MM:SS.mmm
+ 
                 t_gen_str = payload.get("t_gen", "0")
                 try:
                     minutos, resto = t_gen_str.split(":")
@@ -39,10 +43,14 @@ def recibir_epr(payload, node_info, my_port, emisor_port):
                     t_gen_val = 0.0
 
                 t_local = time.time()
-                # Convertir t_local a mismo formato (segundos desde inicio de minuto)
+
+                # Valor numérico para cálculos
                 t_local_val = (int(time.strftime("%M"))*60 +
-                               int(time.strftime("%S")) +
-                               (int((t_local % 1)*1000))/1000.0)
+                            int(time.strftime("%S")) +
+                            (int((t_local % 1)*1000))/1000.0)
+
+                # Cadena con mismo formato que t_gen: MM:SS.mmm
+                t_recv_str = time.strftime("%M:%S", time.localtime(t_local)) + f".{int((t_local % 1)*1000):03d}"
 
                 tdif = t_local_val - t_gen_val
 
@@ -58,8 +66,11 @@ def recibir_epr(payload, node_info, my_port, emisor_port):
 
                 resultado["medicion"] = m
                 resultado["w_out"] = w_out
-                resultado["t_recv"] = t_local
+                resultado["t_recv"] = t_recv_str
                 resultado["t_diff"] = tdif
+                vecino = payload["vecino"]
+
+                resultado["distancia_nodos"] = next(v["distanceKm"] for v in node_info["neighbors"] if v["id"] == vecino)
 
                 print("[DEBUG] my_port =", my_port)
                 print("[DEBUG] emisor_port =", emisor_port)

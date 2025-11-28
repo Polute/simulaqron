@@ -1,5 +1,6 @@
 import sys
 import random
+import json
 import requests
 import time
 from cqc.pythonLib import CQCConnection
@@ -13,8 +14,24 @@ def send_info(url, payload):
     except Exception as e:
         print(f"[SENDER] Error sending info to {url}: {e}")
 
-def generar_epr(emisor, receptor, emisor_port, receptor_port, pgen, epr_id):
+def generar_epr(emisor, receptor, emisor_port, receptor_port, pgen, epr_id, node_info):
     print(f"[SENDER] {emisor} attempting EPR with {receptor} (pgen={pgen})")
+    print(f"[SENDER] {emisor} attempting EPR with {receptor} (pgen={pgen})")
+
+    # comprobar si receptor está en la lista de vecinos de node_info
+    vecinos = [n["id"] for n in node_info["neighbors"]]
+    if receptor not in vecinos:
+        print(f"[SENDER] Error: {receptor} no es vecino de {emisor} según node_info")
+        payload1 = {
+            "id": epr_id,
+            "vecino": receptor,
+            "t_gen": "0",
+            "w_gen": "fallo"
+        }
+        # Send to own node
+        send_info(f"http://localhost:{emisor_port}/parEPR/add", payload1)
+        return
+    
 
     # Probabilistic check
     if random.random() > pgen:
@@ -104,5 +121,6 @@ if __name__ == "__main__":
     receptor_port = int(sys.argv[4])
     pgen = float(sys.argv[5])   # probability of generation
     epr_id = sys.argv[6]
+    node_info = json.loads(sys.argv[7])
     print("en sender.py")
-    generar_epr(emisor, receptor, emisor_port, receptor_port, pgen, epr_id)
+    generar_epr(emisor, receptor, emisor_port, receptor_port, pgen, epr_id, node_info)

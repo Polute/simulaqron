@@ -426,14 +426,16 @@ window.onload = function () {
 
                 if (nuevasOrdenes !== anterioresOrdenes) {
                     console.log("Órdenes nuevas detectadas, aplicando...");
-                    data.forEach(orden => {
-                        fetch("/operations", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(orden)
-                        }).catch(err => console.error("Error aplicando orden:", err));
+                    console.log("Tiene un sleep de 500 ms");
+                    data.forEach((orden, idx) => {
+                        setTimeout(() => {
+                            fetch("/operations", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(orden)
+                            }).catch(err => console.error("Error aplicando orden:", err));
+                        }, idx * 500); // ⏱ cada orden se retrasa 0.2s respecto a la anterior
                     });
-                    // Actualizar cache
                     ultimasOrdenes = data;
                 } else {
                     console.log("Órdenes iguales, no se reenvían");
@@ -446,6 +448,13 @@ window.onload = function () {
     }
 
 
+    const evtSource = new EventSource("/mandate/stream");
+    evtSource.onmessage = function(event) {
+        if (event.data === "mandate") {
+            console.log("Mandato detectado, refrescando órdenes...");
+            actualizarOrdenes();
+        }
+    };
 
 
     // Llamada inicial
@@ -454,18 +463,18 @@ window.onload = function () {
 
     // Guardar los IDs de los intervalos
     let nodoInterval = setInterval(actualizarNodo, 2000);
-    let ordenesInterval = setInterval(actualizarOrdenes, 2000);
+   // let ordenesInterval = setInterval(actualizarOrdenes, 2000);
 
     // Funciones para pausar y reanudar
     function pausarActualizaciones() {
         clearInterval(nodoInterval);
-        clearInterval(ordenesInterval);
+       // clearInterval(ordenesInterval);
         console.log("Actualizaciones pausadas");
     }
 
     function reanudarActualizaciones() {
-        nodoInterval = setInterval(actualizarNodo, 10000);
-        ordenesInterval = setInterval(actualizarOrdenes, 10000);
+        nodoInterval = setInterval(actualizarNodo, 2000);
+       // ordenesInterval = setInterval(actualizarOrdenes, 2000);
         console.log("Actualizaciones reanudadas");
     }
 

@@ -1,5 +1,5 @@
 import socket
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response
 import json
 import sys
 from multiprocessing import Process
@@ -7,6 +7,8 @@ from flask_cors import CORS
 from time import time, sleep
 import subprocess
 import requests
+import queue
+event_queue = queue.Queue()
 
 def puerto_disponible(puerto: int) -> bool:
     """Devuelve True si el puerto está libre en localhost."""
@@ -27,8 +29,8 @@ def seleccionar_puerto(inicio=5000, fin=5010, excluir=None):
             return puerto
     return None
 
-
 ORDERS = []
+
 
 def app_open(PUERTO):
     # Diccionario que mapea puertos a nodos completos
@@ -63,7 +65,6 @@ def app_open(PUERTO):
             "pgen": 0.9,
             "roles": ["emisor", "repeater", "receptor"],
             "neighbors": [
-                {"id": "node_alice", "distanceKm": 70},
                 {"id": "node_bob", "distanceKm": 40}
             ],
             "parEPR": []
@@ -110,22 +111,28 @@ def app_open(PUERTO):
                 origen_id, destino_id,
                 str(origen_port), str(destino_port),
                 pgen_origen,
-                str(epr_id)
+                str(epr_id),
+                json.dumps(node_info)
             ], check=True)
 
         elif accion == "recibe EPR":
-            epr_id = orden["id"]  # id del EPR que viene en la orden
-
-            # acceder directamente a node_info["parEPR"] y buscar el objeto con ese id
+            epr_id = orden["id"]  # id del EPR que viene en la ordenente a node_info["parEPR"] y buscar el objeto con ese id
             epr_list = node_info["parEPR"]
-            for _ in range(5):  # hasta 5 intentos
-                epr_obj = next((e for e in node_info["parEPR"] if e["id"] == epr_id), None)
+            timeout = 5.0   # segundos máximos de espera
+            interval = 0.2  # intervalo entre intentos
+            start = time()
+            epr_obj = None
+            print("Buscando")
+            while time() - start < timeout:
+                epr_obj = next((e for e in node_info["parEPR"] if str(e["id"]) == str(epr_id)), None)
+                print("...\n")
                 if epr_obj:
+                    print(f"[RECEIVER] EPR {epr_id} encontrado")
                     break
-                sleep(0.2)  # espera 200 ms
+                sleep(interval)
 
             if epr_obj is None:
-                print(f"[RECEIVER] No se encontró EPR con id {epr_id}")
+                print(f"[RECEIVER] Timeout esperando EPR {epr_id}")
                 return
 
             my_port = get_port_by_id(node_info["id"])
@@ -140,9 +147,6 @@ def app_open(PUERTO):
                 str(my_port),
                 str(emisor_port)
             ], check=True)
-
-
-
 
         elif accion in ["purifica", "purificar"]:
             print(f"[{origen_id}] Ejecutando protocolo de purificación...")
@@ -201,7 +205,8 @@ def app_open(PUERTO):
             pares.append(nuevo_epr)
 
         nodo_info["parEPR"] = pares
-        #notificar_master_parEPR(nodo_info)
+        notificar_master_parEPR(nodo_info)
+
         return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]})
 
 
@@ -241,7 +246,6 @@ def app_open(PUERTO):
             return jsonify({"status": "deleted", "parEPR": nodo_info["parEPR"]})
 
         return jsonify({"error": "ID no encontrado"}), 404
-    import requests
 
     def notificar_master_parEPR(nodo_info):
         try:
@@ -305,8 +309,16 @@ def app_open(PUERTO):
                 ORDERS.append(item)
         else:
             ORDERS.append(data)
-
+        event_queue.put("mandate")
         return jsonify({"status": "ok", "ORDERS": ORDERS})
+    
+
+    @app.route("/mandate/stream")
+    def mandate_stream():
+        def event_stream():
+            msg = event_queue.get()  # 🔔 espera bloqueante
+            yield f"data: {msg}\n\n"
+        return Response(event_stream(), mimetype="text/event-stream")
 
     @app.route("/orders", methods=["GET"])
     def get_orders():

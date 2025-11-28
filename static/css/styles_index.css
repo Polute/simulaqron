@@ -45,6 +45,17 @@ h1, h2 {
     padding: 1em;
     border-left: 5px solid;
 }
+/* Solo cuando la tabla tenga la clase modo-resultados */
+#tabla-resultados.modo-resultados th:first-child,
+#tabla-resultados.modo-resultados td:first-child {
+  width: 10%;   /* columna # más pequeña */
+}
+
+#tabla-resultados.modo-resultados th:nth-child(2),
+#tabla-resultados.modo-resultados td:nth-child(2) {
+  width: 90%;   /* columna detalle más grande */
+}
+
 .resultado { background-color: #e8f5e9; border-color: #4caf50; }
 .estado { background-color: #e3f2fd; border-color: #2196f3; }
 .contador { background-color: #fff3e0; border-color: #ff9800; }
