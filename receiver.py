@@ -3,87 +3,75 @@ import math
 import time
 import json
 import requests
+import socket
 from cqc.pythonLib import CQCConnection
 from cqc.pythonLib.util import CQCTimeoutError
 
 C = 3e5  # km/s
 
-def recibir_epr(payload, node_info, my_port, emisor_port):
+# Memoria local de qubits
+epr_store = {}
+nodo_info = {"parEPR": []}
+
+def recibir_epr(payload, node_info, conn, my_port, emisor_port):
     idx = payload.get("id", 0)
-    print(f"[RECEIVER] Obtuvo este payload: {payload}")
-    print(f"[RECEIVER] Posee este node_info {node_info}")
     estado = payload.get("estado", "fallo")
 
     resultado = {
         "id": idx,
         "vecino": payload.get("vecino"),
         "t_gen": payload.get("t_gen"),
-        "t_recv": None,          
+        "t_recv": None,
         "t_diff": None,
         "w_gen": payload.get("w_gen"),
-        "w_out": None,           
+        "w_out": None,
         "estado": estado,
-        "medicion": None, 
+        "medicion": None,
         "distancia_nodos": None
     }
 
     if estado == "ok":
         try:
-            with CQCConnection(node_info["id"]) as conn:
-                q = conn.recvEPR()
-                w_in = float(payload.get("w_gen", 1.0))
-                # Parsear t_gen en formato MM:SS.mmm
- 
-                t_gen_str = payload.get("t_gen", "0")
-                try:
-                    minutos, resto = t_gen_str.split(":")
-                    segundos, milesimas = resto.split(".")
-                    t_gen_val = int(minutos)*60 + int(segundos) + int(milesimas)/1000.0
-                except Exception:
-                    t_gen_val = 0.0
+            q = conn.recvEPR()
+            # Guardar qubit en memoria interna
+            epr_store[idx] = q
 
-                t_local = time.time()
+            w_in = float(payload.get("w_gen", 1.0))
+            # Calcular tiempos
+            t_gen_str = payload.get("t_gen", "0")
+            try:
+                minutos, resto = t_gen_str.split(":")
+                segundos, milesimas = resto.split(".")
+                t_gen_val = int(minutos)*60 + int(segundos) + int(milesimas)/1000.0
+            except Exception:
+                t_gen_val = 0.0
 
-                # Valor numérico para cálculos
-                t_local_val = (int(time.strftime("%M"))*60 +
-                            int(time.strftime("%S")) +
-                            (int((t_local % 1)*1000))/1000.0)
+            t_local = time.time()
+            t_local_val = (int(time.strftime("%M"))*60 +
+                           int(time.strftime("%S")) +
+                           (int((t_local % 1)*1000))/1000.0)
+            t_recv_str = time.strftime("%M:%S", time.localtime(t_local)) + f".{int((t_local % 1)*1000):03d}"
+            tdif = t_local_val - t_gen_val
 
-                # Cadena con mismo formato que t_gen: MM:SS.mmm
-                t_recv_str = time.strftime("%M:%S", time.localtime(t_local)) + f".{int((t_local % 1)*1000):03d}"
+            dist_km = float(node_info.get("distkm", 0.0))
+            tcoh = float(node_info.get("tcoh", 1.0))
+            tesp = dist_km / (2.0/3.0 * C)
 
-                tdif = t_local_val - t_gen_val
+            w_out = w_in * math.exp(-(tdif + tesp) / tcoh)
 
-                dist_km = float(node_info.get("distkm", 0.0))
-                tcoh = float(node_info.get("tcoh", 1.0))
+            resultado["w_out"] = w_out
+            resultado["t_recv"] = t_recv_str
+            resultado["t_diff"] = tdif
+            resultado["estado"] = "activo"
+            vecino = payload["vecino"]
 
-                tesp = dist_km / (2.0/3.0 * C)
-
-                # calcular w_out
-                w_out = w_in * math.exp(-(tdif + tesp) / tcoh)
-
-                m = q.measure()
-
-                resultado["medicion"] = m
-                resultado["w_out"] = w_out
-                resultado["t_recv"] = t_recv_str
-                resultado["t_diff"] = tdif
-                vecino = payload["vecino"]
-
-                resultado["distancia_nodos"] = next(v["distanceKm"] for v in node_info["neighbors"] if v["id"] == vecino)
-
-                print("[DEBUG] my_port =", my_port)
-                print("[DEBUG] emisor_port =", emisor_port)
-                print(f"[RECEIVER] Medición #{idx}: {m}, w_out={w_out:.4f}")
+            resultado["distancia_nodos"] = next(v["distanceKm"] for v in node_info["neighbors"] if v["id"] == vecino)
 
         except CQCTimeoutError:
-            print(f"[RECEIVER] Timeout al recibir qubit #{idx}")
             resultado["estado"] = "timeout"
         except Exception as e:
-            print(f"[RECEIVER] Error inesperado: {e}")
             resultado["estado"] = "error"
     else:
-        print(f"[RECEIVER] Qubit #{idx} marcado como fallo")
         resultado["estado"] = "EPR no encontrado"
 
     # Actualizar memoria local
@@ -98,7 +86,7 @@ def recibir_epr(payload, node_info, my_port, emisor_port):
         pares.append(resultado)
     node_info["parEPR"] = pares
 
-    # Enviar resultado al propio nodo (/parEPR/recv) y al emisor (/parEPR/recv)
+    # Notificar endpoints
     try:
         if my_port:
             requests.post(f"http://localhost:{my_port}/parEPR/recv", json=resultado, timeout=2)
@@ -109,12 +97,76 @@ def recibir_epr(payload, node_info, my_port, emisor_port):
 
     return resultado
 
+def medir_epr(epr_id, node_info, conn, my_port=None, emisor_port=None):
+    q = epr_store.get(epr_id)
+    if q:
+        m = q.measure()
+        for epr in node_info["parEPR"]:
+            if epr["id"] == epr_id:
+                epr["estado"] = "medido"
+                epr["medicion"] = m
+        del epr_store[epr_id]
+        result = {"id": epr_id, "medicion": m, "estado": "medido"}
+        # notificar al propio nodo y al emisor
+        try:
+            if my_port:
+                requests.post(f"http://localhost:{my_port}/parEPR/recv", json=result, timeout=2)
+            if emisor_port:
+                requests.post(f"http://localhost:{emisor_port}/parEPR/recv", json=result, timeout=2)
+        except Exception as e:
+            print(f"[RECEIVER] Error notificando endpoints: {e}")
+        return result
+    return None
+
+def socket_listener(node_info, conn, port=9000, my_port=None, emisor_port=None):
+    """Escucha órdenes de medida en un socket TCP y mide automáticamente tras 5s de inactividad"""
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("localhost", port))
+    server.listen(5)
+    server.settimeout(5.0)   # timeout de 5 segundos
+    print(f"[RECEIVER] Escuchando órdenes en puerto {port}...")
+
+    while True:
+        try:
+            conn_sock, addr = server.accept()
+            data = conn_sock.recv(4096).decode()
+            if not data:
+                conn_sock.close()
+                continue
+            payload = json.loads(data)
+            if payload.get("accion") == "measure":
+                epr_id = payload["id"]
+                result = medir_epr(epr_id, node_info, conn, my_port, emisor_port)
+                if result:
+                    conn_sock.send(json.dumps(result).encode())
+                else:
+                    conn_sock.send(json.dumps({"error": "EPR no encontrado"}).encode())
+            conn_sock.close()
+
+        except socket.timeout:
+            # Si no se recibió nada en 5 segundos, medir automáticamente todos los activos
+            print("[RECEIVER] Timeout de 5s: midiendo EPRs activos por cuenta propia...")
+            activos = [e for e in node_info["parEPR"] if e["estado"] == "activo"]
+            if not activos:
+                print("[RECEIVER] No quedan EPRs activos, cerrando listener.")
+                break
+            for epr in activos:
+                result = medir_epr(epr["id"], node_info, conn, my_port, emisor_port)
+                if result:
+                    print(f"[RECEIVER] Medido automáticamente EPR {epr['id']}: {result['medicion']}")
+            break
 
 if __name__ == "__main__":
     payload = json.loads(sys.argv[1])
-    node_info = json.loads(sys.argv[2])
+    nodo_info = json.loads(sys.argv[2])
     my_port = int(sys.argv[3])
     emisor_port = int(sys.argv[4])
+    listener_port = int(sys.argv[5])
 
-    resultado = recibir_epr(payload, node_info, my_port, emisor_port)
-    print(f"[RECEIVER] Resultado final sincronizado: {resultado}")
+    # 🔥 Mantener la conexión abierta mientras corre el listener
+    with CQCConnection(nodo_info["id"]) as conn:
+        resultado = recibir_epr(payload, nodo_info, conn, my_port, emisor_port)
+        print(f"[RECEIVER] Resultado inicial sincronizado: {resultado}")
+
+        socket_listener(nodo_info, conn, port=listener_port, my_port=my_port, emisor_port=emisor_port)

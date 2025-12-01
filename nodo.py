@@ -28,6 +28,16 @@ def seleccionar_puerto(inicio=5000, fin=5010, excluir=None):
             print(f"[INFO] Puerto libre encontrado: {puerto}")
             return puerto
     return None
+# contador global de puertos
+listener_counter = 9000
+
+def get_next_listener_port():
+    global listener_counter
+    listener_counter += 1
+    if listener_counter > 65535:
+        listener_counter = 9000  # reinicia si se pasa del máximo
+    return listener_counter
+
 
 ORDERS = []
 
@@ -95,6 +105,7 @@ def app_open(PUERTO):
         accion = orden["accion"]
         origen_id = node_info["id"]
         epr_id = orden.get("id")
+        listener_port = get_next_listener_port()
 
         print("APLICO ORDEN!!!")
         print("La cual tiene de node info: ",node_info)
@@ -140,21 +151,28 @@ def app_open(PUERTO):
 
             print(f"[RECEIVER] Procesando EPR {epr_id} entre {node_info['id']}:{my_port} y {orden['origen']}:{emisor_port}")
 
-            subprocess.run([
+            subprocess.Popen([
                 "python", "receiver.py",
                 json.dumps(epr_obj),      # este es el payload que espera receiver.py
                 json.dumps(node_info),    # info completa del nodo receptor
                 str(my_port),
-                str(emisor_port)
-            ], check=True)
+                str(emisor_port),
+                str(listener_port)
+            ])
 
         elif accion in ["purifica", "purificar"]:
             print(f"[{origen_id}] Ejecutando protocolo de purificación...")
+            my_port = get_port_by_id(node_info["id"])
+            emisor_port = get_port_by_id(orden["con"])   # el origen con quien se purifica
             subprocess.run([
                 "python", "purify.py",
                 json.dumps(node_info),
-                str(epr_id)
+                str(listener_port),
+                str(epr_id),          # id master del nuevo EPR purificado
+                str(my_port),         # puerto local
+                str(emisor_port)      # puerto del emisor
             ])
+
 
         elif accion in ["swap", "swapping"]:
             destinatarios = orden["con"]

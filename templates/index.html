@@ -441,8 +441,8 @@
                     for (let nodo in eprHistoryGlobal) {
                         const eprs = eprHistoryGlobal[nodo] || [];
                         
-                        // Solo EPR donde este nodo es el que los creó (src)
-                        const creados = eprs.filter(e => e.src === nodo);
+                        // Solo EPR donde este nodo es el que los recibio (src)
+                        const creados = eprs.filter(e => e.dst === nodo);
 
                         const paresContados = {};
                         creados.forEach(e => {
@@ -494,7 +494,7 @@
                             const { nodo, paresUsar } = elegido;
 
                             // Asignar datos al bloque
-                            b.dataset.src = nodo;
+                            b.dataset.dst = nodo;
                             b.dataset.finalizado = true;
                             b.dataset.paresUsados = JSON.stringify(paresUsar);
                             b.textContent = `🧪 ${nodo}`;
@@ -605,25 +605,38 @@
                     if (!ordersPorNodo[dstId]) ordersPorNodo[dstId] = [];
                     ordersPorNodo[dstId].push({ id: eprId, accion: "recibe EPR", origen: srcId });
 
-                } else if (op === "pur") {
-                    const srcName = b.dataset.src;
-                    if (!srcName) {
-                        orders.push(`ERROR: Bloque PUR en posición ${i} sin nodo asignado`);
+                }else if (op === "pur") {
+                    const dstName = b.dataset.dst;
+
+                    // Recuperar el último EPR del historial para saber con quién se purifica
+                    const lastEpr = eprHistory[eprHistory.length - 1];
+                    const srcName = lastEpr ? lastEpr.src : null;
+
+                    console.log("Quien hace el pur:", dstName, "| y con quien lo comparte:", srcName);
+
+                    if (!dstName || !srcName) {
+                        orders.push(`ERROR: Bloque PUR en posición ${i} sin nodo asignado o sin EPR previo`);
                         return;
                     }
 
-                    const eprCount = eprHistory.filter(e => e.src === srcName || e.dst === srcName).length;
+                    // Contar EPR donde este nodo es receptor
+                    const eprCount = eprHistory.filter(e => e.dst === dstName || e.src === dstName).length;
                     if (eprCount < 2) {
-                        orders.push(`ERROR: ${srcName} no tiene suficientes EPR previos para purificar [pos ${i}]`);
+                        orders.push(`ERROR: ${dstName} no tiene suficientes EPR previos para purificar [pos ${i}]`);
                     } else {
-                        orders.push(`PURIFICACIÓN: ${srcName} purifica dos EPR previos [pos ${i}]`);
+                        orders.push(`PURIFICACIÓN: ${dstName} purifica dos EPR previos [pos ${i}]`);
                         const srcId = nameToId[srcName];
+                        const dstId = nameToId[dstName];
                         const purId = generarIdUnico();
-                        if (!ordersPorNodo[srcId]) ordersPorNodo[srcId] = [];
-                        ordersPorNodo[srcId].push({ id: purId, accion: "purifica", detalle: "dos EPR previos" });
+                        if (!ordersPorNodo[dstId]) ordersPorNodo[dstId] = [];
+                        ordersPorNodo[dstId].push({
+                            id: purId,
+                            accion: "purifica",
+                            detalle: "dos EPR previos",
+                            con: srcId
+                        });
                     }
-
-                }else if (op === "swap") {
+                } else if (op === "swap") {
                     const id1Name = b.dataset.src;
                     const id2Name = b.dataset.dst;
                     const helperName = b.dataset.helper;
@@ -659,7 +672,7 @@
                         });
 
                         if (!ordersPorNodo[id2Id]) ordersPorNodo[id2Id] = [];
-                        ordersPorNodo[id1Id].push({ 
+                        ordersPorNodo[id2Id].push({ 
                             id: swapId, 
                             accion: "swap recibido", 
                             con: [id1Id],          // con quién se hace el swap
@@ -747,6 +760,7 @@
                     if (derecha) derecha.style.flex = "1.5";
                     // mostrar también las órdenes cuánticas
                     if (operaciones) operaciones.style.display = "none";
+                    f5 = true
                 } else {
                     // ocultar cabecera de simulación
                     if (header) header.style.display = "none";
@@ -763,7 +777,7 @@
         const rol = "{{ rol }}";
         let nodes = [];
         let links = [];
-
+        let f5 = false;
         if (rol === "master") {
             const nodo_info = JSON.parse('{{ nodo_info|tojson|safe }}');
             console.log("Objeto nodo_info recibido:", nodo_info);
@@ -897,6 +911,12 @@
             };
             // Recibir información desde el master y actualizar el mapa
             recibirInfoBtn.addEventListener("click", () => {
+                console.log("f5 es: ",f5);
+                if(f5){
+                   location.reload();
+                   f5 = false; 
+                }
+                
                 fetch("/actualizar_mapa")
                     .then(res => res.json())
                     .then(data => {
