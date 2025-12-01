@@ -97,16 +97,16 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port):
 
     return resultado
 
-def medir_epr(epr_id, node_info, conn, my_port=None, emisor_port=None):
+def medir_epr(epr_id, node_info, conn, my_port=None, emisor_port=None, order=None):
     q = epr_store.get(epr_id)
     if q:
         m = q.measure()
         for epr in node_info["parEPR"]:
             if epr["id"] == epr_id:
-                epr["estado"] = "medido"
+                epr["estado"] = order
                 epr["medicion"] = m
         del epr_store[epr_id]
-        result = {"id": epr_id, "medicion": m, "estado": "medido"}
+        result = {"id": epr_id, "medicion": m, "estado": order}
         # notificar al propio nodo y al emisor
         try:
             if my_port:
@@ -131,14 +131,19 @@ def socket_listener(node_info, conn, port=9000, my_port=None, emisor_port=None):
         try:
             conn_sock, addr = server.accept()
             data = conn_sock.recv(4096).decode()
+            print("[DEBUG RECV] Recibido:", repr(data))
+
             if not data:
                 conn_sock.close()
                 continue
             payload = json.loads(data)
             if payload.get("accion") == "measure":
                 epr_id = payload["id"]
-                result = medir_epr(epr_id, node_info, conn, my_port, emisor_port)
+                order = "Consumed"
+                print("aaaaaaaaaaaaaaaaaaaa")
+                result = medir_epr(epr_id, node_info, conn, my_port, emisor_port, order)
                 if result:
+                    print("RESULTADOSSSS",result)
                     conn_sock.send(json.dumps(result).encode())
                 else:
                     conn_sock.send(json.dumps({"error": "EPR no encontrado"}).encode())
@@ -152,7 +157,8 @@ def socket_listener(node_info, conn, port=9000, my_port=None, emisor_port=None):
                 print("[RECEIVER] No quedan EPRs activos, cerrando listener.")
                 break
             for epr in activos:
-                result = medir_epr(epr["id"], node_info, conn, my_port, emisor_port)
+                order = "measure"
+                result = medir_epr(epr["id"], node_info, conn, my_port, emisor_port, order)
                 if result:
                     print(f"[RECEIVER] Medido automáticamente EPR {epr['id']}: {result['medicion']}")
             break
@@ -164,7 +170,7 @@ if __name__ == "__main__":
     emisor_port = int(sys.argv[4])
     listener_port = int(sys.argv[5])
 
-    # 🔥 Mantener la conexión abierta mientras corre el listener
+    # Mantener la conexión abierta mientras corre el listener
     with CQCConnection(nodo_info["id"]) as conn:
         resultado = recibir_epr(payload, nodo_info, conn, my_port, emisor_port)
         print(f"[RECEIVER] Resultado inicial sincronizado: {resultado}")

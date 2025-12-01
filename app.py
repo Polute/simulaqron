@@ -320,21 +320,17 @@ def app_open(ROL, PUERTO):
         subprocess.run(["simulaqron", "reset", "--force"], capture_output=True, text=True)
 
         ids_actuales = [n["id"] for n in nodos]
+        todos_pre = all(n["id"].endswith("pre") for n in nodos)
 
         # Arrancar nodos según cantidad
-        if len(ids_actuales) < 4:
+        if len(ids_actuales) < 4 and todos_pre:
             # Arrancar todos los nodos juntos con sus IDs reales
             proc = subprocess.Popen(
                 ["simulaqron", "start", "--name", "default", "--force", "-n", ",".join(ids_actuales)]
             )
-        elif len(ids_actuales) == 4:
-            # Arrancar los 4 nodos en línea, usando sus IDs reales
-            print("Con 4 nodos: ", ids_actuales)
-            proc = subprocess.Popen(
-                ["simulaqron", "start", "--name", "default", "--force", "-n", ",".join(ids_actuales), "-t", "path"]
-            )
         else:
             # Más de 4: extender como línea, también con IDs reales
+            print("Con estos nodos: ", ids_actuales)
             proc = subprocess.Popen(
                 ["simulaqron", "start", "--name", "default", "--force", "-n", ",".join(ids_actuales), "-t", "path"]
             )

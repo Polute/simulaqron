@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Simulación Cuántica</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_index.css') }}?v=9">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_index.css') }}?v=13">
 </head>
 <body>
     <div class="container-flex">
@@ -200,24 +200,35 @@
                     <pre id="ordenesTexto"></pre>
                 </div>
             </div>
-            <!-- Columna derecha: historial -->
             <div class="columna-derecha">
                 <h2>Historial</h2>
                 <select id="modoHistorial" onchange="cargarHistorial()">
                     <option value="resultados">Resultados</option>
                     <option value="epr">Pares EPR</option>
                 </select>
-                <table id="tabla-resultados">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Detalle</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+                <div id="tabla-resultados-wrapper">
+                    <table id="tabla-resultados">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Estado</th>
+                                <th>Enlace</th>
+                                <th>w_gen</th>
+                                <th>w_out</th>
+                                <th>t_gen</th>
+                                <th>t_recv</th>
+                                <th>t_diff</th>
+                                <th>Medición</th>
+                                <th>Purificado de</th>
+                                <th>t_pur</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
                 <button class="boton" onclick="limpiarHistorial()">Limpiar historial</button>
             </div>
+
     </div>
     <script>
         // --- DRAG DESDE LA PALETA ---
@@ -1612,27 +1623,43 @@
             }
         }
 
+        let ultimoHistorialEPR = null;
+
+        function formatNumber(val) {
+            return (typeof val === "number") ? val.toFixed(5) : (val ?? "");
+        }
 
         function actualizarTablaEPR(historial) {
-            console.log(historial);
+            const nuevoJSON = JSON.stringify(historial);
+            if (ultimoHistorialEPR === nuevoJSON) return;
+            ultimoHistorialEPR = nuevoJSON;
+
             const tbody = document.querySelector("#tabla-resultados tbody");
             tbody.innerHTML = "";
+
             historial.forEach(epr => {
                 const fila = document.createElement("tr");
+                if (epr.estado === "purificado") fila.classList.add("fila-purificada");
+
                 fila.innerHTML = `
                     <td>${epr.id}</td>
-                    <td>Enlace: ${epr.enlace}</td>
-                    <td>Estado: ${epr.estado}</td>
-                    <td>Fidelidad inicial (w_gen): ${epr.w_gen}</td>
-                    <td>Fidelidad final (w_out): ${epr.w_out ?? "-"}</td>
-                    <td>t_gen: ${epr.t_gen}</td>
-                    <td>t_recv: ${epr.t_recv ?? "-"}</td>
-                    <td>t_diff: ${epr.t_diff ?? "-"}</td>
-                    <td>Medición: ${epr.medicion ?? "-"}</td>
+                    <td>${epr.estado}</td>
+                    <td>${epr.enlace}</td>
+                    <td>${epr.w_gen ?? ""}</td>
+                    <td>${formatNumber(epr.w_out)}</td>
+                    <td>${epr.t_gen ?? ""}</td>
+                    <td>${epr.t_recv ?? ""}</td>
+                    <td>${formatNumber(epr.t_diff)}</td>
+                    <td>${epr.medicion ?? ""}</td>
+                    <td>${epr.estado === "purificado" ? (epr.purificado_de?.join(", ") ?? "") : ""}</td>
+                    <td>${epr.estado === "purificado" ? (epr.t_pur ?? "") : ""}</td>
                 `;
                 tbody.appendChild(fila);
             });
         }
+
+
+
         
 
         function limpiarHistorial() {

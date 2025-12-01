@@ -6,6 +6,7 @@ def pedir_medicion(epr_id, listener_port):
     s.connect(("localhost", listener_port))
     s.send(json.dumps(msg).encode())
     resp = s.recv(4096).decode()
+    print("[DEBUG PUR] Recibido:", repr(resp)) 
     s.close()
     return json.loads(resp)
 def purify(node_info, listener_port, master_id, my_port=None, emisor_port=None):
@@ -35,7 +36,7 @@ def purify(node_info, listener_port, master_id, my_port=None, emisor_port=None):
         nuevo_epr = {
             "id": master_id,   # usar el id de la orden
             "vecino": epr2["vecino"],
-            "estado": "medido",
+            "estado": "purificado",
             "medicion": epr2["medicion"],
             "distancia_nodos": epr2.get("distancia_nodos"),
             "t_gen": epr2.get("t_gen"),
