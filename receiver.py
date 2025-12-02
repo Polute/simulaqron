@@ -13,7 +13,7 @@ C = 3e5  # km/s
 epr_store = {}
 nodo_info = {"parEPR": []}
 
-def recibir_epr(payload, node_info, conn, my_port, emisor_port):
+def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
     idx = payload.get("id", 0)
     estado = payload.get("estado", "fallo")
 
@@ -27,7 +27,8 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port):
         "w_out": None,
         "estado": estado,
         "medicion": None,
-        "distancia_nodos": None
+        "distancia_nodos": None,
+        "listener_port": None
     }
 
     if estado == "ok":
@@ -67,12 +68,13 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port):
 
             resultado["distancia_nodos"] = next(v["distanceKm"] for v in node_info["neighbors"] if v["id"] == vecino)
 
+            resultado["listener_port"] = listener_port
         except CQCTimeoutError:
             resultado["estado"] = "timeout"
         except Exception as e:
             resultado["estado"] = "error"
     else:
-        resultado["estado"] = "EPR no encontrado"
+        resultado["estado"] = "EPR no recibido"
 
     # Actualizar memoria local
     pares = node_info.get("parEPR", [])
@@ -172,7 +174,7 @@ if __name__ == "__main__":
 
     # Mantener la conexión abierta mientras corre el listener
     with CQCConnection(nodo_info["id"]) as conn:
-        resultado = recibir_epr(payload, nodo_info, conn, my_port, emisor_port)
+        resultado = recibir_epr(payload, nodo_info, conn, my_port, emisor_port, listener_port)
         print(f"[RECEIVER] Resultado inicial sincronizado: {resultado}")
 
         socket_listener(nodo_info, conn, port=listener_port, my_port=my_port, emisor_port=emisor_port)

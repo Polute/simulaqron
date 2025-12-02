@@ -208,27 +208,12 @@
                 </select>
                 <div id="tabla-resultados-wrapper">
                     <table id="tabla-resultados">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Estado</th>
-                                <th>Enlace</th>
-                                <th>w_gen</th>
-                                <th>w_out</th>
-                                <th>t_gen</th>
-                                <th>t_recv</th>
-                                <th>t_diff</th>
-                                <th>Medición</th>
-                                <th>Purificado de</th>
-                                <th>t_pur</th>
-                            </tr>
-                        </thead>
+                        <thead></thead>
                         <tbody></tbody>
                     </table>
                 </div>
                 <button class="boton" onclick="limpiarHistorial()">Limpiar historial</button>
             </div>
-
     </div>
     <script>
         // --- DRAG DESDE LA PALETA ---
@@ -922,27 +907,28 @@
             };
             // Recibir información desde el master y actualizar el mapa
             recibirInfoBtn.addEventListener("click", () => {
-                console.log("f5 es: ",f5);
-                if(f5){
-                   location.reload();
-                   f5 = false; 
+                console.log("f5 es: ", f5);
+                if (f5) {
+                    location.reload();
+                    f5 = false;
                 }
-                
+
                 fetch("/actualizar_mapa")
                     .then(res => res.json())
                     .then(data => {
                         console.log("Datos recibidos de /actualizar_mapa:", data);
-                        
+
                         // Detectar nodos vivos
                         const nodosVivos = new Set(data.nodes.map(n => n.id));
 
                         // Eliminar nodos muertos del array local
                         for (let i = nodes.length - 1; i >= 0; i--) {
                             if (!nodosVivos.has(nodes[i].id)) {
-                                console.log("Nodo desconectado eliminado:", nodes[i].name);
+                                console.log("Nodo desconectado eliminado:", nodes[i].id || nodes[i].name);
                                 nodes.splice(i, 1);
                             }
                         }
+
                         // Merge inteligente: no machacar cambios locales si son más recientes
                         data.nodes.forEach(remoteNode => {
                             const localNode = nodes.find(n => n.id === remoteNode.id);
@@ -950,7 +936,7 @@
                                 if (!localNode.lastUpdated || localNode.lastUpdated < remoteNode.lastUpdated) {
                                     Object.assign(localNode, remoteNode);
                                 } else {
-                                    console.log(`Manteniendo cambios locales en nodo ${localNode.name}`);
+                                    console.log(`Manteniendo cambios locales en nodo ${localNode.id || localNode.name}`);
                                 }
                             } else {
                                 nodes.push(remoteNode);
@@ -965,14 +951,26 @@
                             const ts = nodo.lastUpdated || 0;
                             if (Array.isArray(nodo.neighbors)) {
                                 nodo.neighbors.forEach(vecino => {
-                                    const par = [nodo.name, vecino.name].sort().join("-");
+                                    const nodoKey = nodo.id || nodo.name;
+                                    const vecinoKey = vecino.id || vecino.name;
+                                    const par = [nodoKey, vecinoKey].sort().join("-");
                                     const distancia = vecino.distanceKm;
 
                                     if (!linksDict[par]) {
-                                        linksDict[par] = { source: nodo.name, target: vecino.name, distanciaKm: distancia, lastUpdated: ts };
+                                        linksDict[par] = {
+                                            source: nodoKey,
+                                            target: vecinoKey,
+                                            distanciaKm: distancia,
+                                            lastUpdated: ts
+                                        };
                                     } else {
                                         if (ts > linksDict[par].lastUpdated) {
-                                            linksDict[par] = { source: nodo.name, target: vecino.name, distanciaKm: distancia, lastUpdated: ts };
+                                            linksDict[par] = {
+                                                source: nodoKey,
+                                                target: vecinoKey,
+                                                distanciaKm: distancia,
+                                                lastUpdated: ts
+                                            };
                                         }
                                     }
                                 });
@@ -986,77 +984,7 @@
 
                         const paleta = document.getElementById("paleta");
                         paleta.querySelectorAll('[data-op="node"]').forEach(b => b.remove());
-                        console.log("nodos",nodes);
-                        crearBloquesDinamicos(nodes);
-
-                        draw();
-                        actualizarTablaNodos();
-                        actualizarTablaAristas();
-                    })
-                    .catch(err => console.error("Error al recibir info de nodos:", err));
-                    // Mostrar aviso al usuario
-            });
-            // Recibir información desde el master y actualizar el mapa
-            recibirInfoBtn.addEventListener("click", () => {
-                fetch("/actualizar_mapa")
-                    .then(res => res.json())
-                    .then(data => {
-                        console.log("Datos recibidos de /actualizar_mapa:", data);
-                        
-                        // Detectar nodos vivos
-                        const nodosVivos = new Set(data.nodes.map(n => n.id));
-
-                        // Eliminar nodos muertos del array local
-                        for (let i = nodes.length - 1; i >= 0; i--) {
-                            if (!nodosVivos.has(nodes[i].id)) {
-                                console.log("Nodo desconectado eliminado:", nodes[i].id);
-                                nodes.splice(i, 1);
-                            }
-                        }
-                        // Merge inteligente: no machacar cambios locales si son más recientes
-                        data.nodes.forEach(remoteNode => {
-                            const localNode = nodes.find(n => n.id === remoteNode.id);
-                            if (localNode) {
-                                if (!localNode.lastUpdated || localNode.lastUpdated < remoteNode.lastUpdated) {
-                                    Object.assign(localNode, remoteNode);
-                                } else {
-                                    console.log(`Manteniendo cambios locales en nodo ${localNode.id}`);
-                                }
-                            } else {
-                                nodes.push(remoteNode);
-                            }
-                        });
-
-                        /// Recalcular links consolidando por lastUpdated
-                        links.length = 0;
-                        const linksDict = {};
-
-                        nodes.forEach(nodo => {
-                            const ts = nodo.lastUpdated || 0;
-                            if (Array.isArray(nodo.neighbors)) {
-                                nodo.neighbors.forEach(vecino => {
-                                    const par = [nodo.id, vecino.id].sort().join("-");
-                                    const distancia = vecino.distanceKm;
-
-                                    if (!linksDict[par]) {
-                                        linksDict[par] = { source: nodo.id, target: vecino.id, distanciaKm: distancia, lastUpdated: ts };
-                                    } else {
-                                        if (ts > linksDict[par].lastUpdated) {
-                                            linksDict[par] = { source: nodo.id, target: vecino.id, distanciaKm: distancia, lastUpdated: ts };
-                                        }
-                                    }
-                                });
-                            }
-                        });
-
-                        // convertir a array
-                        Object.values(linksDict).forEach(l => {
-                            links.push({ source: l.source, target: l.target, distanciaKm: l.distanciaKm });
-                        });
-
-                        const paleta = document.getElementById("paleta");
-                        paleta.querySelectorAll('[data-op="node"]').forEach(b => b.remove());
-                        console.log("nodos",nodes);
+                        console.log("nodos", nodes);
                         crearBloquesDinamicos(nodes);
 
                         draw();
@@ -1065,6 +993,7 @@
                     })
                     .catch(err => console.error("Error al recibir info de nodos:", err));
             });
+
 
             // Enviar todos los cambios a cada nodo
             actualizarNodosBtn.addEventListener("click", () => {
@@ -1558,6 +1487,13 @@
         function cargarHistorial(historial) {
             const modo = document.getElementById("modoHistorial").value;
             const tabla = document.getElementById("tabla-resultados");
+            const thead = tabla.querySelector("thead");
+            const tbody = tabla.querySelector("tbody");
+
+            // reset encabezado
+            thead.innerHTML = "";
+            tbody.innerHTML = "";
+
             // Si venías de EPR y cambias a otro modo, parar el intervalo
             if (modo !== "epr" && eprIntervalId !== null) {
                 clearInterval(eprIntervalId);
@@ -1565,11 +1501,31 @@
             }
 
             if (modo === "resultados") {
-                tabla.classList.add("modo-resultados");
+                // encabezado reducido
+                thead.innerHTML = `
+                    <tr>
+                        <th>ID</th>
+                        <th>Estado</th>
+                    </tr>
+                `;
                 actualizarTabla(historial);
             } else if (modo === "epr") {
-                console.log("Recibo los EPRS");
-                tabla.classList.remove("modo-resultados");
+                // encabezado completo
+                thead.innerHTML = `
+                    <tr>
+                        <th>ID</th>
+                        <th>Estado</th>
+                        <th>Enlace</th>
+                        <th>w_gen</th>
+                        <th>w_out</th>
+                        <th>t_gen</th>
+                        <th>t_recv</th>
+                        <th>t_diff</th>
+                        <th>Medición</th>
+                        <th>Purificado de</th>
+                        <th>t_pur</th>
+                    </tr>
+                `;
                 const cargarEPR = () => {
                     fetch("/master/parEPR")
                         .then(res => res.json())
@@ -1578,7 +1534,6 @@
                             for (const [clave, lista] of Object.entries(data.MASTER_PAR_EPR || {})) {
                                 lista.forEach(epr => {
                                     if (mapa.has(epr.id)) {
-                                        // fusionar con lo que ya había
                                         const existente = mapa.get(epr.id);
                                         mapa.set(epr.id, { ...existente, ...epr, enlace: clave });
                                     } else {
@@ -1591,15 +1546,13 @@
                         .catch(err => console.error("Error cargando EPR:", err));
                 };
 
-                // primera carga
                 cargarEPR();
-
-                // arrancar intervalo solo si no está ya activo
                 if (eprIntervalId === null) {
                     eprIntervalId = setInterval(cargarEPR, 2000);
                 }
             }
         }
+
 
         function actualizarTabla(historial) {
             const tbody = document.querySelector("#tabla-resultados tbody");

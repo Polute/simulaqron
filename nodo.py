@@ -164,15 +164,14 @@ def app_open(PUERTO):
             print(f"[{origen_id}] Ejecutando protocolo de purificación...")
             my_port = get_port_by_id(node_info["id"])
             emisor_port = get_port_by_id(orden["con"])   # el origen con quien se purifica
+            sleep(1)
             subprocess.run([
                 "python", "purify.py",
                 json.dumps(node_info),
-                str(listener_port),
-                str(epr_id),          # id master del nuevo EPR purificado
-                str(my_port),         # puerto local
-                str(emisor_port)      # puerto del emisor
-            ])
-
+                str(epr_id),
+                str(my_port),
+                str(emisor_port)
+            ], check=True)
 
         elif accion in ["swap", "swapping"]:
             destinatarios = orden["con"]
