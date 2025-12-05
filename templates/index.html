@@ -1483,7 +1483,8 @@
         });
         // variable global para guardar el id del intervalo
         let eprIntervalId = null;
-
+        // Global map that persists across calls
+        const eprMap = new Map();
         function cargarHistorial(historial) {
             const modo = document.getElementById("modoHistorial").value;
             const tabla = document.getElementById("tabla-resultados");
@@ -1515,7 +1516,7 @@
                     <tr>
                         <th>ID</th>
                         <th>Estado</th>
-                        <th>Enlace</th>
+                        <th>link</th>
                         <th>w_gen</th>
                         <th>w_out</th>
                         <th>t_gen</th>
@@ -1526,29 +1527,35 @@
                         <th>t_pur</th>
                     </tr>
                 `;
-                const cargarEPR = () => {
+                
+
+                const loadEPR = () => {
                     fetch("/master/parEPR")
                         .then(res => res.json())
                         .then(data => {
-                            const mapa = new Map();
-                            for (const [clave, lista] of Object.entries(data.MASTER_PAR_EPR || {})) {
-                                lista.forEach(epr => {
-                                    if (mapa.has(epr.id)) {
-                                        const existente = mapa.get(epr.id);
-                                        mapa.set(epr.id, { ...existente, ...epr, enlace: clave });
+                            for (const [key, list] of Object.entries(data.MASTER_PAR_EPR || {})) {
+                                list.forEach(epr => {
+                                    if (eprMap.has(epr.id)) {
+                                        // Update existing entry without changing its position
+                                        const existing = eprMap.get(epr.id);
+                                        eprMap.set(epr.id, { ...existing, ...epr, link: key });
                                     } else {
-                                        mapa.set(epr.id, { ...epr, enlace: clave });
+                                        // New entry → appended at the end
+                                        eprMap.set(epr.id, { ...epr, link: key });
                                     }
                                 });
                             }
-                            actualizarTablaEPR(Array.from(mapa.values()));
+                            // Convert to array in insertion order
+                            const orderedList = Array.from(eprMap.values());
+                            updateEPRTable(orderedList);
                         })
-                        .catch(err => console.error("Error cargando EPR:", err));
+                        .catch(err => console.error("Error loading EPR:", err));
                 };
 
-                cargarEPR();
+
+                loadEPR();
                 if (eprIntervalId === null) {
-                    eprIntervalId = setInterval(cargarEPR, 2000);
+                    eprIntervalId = setInterval(loadEPR, 2000);
                 }
             }
         }
@@ -1575,20 +1582,26 @@
                 tbody.appendChild(fila);
             }
         }
-
         let ultimoHistorialEPR = null;
 
         function formatNumber(val) {
             return (typeof val === "number") ? val.toFixed(5) : (val ?? "");
         }
 
-        function actualizarTablaEPR(historial) {
+        function updateEPRTable(historial) {
+            // si hay al menos un elemento, actualizamos el timestamp del último
+            console.log(historial)
+            if(historial == []){
+                return
+            }
+
             const nuevoJSON = JSON.stringify(historial);
             if (ultimoHistorialEPR === nuevoJSON) return;
             ultimoHistorialEPR = nuevoJSON;
 
             const tbody = document.querySelector("#tabla-resultados tbody");
             tbody.innerHTML = "";
+
 
             historial.forEach(epr => {
                 const fila = document.createElement("tr");
@@ -1597,7 +1610,7 @@
                 fila.innerHTML = `
                     <td>${epr.id}</td>
                     <td>${epr.estado}</td>
-                    <td>${epr.enlace}</td>
+                    <td>${epr.link}</td>
                     <td>${epr.w_gen ?? ""}</td>
                     <td>${formatNumber(epr.w_out)}</td>
                     <td>${epr.t_gen ?? ""}</td>
@@ -1606,6 +1619,7 @@
                     <td>${epr.medicion ?? ""}</td>
                     <td>${epr.estado === "purificado" ? (epr.purificado_de?.join(", ") ?? "") : ""}</td>
                     <td>${epr.estado === "purificado" ? (epr.t_pur ?? "") : ""}</td>
+                    <td>${epr.ts_print ? new Date(epr.ts_print).toLocaleTimeString() : ""}</td>
                 `;
                 tbody.appendChild(fila);
             });
@@ -1648,8 +1662,10 @@
                             "<strong>Estado:</strong> Historial limpiado correctamente.";
                         document.getElementById("contador").innerHTML =
                             "<strong>Simulaciones realizadas:</strong> 0";
+                        eprMap.clear();
+                        ultimoHistorialEPR = null;
                         actualizarTabla([]);
-                        actualizarTablaEPR([]);
+                        updateEPRTable([]);
                     })
                     .catch(err => console.error("Error limpiando historial master:", err));
             })();

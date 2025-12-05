@@ -408,27 +408,29 @@ def app_open(ROL, PUERTO):
         if request.method == "POST":
             data = request.get_json()
             if not isinstance(data, dict):
-                return jsonify({"error": "Formato inválido"}), 400
-
+                return jsonify({"error": "Invalid format"}), 400
+            print("Nuevos recibimientos: ", data)
             for nodo_id, historial in data.items():
                 for epr in historial:
-                    clave = f"{nodo_id}-{epr['vecino']}"
+                    # Build key using node id and neighbor
+                    # Normalize neighbor: use "None" string if missing
+                    vecino = epr.get("vecino") if epr.get("vecino") is not None else "None"
+                    clave = f"{nodo_id}-{vecino}"
                     if clave not in MASTER_PAR_EPR:
-                        MASTER_PAR_EPR[clave] = []
-                    # buscar si ya existe ese id y actualizar
-                    updated = False
-                    for i, existente in enumerate(MASTER_PAR_EPR[clave]):
-                        if str(existente.get("id")) == str(epr.get("id")):
-                            existente.update(epr)
-                            MASTER_PAR_EPR[clave][i] = existente
-                            updated = True
-                            break
-                    if not updated:
-                        MASTER_PAR_EPR[clave].append(epr)
-                    print(f"[MASTER] Historial actualizado para {clave}: {epr}")
+                        MASTER_PAR_EPR[clave] = {}
 
-        # Tanto GET como POST devuelven el estado actual
-        return jsonify({"status": "ok", "MASTER_PAR_EPR": MASTER_PAR_EPR})
+                    # Update or insert directly by EPR id
+                    MASTER_PAR_EPR[clave][str(epr.get("id"))] = epr
+                    print(f"[MASTER] History updated for {clave}: {epr}")
+
+        # Both GET and POST return the current state
+        # Convert inner dicts to lists for JSON response
+        estado = {
+            clave: list(valores.values())
+            for clave, valores in MASTER_PAR_EPR.items()
+        }
+        return jsonify({"status": "ok", "MASTER_PAR_EPR": estado})
+
 
     
     @app.route("/master/parEPR/clear", methods=["POST"])

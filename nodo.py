@@ -244,7 +244,12 @@ def app_open(PUERTO):
         print("Enviando a Emisor y a Master: ",nodo_info)
         notificar_master_parEPR(nodo_info)
         return jsonify({"status": "updated", "parEPR": nodo_info["parEPR"]})
-
+    @app.route("/parEPR/failed_pur", methods=["POST"])
+    def parEPR_failed_pur():
+        data = request.get_json()
+        nodo_info["parEPR"].append(data)
+        notificar_master_parEPR(nodo_info)
+        return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]})
 
 
 

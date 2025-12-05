@@ -63,7 +63,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             resultado["w_out"] = w_out
             resultado["t_recv"] = t_recv_str
             resultado["t_diff"] = tdif
-            resultado["estado"] = "activo"
+            resultado["estado"] = "active"
             vecino = payload["vecino"]
 
             resultado["distancia_nodos"] = next(v["distanceKm"] for v in node_info["neighbors"] if v["id"] == vecino)
@@ -74,7 +74,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
         except Exception as e:
             resultado["estado"] = "error"
     else:
-        resultado["estado"] = "EPR no recibido"
+        resultado["estado"] = "EPR not received"
 
     # Actualizar memoria local
     pares = node_info.get("parEPR", [])
@@ -93,6 +93,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
         if my_port:
             requests.post(f"http://localhost:{my_port}/parEPR/recv", json=resultado, timeout=2)
         if emisor_port:
+            resultado["vecino"] = node_info["id"]
             requests.post(f"http://localhost:{emisor_port}/parEPR/recv", json=resultado, timeout=2)
     except Exception as e:
         print(f"[RECEIVER] Error notificando endpoints: {e}")
@@ -142,19 +143,26 @@ def socket_listener(node_info, conn, port=9000, my_port=None, emisor_port=None):
             if payload.get("accion") == "measure":
                 epr_id = payload["id"]
                 order = "Consumed"
-                print("aaaaaaaaaaaaaaaaaaaa")
                 result = medir_epr(epr_id, node_info, conn, my_port, emisor_port, order)
                 if result:
-                    print("RESULTADOSSSS",result)
                     conn_sock.send(json.dumps(result).encode())
                 else:
                     conn_sock.send(json.dumps({"error": "EPR no encontrado"}).encode())
+            """if payload.get("accion") == "swapping":
+                epr_id = payload["id"]
+                order = "Consumed"
+                result = medir_epr(epr_id, node_info, conn, my_port, emisor_port, order)
+                if result:
+                    conn_sock.send(json.dumps(result).encode())
+                else:
+                    conn_sock.send(json.dumps({"error": "EPR no encontrado"}).encode())
+                do_swapping(epr_id, payload["id1"], payload["id1"])  """ 
             conn_sock.close()
 
         except socket.timeout:
             # Si no se recibió nada en 5 segundos, medir automáticamente todos los activos
             print("[RECEIVER] Timeout de 5s: midiendo EPRs activos por cuenta propia...")
-            activos = [e for e in node_info["parEPR"] if e["estado"] == "activo"]
+            activos = [e for e in node_info["parEPR"] if e["estado"] == "active"]
             if not activos:
                 print("[RECEIVER] No quedan EPRs activos, cerrando listener.")
                 break

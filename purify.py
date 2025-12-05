@@ -9,55 +9,93 @@ def pedir_medicion(epr_id, listener_port):
     s.close()
     return json.loads(resp)
 
-def pick_active_pair_same_edge(node_info):
+def pick_pair_same_edge(node_info):
+    """
+    Select two EPRs from the same edge.
+    Returns (epr1, epr2, status):
+      status = "valid"    -> two 'active'
+      status = "fallback" -> two 'EPR not received' OR one 'active' + one 'EPR not received'
+      status = "none"     -> no usable pair
+    """
     local_id = node_info["id"]
-    activos = [e for e in node_info.get("parEPR", []) if e.get("estado") == "activo"]
-    print("[PURIFY2]",node_info)
-    print("[PURIFY2]",activos)
+    pairs = node_info.get("parEPR", [])
+    print("[PURIFY2]", node_info)
 
-    grupos = {}
-    for e in activos:
-        v = e.get("vecino")
+    groups = {}
+    for e in pairs:
+        v = e.get("vecino") or "None"
         key = "-".join(sorted([local_id, v]))
-        grupos.setdefault(key, []).append(e)
+        groups.setdefault(key, []).append(e)
+    print("GRUPOSSSSSSSSSS: ", groups)
 
-    for key, lista in grupos.items():
-        if len(lista) >= 2:
-            return lista[-2], lista[-1]
-    return None, None
-def send_epr_pu_failed(node_info, master_id, my_port, emisor_port, reason, epr1=None, epr2=None):
-    if reason == "No 2 active EPR":
-        nuevo_epr = {
-            "id": master_id,
-            "estado": "failed pur",
-            "vecino": epr2["vecino"] if epr2 else None
-        }
-    else:
-        nuevo_epr = {
-            "id": master_id,
-            "estado": "failed p_pur",
-            "vecino": epr2["vecino"] if epr2 else None,
-            "enlace": "-".join(sorted([node_info["id"], epr2["vecino"]])) if epr2 else None,
-            "purificado_de": [epr1["id"], epr2["id"]] if epr1 and epr2 else []
-        }
-    node_info["parEPR"].append(nuevo_epr)
+    for key, lst in groups.items():
+        if len(lst) < 2:
+            continue
+
+        # Case 1: two active
+        active = [e for e in lst if e.get("estado") == "active"]
+        if len(active) >= 2:
+            return active[-2], active[-1], "valid"
+
+        # Case 2: last two are EPR not received
+        if lst[-2].get("estado") == "EPR not received" and lst[-1].get("estado") == "EPR not received":
+            return lst[-2], lst[-1], "fallback"
+
+        # Case 3: one active and one EPR not received
+        states = {lst[-2].get("estado"), lst[-1].get("estado")}
+        if "active" in states and "EPR not received" in states:
+            return lst[-2], lst[-1], "fallback"
+
+    return None, None, "none"
+
+
+def send_epr_pu_failed(node_info, master_id, my_port, emitter_port, reason, epr1=None, epr2=None):
+    neighbor = None
+    if epr2 and "vecino" in epr2:
+        neighbor = epr2["vecino"]
+    elif epr1 and "vecino" in epr1:
+        neighbor = epr1["vecino"]
+
+    link = "-".join(sorted([node_info["id"], neighbor])) if neighbor else None
+    purified_from = []
+    if epr1 and "id" in epr1:
+        purified_from.append(epr1["id"])
+    if epr2 and "id" in epr2:
+        purified_from.append(epr2["id"])
+
+    new_epr = {
+        "id": master_id,
+        "estado": "failed pur" if reason == "No 2 active EPR" else "failed p_pur",
+        "vecino": neighbor,
+        "enlace": link,
+        "purificado_de": purified_from
+    }
+
+    node_info.setdefault("parEPR", []).append(new_epr)
+
     try:
+        time.sleep(0.5)
         if my_port:
-            requests.post(f"http://localhost:{my_port}/parEPR/recv", json=nuevo_epr, timeout=2)
-        if emisor_port:
-            requests.post(f"http://localhost:{emisor_port}/parEPR/recv", json=nuevo_epr, timeout=2)
+            requests.post(f"http://localhost:{my_port}/parEPR/failed_pur", json=new_epr, timeout=2)
+        if emitter_port:
+            requests.post(f"http://localhost:{emitter_port}/parEPR/failed_pur", json=new_epr, timeout=2)
     except Exception as e:
-        print(f"[PURIFY] Error notificando endpoints: {e}")
-    print("[PURIFY] Purificación fallida; se registra EPR fallido:", json.dumps(nuevo_epr, indent=2))
+        print(f"[PURIFY] Error notifying endpoints: {e}")
 
-def purify(node_info, master_id, my_port=None, emisor_port=None):
-    # Seleccionar dos EPR activos en la misma arista
-    epr1, epr2 = pick_active_pair_same_edge(node_info)
-    if not epr1 or not epr2:
+    print("[PURIFY] Purification failed; failed EPR registered:", json.dumps(new_epr, indent=2))
+
+
+def purify(node_info, master_id, my_port=None, emitter_port=None):
+    epr1, epr2, status = pick_pair_same_edge(node_info)
+
+    if status != "valid":
         reason = "No 2 active EPR"
-        send_epr_pu_failed(node_info, master_id ,my_port, emisor_port, reason, epr1, epr2)
-        print("[PURIFY] No hay dos EPR activos en la misma arista")
+        send_epr_pu_failed(node_info, master_id, my_port, emitter_port, reason, epr1, epr2)
+        print("[PURIFY] No valid pair of active EPRs on the same edge")
         return
+
+    # Actual purification logic when two valid actives are found
+    print("[PURIFY] Purification with EPRs:", epr1["id"], epr2["id"])
 
     # Medir usando el listener_port guardado en cada EPR
     lp1 = epr1.get("listener_port")
@@ -83,8 +121,8 @@ def purify(node_info, master_id, my_port=None, emisor_port=None):
 
     p_pur = (1 + (w1 * w2)) / 2
     if random.random() <= p_pur:
-        mejora = (w1 + w2 + 4 * w1 * w2) / 6
-        w_final = min((w2 or 0) + mejora, 1.0)
+        mejora = (w1 + w2 + 4 * w1 * w2) / (6*p_pur)
+        w_final = mejora
 
         nuevo_epr = {
             "id": master_id,
