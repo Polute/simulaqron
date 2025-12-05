@@ -38,11 +38,33 @@ def get_next_listener_port():
         listener_counter = 9000  # reinicia si se pasa del máximo
     return listener_counter
 
+def port_available(port: int) -> bool:
+    """Return True if the port is free to bind on localhost."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(("localhost", port))
+            return True
+        except OSError:
+            return False
+
+def select_port(start=9000, end=10000, exclude=None):
+    """
+    Iterate ports in [start, end] and return the first free one not in 'exclude'.
+    """
+    exclude = exclude or []
+    for port in range(start, end + 1):
+        if port in exclude:
+            continue
+        if port_available(port):
+            print(f"[INFO] Free port found: {port}")
+            return port
+    return None
 
 ORDERS = []
+# global flag
+receiver_started = False
 
-
-def app_open(PUERTO):
+def app_open(PUERTO, listener_port):
     # Diccionario que mapea puertos a nodos completos
     PORT_NODE_MAP = {
         5000: {
@@ -100,12 +122,14 @@ def app_open(PUERTO):
             if info["id"] == node_id:
                 return port
         raise ValueError(f"No se encontró puerto para {node_id}")
+    
 
     def aplicar_orden(orden, node_info):
+        global receiver_started
         accion = orden["accion"]
         origen_id = node_info["id"]
         epr_id = orden.get("id")
-        listener_port = get_next_listener_port()
+
 
         print("APLICO ORDEN!!!")
         print("La cual tiene de node info: ",node_info)
@@ -151,20 +175,41 @@ def app_open(PUERTO):
 
             print(f"[RECEIVER] Procesando EPR {epr_id} entre {node_info['id']}:{my_port} y {orden['origen']}:{emisor_port}")
 
-            subprocess.Popen([
-                "python", "receiver.py",
-                json.dumps(epr_obj),      # este es el payload que espera receiver.py
-                json.dumps(node_info),    # info completa del nodo receptor
-                str(my_port),
-                str(emisor_port),
-                str(listener_port)
-            ])
+            if not receiver_started:
+                print("[INFO] Starting receiver.py for the first time")
+                subprocess.Popen([
+                    "python", "receiver.py",
+                    json.dumps(epr_obj),
+                    json.dumps(node_info),
+                    str(my_port),
+                    str(emisor_port),
+                    str(listener_port)
+                ])
+                receiver_started = True
+            else:
+                print("[INFO] receiver.py already running, send order via socket")
+                payload = {
+                    "accion": "recibe EPR",
+                    "id": epr_id,
+                    "origen": node_info["id"],
+                    "epr_obj": epr_obj,
+                    "node_info": node_info,
+                    "my_port": my_port,
+                    "emisor_port": emisor_port,
+                    "listener_port": listener_port,
+                }
+                # connect to the listener and send the order
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect(("localhost", listener_port))
+                    s.send(json.dumps(payload).encode())
+                    resp = s.recv(4096).decode()
+                    print("[RECEIVER] Response:", resp)
 
         elif accion in ["purifica", "purificar"]:
             print(f"[{origen_id}] Ejecutando protocolo de purificación...")
             my_port = get_port_by_id(node_info["id"])
             emisor_port = get_port_by_id(orden["con"])   # el origen con quien se purifica
-            sleep(1)
+            sleep(2)
             subprocess.run([
                 "python", "purify.py",
                 json.dumps(node_info),
@@ -174,13 +219,26 @@ def app_open(PUERTO):
             ], check=True)
 
         elif accion in ["swap", "swapping"]:
-            destinatarios = orden["con"]
-            destinatarios_ports = [str(get_port_by_id(n)) for n in destinatarios]
-            pswap_origen = str(node_info.get("pswap", 0))
-            subprocess.run([
-                "python", "swap.py", pswap_origen, str(epr_id)
-            ] + destinatarios + destinatarios_ports)
-
+            sleep(3)
+            print(f"[{origen_id}] Ejecutando swapping...")
+            payload = {
+                    "accion": "do swapping",
+                    "id": epr_id,
+                    "origen": node_info["id"],
+                    "node_info": node_info,
+                    "destinatarios": orden["con"],
+                    "destinatarios_ports": [str(get_port_by_id(n)) for n in orden["con"]],
+                    "pswap": str(node_info.get("pswap", 1)),
+                    "listener_port": listener_port
+                }
+            # connect to the listener and send the order
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect(("localhost", listener_port))
+                s.send(json.dumps(payload).encode())
+                resp = s.recv(4096).decode()
+                print("[RECEIVER] Response:", resp)
+        elif accion in ["swap recibido"]:
+            print("Intento de swap entre: ",orden["con"])
         else:
             raise ValueError(f"Acción desconocida: {accion}")
 
@@ -251,23 +309,39 @@ def app_open(PUERTO):
         notificar_master_parEPR(nodo_info)
         return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]})
 
-
-
-    @app.route("/parEPR/delete", methods=["POST"])
-    def parEPR_delete():
+    @app.route("/parEPR/swap", methods=["POST"])
+    def parEPR_swap():
         data = request.get_json()
-        pair_id = data.get("id")
+        pares = nodo_info.setdefault("parEPR", [])
 
-        if pair_id is None:
-            return jsonify({"error": "Falta id"}), 400
+        # Usa el id recibido o genera uno nuevo
+        epr_id = data.get("id") or (max((p["id"] for p in pares), default=0) + 1)
+        print("DATAAAAAAAA: ", data)
+        # Construye el nuevo EPR de swapping
+        nuevo_epr = {
+            "id": epr_id,
+            "vecino": data.get("vecino"),          # normalmente lista de destinatarios
+            "estado": data.get("estado", "swapped"),
+            "medicion": data.get("medicion")
+        }
 
-        original = len(nodo_info["parEPR"])
-        nodo_info["parEPR"] = [p for p in nodo_info["parEPR"] if p["id"] != pair_id]
+        # Actualiza si ya existe, si no lo añade
+        updated = False
+        for i, epr in enumerate(pares):
+            if str(epr.get("id")) == str(epr_id):
+                epr.update(nuevo_epr)
+                pares[i] = epr
+                updated = True
+                break
+        if not updated:
+            pares.append(nuevo_epr)
 
-        if len(nodo_info["parEPR"]) < original:
-            return jsonify({"status": "deleted", "parEPR": nodo_info["parEPR"]})
+        nodo_info["parEPR"] = pares
+        notificar_master_parEPR(nodo_info)
 
-        return jsonify({"error": "ID no encontrado"}), 404
+        return jsonify({"status": "swapped", "parEPR": nodo_info["parEPR"]})
+
+
 
     def notificar_master_parEPR(nodo_info):
         try:
@@ -373,9 +447,12 @@ if __name__ == "__main__":
     # Seleccionar un puerto libre en el rango, excepto 5001
     PUERTO = seleccionar_puerto(5000, 5010, excluir=[5001])
     if PUERTO is None:
-        print("[ERROR] No hay puertos disponibles.")
+        print("[ERROR] No ports available")
         sys.exit(1)
-
-    proceso = Process(target=app_open, args=(PUERTO,))
+    listener_port = select_port(9000,9010, None)
+    if PUERTO is None:
+        print("[ERROR] No socket ports available")
+        sys.exit(1)
+    proceso = Process(target=app_open, args=(PUERTO, listener_port,))
     proceso.start()
     proceso.join()

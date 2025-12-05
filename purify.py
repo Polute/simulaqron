@@ -8,44 +8,54 @@ def pedir_medicion(epr_id, listener_port):
     resp = s.recv(4096).decode()
     s.close()
     return json.loads(resp)
+import time
 
-def pick_pair_same_edge(node_info):
+def pick_pair_same_edge(node_info, timeout=5.0, interval=0.2):
     """
-    Select two EPRs from the same edge.
+    Wait up to `timeout` seconds for two EPRs 'active' on the same edge.
     Returns (epr1, epr2, status):
       status = "valid"    -> two 'active'
       status = "fallback" -> two 'EPR not received' OR one 'active' + one 'EPR not received'
       status = "none"     -> no usable pair
     """
     local_id = node_info["id"]
-    pairs = node_info.get("parEPR", [])
-    print("[PURIFY2]", node_info)
+    start = time.time()
 
-    groups = {}
-    for e in pairs:
-        v = e.get("vecino") or "None"
-        key = "-".join(sorted([local_id, v]))
-        groups.setdefault(key, []).append(e)
-    print("GRUPOSSSSSSSSSS: ", groups)
+    while time.time() - start < timeout:
+        pairs = node_info.get("parEPR", [])
+        groups = {}
+        for e in pairs:
+            v = e.get("vecino") or "None"
+            # Saltar si vecino es una lista (caso swapped)
+            if isinstance(v, list):
+                continue
+            key = "-".join(sorted([local_id, v]))
+            groups.setdefault(key, []).append(e)
 
-    for key, lst in groups.items():
-        if len(lst) < 2:
-            continue
+        print("[DEBUG] Groups by edge:", groups)
 
-        # Case 1: two active
-        active = [e for e in lst if e.get("estado") == "active"]
-        if len(active) >= 2:
-            return active[-2], active[-1], "valid"
+        for key, lst in groups.items():
+            if len(lst) < 2:
+                continue
 
-        # Case 2: last two are EPR not received
-        if lst[-2].get("estado") == "EPR not received" and lst[-1].get("estado") == "EPR not received":
-            return lst[-2], lst[-1], "fallback"
+            # Case 1: two 'active' EPRs
+            active = [e for e in lst if e.get("estado") == "active"]
+            if len(active) >= 2:
+                return active[-2], active[-1], "valid"
 
-        # Case 3: one active and one EPR not received
-        states = {lst[-2].get("estado"), lst[-1].get("estado")}
-        if "active" in states and "EPR not received" in states:
-            return lst[-2], lst[-1], "fallback"
+            # Case 2: last two are 'EPR not received'
+            if lst[-2].get("estado") == "EPR not received" and lst[-1].get("estado") == "EPR not received":
+                return lst[-2], lst[-1], "fallback"
 
+            # Case 3: one 'active' and one 'EPR not received'
+            states = {lst[-2].get("estado"), lst[-1].get("estado")}
+            if "active" in states and "EPR not received" in states:
+                return lst[-2], lst[-1], "fallback"
+
+        # Wait before retrying
+        time.sleep(interval)
+
+    # Timeout reached without finding a valid pair
     return None, None, "none"
 
 
