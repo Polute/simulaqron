@@ -389,6 +389,17 @@
             marcoPapelera.classList.remove("dragover");
         });
 
+        function hasEprWith(node, target) {
+        const eprs = eprHistoryGlobal[node] || [];
+        return eprs.some(e => {
+            const pair = [e.src, e.dst].sort().join("-");
+            const expected = [node, target].sort().join("-");
+            return pair === expected;
+        });
+        }
+
+
+
         function actualizarBloques() {
             const blocks = Array.from(workspace.querySelectorAll(".block"));
             const actualizarInfoBtn = 
@@ -508,7 +519,7 @@
                     }
                 }
                 else if (b.dataset.op === "swap") {
-                    // SWAP: usar nodos aunque estén ocultos, validar con historial
+                    // SWAP: use nodes even if hidden, validate with history
                     const helperNode = blocks.slice(0, idx).reverse().find(bb => bb.dataset.op === "node");
                     const nextTwoNodes = blocks.slice(idx + 1).filter(bb => bb.dataset.op === "node").slice(0, 2);
 
@@ -523,23 +534,32 @@
                         console.log("Target nodes:", n1.dataset.src, n2.dataset.src);
                         console.log("Historial global del helper:", eprHistoryGlobal[helperNode.dataset.src]);
 
-                        // Validar que el helper tiene EPR previos con ambos nodos
-                        const valid1 = eprHistoryGlobal[helperNode.dataset.src].some(e =>
-                            [e.src, e.dst].sort().join("-") === [helperNode.dataset.src, n1.dataset.src].sort().join("-")
-                        );
+                        // Validate that helper has EPRs with both target nodes
+                        const valid1 = hasEprWith(helperNode.dataset.src, n1.dataset.src);
+                        const valid2 = hasEprWith(helperNode.dataset.src, n2.dataset.src);
 
-                        const valid2 = eprHistoryGlobal[helperNode.dataset.src].some(e =>
-                            [e.src, e.dst].sort().join("-") === [helperNode.dataset.src, n2.dataset.src].sort().join("-")
-                        );
 
                         console.log("Resultados validación swap:", valid1, valid2);
                         console.log("==================");
 
                         if (valid1 && valid2) {
-                            b.textContent = `${n1.dataset.src.charAt(0)}<=>${n2.dataset.src.charAt(0)}(${helperNode.dataset.src.charAt(0)})`;
+                            // Mark block as finalized
                             b.dataset.finalizado = true;
+                            b.textContent = `${n1.dataset.src}<=>${n2.dataset.src}(${helperNode.dataset.src})`;
 
-                            // Ocultar nodos visualmente
+                            // Record new swapped EPR in global history
+                            const nuevoSwap = {
+                                src: n1.dataset.src,
+                                dst: n2.dataset.src,
+                                helper: helperNode.dataset.src
+                            };
+                            eprHistoryGlobal[n1.dataset.src].push(nuevoSwap);
+                            eprHistoryGlobal[n2.dataset.src].push(nuevoSwap);
+
+                            console.log("SWAP agregado:", nuevoSwap);
+                            console.log("Historial global tras SWAP:", eprHistoryGlobal);
+
+                            // Hide nodes visually
                             helperNode.style.display = "none";
                             n1.style.display = "none";
                             n2.style.display = "none";

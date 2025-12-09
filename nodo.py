@@ -10,46 +10,15 @@ import requests
 import queue
 event_queue = queue.Queue()
 
-def puerto_disponible(puerto: int) -> bool:
-    """Devuelve True si el puerto está libre en localhost."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(("127.0.0.1", puerto)) != 0
-
-def seleccionar_puerto(inicio=5000, fin=5010, excluir=None):
-    """
-    Recorre los puertos en el rango [inicio, fin].
-    Devuelve el primer puerto libre que no esté en 'excluir'.
-    """
-    excluir = excluir or []
-    for puerto in range(inicio, fin + 1):
-        if puerto in excluir:
-            continue
-        if puerto_disponible(puerto):
-            print(f"[INFO] Puerto libre encontrado: {puerto}")
-            return puerto
-    return None
-# contador global de puertos
-listener_counter = 9000
-
-def get_next_listener_port():
-    global listener_counter
-    listener_counter += 1
-    if listener_counter > 65535:
-        listener_counter = 9000  # reinicia si se pasa del máximo
-    return listener_counter
-
 def port_available(port: int) -> bool:
-    """Return True if the port is free to bind on localhost."""
+    """Returns True if the port is free on localhost."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        try:
-            s.bind(("localhost", port))
-            return True
-        except OSError:
-            return False
+        return s.connect_ex(("127.0.0.1", port)) != 0
 
-def select_port(start=9000, end=10000, exclude=None):
+def select_port(start=5000, end=5010, exclude=None):
     """
-    Iterate ports in [start, end] and return the first free one not in 'exclude'.
+    Iterate through the ports in the range [start, end].
+    Returns the first free port that is not in 'exclude'.
     """
     exclude = exclude or []
     for port in range(start, end + 1):
@@ -59,6 +28,7 @@ def select_port(start=9000, end=10000, exclude=None):
             print(f"[INFO] Free port found: {port}")
             return port
     return None
+
 
 ORDERS = []
 # global flag
@@ -129,7 +99,7 @@ def app_open(PUERTO, listener_port):
         accion = orden["accion"]
         origen_id = node_info["id"]
         epr_id = orden.get("id")
-
+        sleep(1)
 
         print("APLICO ORDEN!!!")
         print("La cual tiene de node info: ",node_info)
@@ -445,14 +415,11 @@ def app_open(PUERTO, listener_port):
 
 if __name__ == "__main__":
     # Seleccionar un puerto libre en el rango, excepto 5001
-    PUERTO = seleccionar_puerto(5000, 5010, excluir=[5001])
+    PUERTO = select_port(5000, 5010, exclude=[5001])
     if PUERTO is None:
         print("[ERROR] No ports available")
         sys.exit(1)
-    listener_port = select_port(9000,9010, None)
-    if PUERTO is None:
-        print("[ERROR] No socket ports available")
-        sys.exit(1)
-    proceso = Process(target=app_open, args=(PUERTO, listener_port,))
+
+    proceso = Process(target=app_open, args=(PUERTO, PUERTO+4000))
     proceso.start()
     proceso.join()
