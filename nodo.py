@@ -42,7 +42,6 @@ def app_open(PUERTO, listener_port):
             "name": "Alice",
             "x": 100,
             "y": 100,
-            "pgen": 0.8,
             "roles": ["emisor", "receptor"],
             "neighbors": [],   # Alice no tiene vecinos iniciales
             "parEPR": []
@@ -52,10 +51,9 @@ def app_open(PUERTO, listener_port):
             "name": "Bob",
             "x": 300,
             "y": 100,
-            "pgen": 0.7,
             "roles": ["receptor", "repeater"],
             "neighbors": [
-                {"id": "node_alice", "distanceKm": 50}
+                {"id": "node_alice", "distanceKm": 50, "pgen": 0.7}
             ],
             "parEPR": []
         },
@@ -64,10 +62,9 @@ def app_open(PUERTO, listener_port):
             "name": "Charlie",
             "x": 200,
             "y": 250,
-            "pgen": 0.9,
             "roles": ["emisor", "repeater", "receptor"],
             "neighbors": [
-                {"id": "node_bob", "distanceKm": 40}
+                {"id": "node_bob", "distanceKm": 40, "pgen": 0.8}
             ],
             "parEPR": []
         },
@@ -76,10 +73,9 @@ def app_open(PUERTO, listener_port):
             "name": "Eve",
             "x": 300,
             "y": 250,
-            "pgen": 0.9,
             "roles": ["emisor", "repeater", "receptor"],
             "neighbors": [
-                {"id": "node_charlie", "distanceKm": 70},
+                {"id": "node_charlie", "distanceKm": 30, "pgen": 0.9},
             ],
             "parEPR": []
         }
@@ -99,7 +95,6 @@ def app_open(PUERTO, listener_port):
         accion = orden["accion"]
         origen_id = node_info["id"]
         epr_id = orden.get("id")
-        sleep(1)
 
         print("APLICO ORDEN!!!")
         print("La cual tiene de node info: ",node_info)
@@ -108,7 +103,12 @@ def app_open(PUERTO, listener_port):
             destino_id = orden["destino"]
             origen_port = get_port_by_id(origen_id)
             destino_port = get_port_by_id(destino_id)
-            pgen_origen = str(node_info["pgen"])
+            # Buscar el pgen del vecino cuyo id coincide con destino_id
+            pgen_origen = None
+            for vecino in node_info.get("neighbors", []):
+                if vecino["id"] == destino_id:
+                    pgen_origen = str(vecino["pgen"])
+                    break
 
             print(origen_id, "va a generarEPR con:", destino_id)
             subprocess.run([
@@ -117,7 +117,8 @@ def app_open(PUERTO, listener_port):
                 str(origen_port), str(destino_port),
                 pgen_origen,
                 str(epr_id),
-                json.dumps(node_info)
+                json.dumps(node_info),
+                str(listener_port)
             ], check=True)
 
         elif accion == "recibe EPR":
@@ -161,12 +162,12 @@ def app_open(PUERTO, listener_port):
                 payload = {
                     "accion": "recibe EPR",
                     "id": epr_id,
-                    "origen": node_info["id"],
+                    "origen": orden["origen"],
                     "epr_obj": epr_obj,
                     "node_info": node_info,
                     "my_port": my_port,
                     "emisor_port": emisor_port,
-                    "listener_port": listener_port,
+                    "listener_port": listener_port
                 }
                 # connect to the listener and send the order
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -189,7 +190,6 @@ def app_open(PUERTO, listener_port):
             ], check=True)
 
         elif accion in ["swap", "swapping"]:
-            sleep(3)
             print(f"[{origen_id}] Ejecutando swapping...")
             payload = {
                     "accion": "do swapping",
@@ -217,6 +217,7 @@ def app_open(PUERTO, listener_port):
 
     @app.route("/")
     def index():
+        print(nodo_info)
         return render_template("nodo.html", nodo_info=nodo_info)
 
     @app.route("/info")
@@ -267,7 +268,11 @@ def app_open(PUERTO, listener_port):
                 updated = True
                 break
         if not updated:
-            pares.append(data)
+            if data.get("vecino") == nodo_info["id"] or data.get("vecino") in [v["id"] for v in nodo_info.get("neighbors", [])]:
+                pares.append(data)
+            else:
+                print(f"[DEBUG] Ignorando EPR {data.get('id')} porque no corresponde a {nodo_info['id']}")
+
         nodo_info["parEPR"] = pares
         print("Enviando a Emisor y a Master: ",nodo_info)
         notificar_master_parEPR(nodo_info)
@@ -283,10 +288,8 @@ def app_open(PUERTO, listener_port):
     def parEPR_swap():
         data = request.get_json()
         pares = nodo_info.setdefault("parEPR", [])
-
         # Usa el id recibido o genera uno nuevo
         epr_id = data.get("id") or (max((p["id"] for p in pares), default=0) + 1)
-        print("DATAAAAAAAA: ", data)
         # Construye el nuevo EPR de swapping
         nuevo_epr = {
             "id": epr_id,
@@ -330,22 +333,25 @@ def app_open(PUERTO, listener_port):
     def update():
         data = request.get_json()
 
-        for key in ["id", "name", "pgen", "pswap", "roles", "neighbors", "parEPR"]:
+        for key in ["id", "name", "pswap", "roles", "neighbors", "parEPR"]:
             if key in data:
                 nodo_info[key] = data[key]
 
         source = data.get("source")
         target = data.get("target")
         distancia = data.get("distanciaKm")
+        pgen = data.get("pgen")
         if source and target and distancia is not None:
             if nodo_info.get("id") == source:
                 for v in nodo_info.get("neighbors", []):
                     if v.get("id") == target:
                         v["distanceKm"] = distancia
+                        v["pgen"] = pgen
             if nodo_info.get("id") == target:
                 for v in nodo_info.get("neighbors", []):
                     if v.get("id") == source:
                         v["distanceKm"] = distancia
+                        v["pgen"] = pgen
 
             vecino_id = target if nodo_info["id"] == source else source
             vecino_port = get_port_by_id(vecino_id)
@@ -382,7 +388,7 @@ def app_open(PUERTO, listener_port):
     @app.route("/mandate/stream")
     def mandate_stream():
         def event_stream():
-            msg = event_queue.get()  # 🔔 espera bloqueante
+            msg = event_queue.get()  #  espera bloqueante
             yield f"data: {msg}\n\n"
         return Response(event_stream(), mimetype="text/event-stream")
 

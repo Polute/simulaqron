@@ -14,15 +14,11 @@
                 <div class="controles">
                     <button id="modoNodo" class="boton">🖌️ Crear Nodos</button>
                     <button id="modoArista" class="boton">🔗 Crear Aristas</button>
-                    <label>pgen:</label>
-                    <input type="number" id="pgen" min="0" max="1" step="0.01" value="0.8">
                     <button id="zoomIn" class="boton">➕</button>
                     <button id="zoomOut" class="boton">➖</button>
                     <button id="resetView" class="boton">📍</button>
                     <button id="btnActualizarNodos">Actualizar nodos</button>
                 </div>
-
-                <input type="number" id="pgenInput" class="pgen-input" />
                 <input type="text" id="nameInput" class="name-input" />
 
                 <div id="mapa-wrapper" style="position: relative;">
@@ -44,11 +40,6 @@
 
                 <h3>Parámetros físicos</h3>
                 <div style="display: flex; align-items: flex-start; gap: 40px;">
-                    <div>
-                        <label for="pswap">pswap (0.0 - 1.0):</label>
-                        <input type="number" id="pswapInput" name="pswap" min="0" max="1" step="0.01" value="0.9">
-                    </div>
-
                     <div>
                         <label for="tipo_canal">Tipo de canal cuántico:</label>
                         <select id="tipo_canal" onchange="toggleCanalInput()">
@@ -103,7 +94,6 @@
                         <tr><th>ID</th>
                             <th>Nombre</th>
                             <th>Roles</th>
-                            <th>pgen</th>
                             <th>pswap</th>
                         </tr>
                     </thead>
@@ -113,7 +103,7 @@
                 <h3>Aristas</h3>
                 <table id="tabla-aristas">
                     <thead>
-                        <tr><th>Origen</th><th>Destino</th><th>Distancia (km)</th></tr>
+                        <tr><th>Origen</th><th>Destino</th><th>Distancia (km)</th><th>pgen</th></tr>
                     </thead>
                     <tbody></tbody>
                 </table>
@@ -390,13 +380,23 @@
         });
 
         function hasEprWith(node, target) {
-        const eprs = eprHistoryGlobal[node] || [];
-        return eprs.some(e => {
-            const pair = [e.src, e.dst].sort().join("-");
-            const expected = [node, target].sort().join("-");
-            return pair === expected;
-        });
+            const eprs = eprHistoryGlobal[node] || [];
+            return eprs.some(e => {
+                // Normalize the pair
+                const pair = [e.src, e.dst].sort().join("-");
+                const expected = [node, target].sort().join("-");
+                if (pair === expected) return true;
+
+                // If the entry has a helper, accept it as a valid swap-generated link
+                if (e.helper) {
+                const indirectPair = [e.src, e.dst].sort().join("-");
+                if (indirectPair === expected) return true;
+                }
+
+                return false;
+            });
         }
+
 
 
 
@@ -575,9 +575,7 @@
         function generarIdUnico() {
             return Math.random().toString(36).substr(2, 9); 
         }
-
-
-       // Exportar órdenes usando el mismo historial
+        // Exportar órdenes usando el mismo historial
         function mostrarOrdenes() {
             const blocks = workspace.querySelectorAll(".block");
             const orders = [];
@@ -662,10 +660,12 @@
                         return;
                     }
 
-                    const valid1 = eprHistory.some(e => (e.src === id1Name && e.dst === helperName) || (e.src === helperName && e.dst === id1Name));
-                    const valid2 = eprHistory.some(e => (e.src === id2Name && e.dst === helperName) || (e.src === helperName && e.dst === id2Name));
-
+                    // Validate that helper has EPRs with both target nodes
+                    const valid1 = hasEprWith(helperName, id1Name);
+                    const valid2 = hasEprWith(helperName, id2Name);
+                    console.log("HISTORY: ",eprHistory);
                     if (!valid1 || !valid2) {
+                        console.log("HISTORY2: ",eprHistory);
                         orders.push(`ERROR: ${helperName} no tiene EPR previos con ${id1Name} y ${id2Name} para SWAP [pos ${i}]`);
                     } else {
                         orders.push(`SWAP: ${helperName} hace entanglement swapping entre ${id1Name} y ${id2Name} [pos ${i}]`);
@@ -739,7 +739,6 @@
                 block.dataset.op = "node";
                 block.dataset.src = nodo.name;    // nombre del nodo
                 block.dataset.id = nodo.id;       // id del nodo
-                block.dataset.pgen = nodo.pgen;   // probabilidad de generación
                 block.dataset.neighbors = JSON.stringify(nodo.neighbors); // vecinos en JSON
                 block.dataset.parEPR = JSON.stringify(nodo.parEPR);
 
@@ -752,7 +751,6 @@
                     e.dataTransfer.setData("op", block.dataset.op);
                     e.dataTransfer.setData("src", block.dataset.src);
                     e.dataTransfer.setData("id", block.dataset.id);
-                    e.dataTransfer.setData("pgen", block.dataset.pgen);
                     e.dataTransfer.setData("neighbors", block.dataset.neighbors);
                     e.dataTransfer.setData("parEPR", block.dataset.parEPR);
                     e.dataTransfer.setData("class", block.className);
@@ -812,7 +810,8 @@
                             const link = {
                                 source: nodo.id,
                                 target: vecino.id,
-                                distanciaKm: vecino.distanceKm
+                                distanciaKm: vecino.distanceKm,
+                                pgen: vecino.pgen
                             };
                             links.push(link);
                         });
@@ -868,16 +867,14 @@
                 "node_bob": 5002,
                 "node_charlie": 5003,
                 "node_eve": 5004
-                // Agrega más si tienes más nodos
+
             };
             return mapa[id];
         }
         //-----------------------------------------MAPA-----------------------------------------------
         window.onload = function () {
             const svg = document.getElementById("canvas");
-            const paramInput = document.getElementById("pgenInput");
             const nameInput = document.getElementById("nameInput");
-            const pgenInput = document.getElementById("pgen");
             const modoNodoBtn = document.getElementById("modoNodo");
             const modoAristaBtn = document.getElementById("modoArista");
             const zoomInBtn = document.getElementById("zoomIn");
@@ -975,13 +972,16 @@
                                     const vecinoKey = vecino.id || vecino.name;
                                     const par = [nodoKey, vecinoKey].sort().join("-");
                                     const distancia = vecino.distanceKm;
+                                    const pgen = vecino.pgen
 
                                     if (!linksDict[par]) {
                                         linksDict[par] = {
                                             source: nodoKey,
                                             target: vecinoKey,
                                             distanciaKm: distancia,
+                                            pgen : vecino.pgen,
                                             lastUpdated: ts
+
                                         };
                                     } else {
                                         if (ts > linksDict[par].lastUpdated) {
@@ -989,6 +989,7 @@
                                                 source: nodoKey,
                                                 target: vecinoKey,
                                                 distanciaKm: distancia,
+                                                pgen : vecino.pgen,
                                                 lastUpdated: ts
                                             };
                                         }
@@ -999,7 +1000,7 @@
 
                         // convertir a array
                         Object.values(linksDict).forEach(l => {
-                            links.push({ source: l.source, target: l.target, distanciaKm: l.distanciaKm });
+                            links.push({ source: l.source, target: l.target, distanciaKm: l.distanciaKm , pgen : l.pgen});
                         });
 
                         const paleta = document.getElementById("paleta");
@@ -1032,11 +1033,16 @@
                             // Solo añadimos si alguno conoce la distancia
                             const distanciaKm = (esteVecino && esteVecino.distanceKm) ||
                                                 (otroVecino && otroVecino.distanceKm);
+                            //pgen               
+                            const pgen = (esteVecino && esteVecino.pgen) ||
+                                                (otroVecino && otroVecino.pgen);
 
                             if (distanciaKm !== undefined) {
                                 vecinosSimetricos.push({
                                     id: other.id,
-                                    distanceKm: distanciaKm
+                                    distanceKm: distanciaKm,
+                                    pgen: pgen
+
                                 });
                             }
                         }
@@ -1049,7 +1055,6 @@
                         body: JSON.stringify({
                             id: node.id,
                             name: node.name,
-                            pgen: node.pgen,
                             pswap: node.pswap,
                             roles: node.roles,
                             neighbors: vecinosSimetricos,
@@ -1078,7 +1083,8 @@
                                         links.push({
                                             source: nodo.id,
                                             target: vecino.id,
-                                            distanciaKm: vecino.distanceKm
+                                            distanciaKm: vecino.distanceKm,
+                                            pgen: vecino.pgen
                                         });
                                     });
                                 }
@@ -1098,7 +1104,6 @@
                     name: "Nodo_" + Date.now(),       // nombre inicial editable
                     roles: ["emisor","receptor","repeater"], // roles activos
                     x, y,
-                    pgen: 0.8,
                     pswap: 0.8,
                     neighbors: []
                 };
@@ -1124,7 +1129,8 @@
                 const distanciaKm = 50;
                 const length = Math.hypot(targetNode.x - sourceNode.x, targetNode.y - sourceNode.y);
 
-                links.push({ source: sourceNode.id, target: targetNode.id, length, distanciaKm });
+                const pgen = 0.9
+                links.push({ source: sourceNode.id, target: targetNode.id, length, distanciaKm, pgen });
                 draw();
 
                 fetch("/modificar_links", {
@@ -1195,13 +1201,6 @@
                     nameLabel.setAttribute("class", "label");
                     nameLabel.textContent = node.name;
                     g.appendChild(nameLabel);
-
-                    const paramLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    paramLabel.setAttribute("x", node.x);
-                    paramLabel.setAttribute("y", node.y + 50);
-                    paramLabel.setAttribute("class", "label");
-                    paramLabel.textContent = "pgen = " + node.pgen;
-                    g.appendChild(paramLabel);
                 });
 
                 actualizarTablaNodos();
@@ -1248,13 +1247,6 @@
             draggingMap = false;
         });
 
-        paramInput.addEventListener("change", () => {
-            if (selectedNode) {
-                selectedNode.pgen = parseFloat(pgenInput.value);
-                pgenInput.style.display = "none";
-                draw();
-            }
-        });
 
         nameInput.addEventListener("change", () => {
             if (selectedNode) {
@@ -1346,21 +1338,7 @@
                 });
                 fila.appendChild(rolesCell);
 
-                // PGEN
-                const pgenCell = document.createElement("td");
-                const pgenInput = document.createElement("input");
-                pgenInput.type = "number";
-                pgenInput.step = "0.01";
-                pgenInput.min = "0";
-                pgenInput.max = "1";
-                pgenInput.value = node.pgen;
-                pgenInput.onchange = () => {
-                    node.pgen = parseFloat(pgenInput.value);
-                    draw();
-                };
-                pgenCell.appendChild(pgenInput);
-                fila.appendChild(pgenCell);
-
+                
                 tbody.appendChild(fila);
                 // Param pswap
                 const pswapCell = document.createElement("td");
@@ -1388,9 +1366,9 @@
             const vistos = new Set();
 
             links.forEach(link => {
-                // normalizar par
+                // normalize pair
                 const key = [link.source, link.target].sort().join("-");
-                if (vistos.has(key)) return; // ya mostrado
+                if (vistos.has(key)) return; // already displayed
                 vistos.add(key);
 
                 const fila = document.createElement("tr");
@@ -1403,6 +1381,7 @@
                 destinoCell.textContent = link.target;
                 fila.appendChild(destinoCell);
 
+                // distance column
                 const distCell = document.createElement("td");
                 const distInput = document.createElement("input");
                 distInput.type = "number";
@@ -1411,7 +1390,7 @@
                 distInput.onchange = () => {
                     const nuevaDistancia = parseFloat(distInput.value);
 
-                    // actualizar ambos links simétricos
+                    // update both symmetric links
                     links.forEach(l => {
                         const par = [l.source, l.target].sort().join("-");
                         if (par === key) {
@@ -1419,7 +1398,7 @@
                         }
                     });
 
-                    // actualizar vecinos en ambos nodos
+                    // update neighbors in both nodes
                     const origenNode = nodes.find(n => n.name === link.source);
                     if (origenNode) {
                         const vecino = origenNode.neighbors.find(v => v.name === link.target);
@@ -1435,9 +1414,46 @@
                 distCell.appendChild(distInput);
                 fila.appendChild(distCell);
 
+                // pgen column
+                const pgenCell = document.createElement("td");
+                const pgenInput = document.createElement("input");
+                pgenInput.type = "number";
+                pgenInput.step = "0.01";
+                pgenInput.min = "0";
+                pgenInput.max = "1";
+                pgenInput.value = link.pgen !== undefined ? link.pgen : "";
+
+                pgenInput.onchange = () => {
+                    const nuevoPgen = parseFloat(pgenInput.value);
+
+                    // update both symmetric links
+                    links.forEach(l => {
+                        const par = [l.source, l.target].sort().join("-");
+                        if (par === key) {
+                            l.pgen = nuevoPgen;
+                        }
+                    });
+
+                    // update neighbors in both nodes
+                    const origenNode = nodes.find(n => n.id === link.source);
+                    if (origenNode) {
+                        const vecino = origenNode.neighbors.find(v => v.id === link.target);
+                        if (vecino) vecino.pgen = nuevoPgen;
+                    }
+                    const destinoNode = nodes.find(n => n.id === link.target);
+                    if (destinoNode) {
+                        const vecino = destinoNode.neighbors.find(v => v.id === link.source);
+                        if (vecino) vecino.pgen = nuevoPgen;
+                    }
+                };
+
+                pgenCell.appendChild(pgenInput);
+                fila.appendChild(pgenCell);
+
                 tbody.appendChild(fila);
             });
         }
+
 
 
 
@@ -1458,19 +1474,19 @@
             const num_ParesEPR = document.getElementById("num_ParesEPR").value;
             console.log("Iniciando simulación única");
 
-            const pgen = document.getElementById("pgen").value;
-            const pswap = document.getElementById("pswapInput").value;
+            const pswap_nodes = nodes.map(n => `${n.name}:${n.swap}`).join(",");
 
-            // Nodos con su pgen
-            const pgen_nodos = nodes.map(n => `${n.name}:${n.pgen}`).join(",");
-
-            // Distancias en formato origen:destino:valor
+            // Distances in format source:target:value
             const distancias = links.map(l => `${l.source}:${l.target}:${l.distanciaKm}`).join(",");
+
+            // pgen values in format source:target:value
+            const pgen_links = links.map(l => `${l.source}:${l.pgen}`).join(",");
+
 
             const modo_tiempo = document.getElementById("modo_tiempo").value;
             const canal_cuantico = getCanalCuantico();
 
-            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_nodos}&distancias=${distancias}&pswap=${pswap}&modo_tiempo=${modo_tiempo}&canal_cuantico=${encodeURIComponent(canal_cuantico)}`)
+            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_links}&distancias=${distancias}&pswap_nodes=${pswap_nodes}&modo_tiempo=${modo_tiempo}&canal_cuantico=${encodeURIComponent(canal_cuantico)}`)
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById("resultado").innerHTML =

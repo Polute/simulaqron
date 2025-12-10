@@ -139,7 +139,6 @@ PREDEFINED_NODES = [
         "name": "Alice_pre",
         "x": 100,
         "y": 100,
-        "pgen": 0.8,
         "roles": ["emisor", "receptor"],
         "neighbors": [],   # Alice no tiene vecinos iniciales
         "parEPR": []
@@ -149,10 +148,9 @@ PREDEFINED_NODES = [
         "name": "Bob_pre",
         "x": 300,
         "y": 100,
-        "pgen": 0.7,
         "roles": ["receptor", "repeater"],
         "neighbors": [
-            {"id": "node_alice_pre", "distanceKm": 50}
+            {"id": "node_alice_pre", "distanceKm": 50, "pgen": 0.8}
         ],
         "parEPR": []
     },
@@ -164,8 +162,8 @@ PREDEFINED_NODES = [
         "pgen": 0.9,
         "roles": ["emisor", "repeater"],
         "neighbors": [
-            {"id": "node_alice_pre", "distanceKm": 70},
-            {"id": "node_bob_pre", "distanceKm": 40}
+            {"id": "node_alice_pre", "distanceKm": 70, "pgen": 0.6},
+            {"id": "node_bob_pre", "distanceKm": 40, "pgen": 0.9}
         ],
         "parEPR": []
     }
@@ -181,42 +179,7 @@ contador = 0
 simulacion_en_curso = False
 def app_open(ROL, PUERTO):
     # Diccionario que mapea puertos a nodos completos
-    PORT_NODE_MAP = {
-        5000: {
-            "id": "node_alice",
-            "name": "Alice",
-            "x": 100,
-            "y": 100,
-            "pgen": 0.8,
-            "roles": ["emisor", "receptor"],
-            "neighbors": []   # Alice no tiene vecinos iniciales
-        },
-        5002: {
-            "id": "node_bob",
-            "name": "Bob",
-            "x": 300,
-            "y": 100,
-            "pgen": 0.7,
-            "roles": ["receptor", "repeater"],
-            "neighbors": [
-                {"id": "node_alice", "distanceKm": 50}
-            ]
-        },
-        5003: {
-            "id": "node_charlie",
-            "name": "Charlie",
-            "x": 200,
-            "y": 250,
-            "pgen": 0.9,
-            "roles": ["emisor", "repeater"],
-            "neighbors": [
-                {"id": "node_alice", "distanceKm": 70},
-                {"id": "node_bob", "distanceKm": 40}
-            ]
-        }
-    }
-
-    
+    PORT_NODE_MAP = {}
 
     nodo_info = PORT_NODE_MAP.get(PUERTO, {"id": "node_unknown", "name": "Desconocido", "neighbors": []})
     app = Flask(__name__)
@@ -234,17 +197,7 @@ def app_open(ROL, PUERTO):
         except FileNotFoundError:
             historial = []
 
-        if ROL == "alice":
-            return render_template(
-                "nodo.html",
-                resultado=ultimo_resultado,
-                contador=contador,
-                historial=historial,
-                rol=ROL,
-                nodo_info=nodo_info,
-
-            )
-        elif ROL == "bob":
+        if ROL == "bob":
             return render_template(
                 "receiver.html",
                 resultado=ultimo_resultado,
@@ -290,7 +243,7 @@ def app_open(ROL, PUERTO):
     @app.route("/update", methods=["POST"])
     def update():
         data = request.get_json()
-        for key in ["id", "name", "pgen", "pswap", "roles", "neighbors", "parEPR"]:
+        for key in ["id", "name", "pswap", "roles", "neighbors", "parEPR"]:
             if key in data:
                 nodo_info[key] = data[key]
         return jsonify({"status": "ok", "nodo_info": nodo_info})
@@ -359,15 +312,17 @@ def app_open(ROL, PUERTO):
                 if vecino_id in vecinos_dict[nodo_id]:
                     par = tuple(sorted([nodo_id, vecino_id]))
                     distancia = vecino.get("distanceKm", 0)
+                    pgen = vecino.get("pgen", 1)
                     if par not in links_dict:
-                        links_dict[par] = {"distanciaKm": distancia, "lastUpdated": ts_nodo}
+                        links_dict[par] = {"distanciaKm": distancia, "pgen": pgen, "lastUpdated": ts_nodo}
                     else:
                         if ts_nodo > links_dict[par]["lastUpdated"]:
                             links_dict[par]["distanciaKm"] = distancia
+                            links_dict[par]["pgen"] = pgen
                             links_dict[par]["lastUpdated"] = ts_nodo
 
         links = [
-            {"source": par[0], "target": par[1], "distanciaKm": info["distanciaKm"]}
+            {"source": par[0], "target": par[1], "distanciaKm": info["distanciaKm"], "pgen": info["pgen"]}
             for par, info in links_dict.items()
         ]
         
@@ -677,7 +632,6 @@ def app_open(ROL, PUERTO):
             })
         simulacion_en_curso = True
         inicio_real = time.time()
-        pswap = float(request.args.get("pswap", 0.9))
         modo = request.args.get("modo", "puro")
         num_ParesEPR = int(request.args.get("num_ParesEPR", 2))
         modo_tiempo = request.args.get("modo_tiempo", "secuencial")
@@ -690,6 +644,13 @@ def app_open(ROL, PUERTO):
             if ":" in item:
                 nombre, valor = item.split(":")
                 pgen_por_nodo[nombre] = float(valor)
+        # --- PSWAP por nodo ---
+        pswap_nodos_raw = request.args.get("pswap_nodos", "")
+        pswap_por_nodo = {}
+        for item in pswap_nodos_raw.split(","):
+            if ":" in item:
+                nombre, valor = item.split(":")
+                pswap_por_nodo[nombre] = float(valor)
 
         # --- Distancias entre nodos ---
         distancias_raw = request.args.get("distancias", "")
@@ -710,8 +671,8 @@ def app_open(ROL, PUERTO):
         dist_cb = dist_por_par.get("Charlie-Bob", 50)
 
         # Obtener pgen específico
-        pgen_alice = pgen_por_nodo.get("Alice", 0.8)
-
+        pgen_alice = pgen_por_nodo.get("node_alice", 0.8)
+        pswap_charlie = pswap_por_nodo.get("Charlie", 0.9)
         print(f"[WEB] Iniciando simulación en modo: {modo} (p={pgen_alice}, qubits={num_ParesEPR})")
         print(f"[WEB] Distancias: AB={dist_ab} km, AC={dist_ac} km, CB={dist_cb} km")
         
@@ -777,7 +738,7 @@ def app_open(ROL, PUERTO):
 
                         proceso_alice.join()
 
-                        subprocess.run(["python3", "repeater_swap.py", str(num_ParesEPR), str(pswap)])
+                        subprocess.run(["python3", "repeater_swap.py", str(num_ParesEPR), str(pswap_charlie)])
                         time.sleep(retardo(dist_cb))  # Charlie → Bob
 
                         with open("pre_docs/fidelidad_alice.txt", "r") as f:
@@ -792,7 +753,6 @@ def app_open(ROL, PUERTO):
                 else:
                     if modo in ["puro", "werner", "swap"]:
                         if modo == "puro":
-                            print(f"[ALICE] Aver que pasa antes de ejecutar")
                             subprocess.run(["python3", "alice.py", modo, str(1.0), str(num_ParesEPR), modo_tiempo, "no_semaforos"])
                             time.sleep(retardo(dist_ab))  # Alice → Bob
                             w_out = 1.0
@@ -815,7 +775,7 @@ def app_open(ROL, PUERTO):
                             subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_ParesEPR), modo_tiempo, "no_semaforos"])
                             time.sleep(retardo(dist_ac))  # Alice → Charlie
 
-                            subprocess.run(["python3", "repeater_swap.py", str(num_ParesEPR), str(pswap)])
+                            subprocess.run(["python3", "repeater_swap.py", str(num_ParesEPR), str(pswap_charlie)])
                             time.sleep(retardo(dist_cb))  # Charlie → Bob
 
                             # Leer fidelidad generada por Alice
@@ -944,16 +904,16 @@ def app_open(ROL, PUERTO):
             simulacion_en_curso = False
 
             # Enviar historial a Bob si el rol es Alice
-            if ROL == "alice" or ROL == "master":
+            if ROL == "master":
                 try:
                     requests.post("http://localhost:5001/actualizar_historial", json={
                         "resultado": resultado,
                         "contador": len(historial),
                         "historial": historial
                     })
-                    print("[ALICE] Historial enviado a Bob.")
+                    print("[MASTER] Historial enviado a Bob.")
                 except Exception as e:
-                    print(f"[ALICE] No se pudo enviar historial a Bob: {e}")
+                    print(f"[MASTER] No se pudo enviar historial a Bob: {e}")
 
             # Devolver todo junto en un único mensaje
             return jsonify({
@@ -984,13 +944,6 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1].lower() == "master":
         ROL = "master"
         PUERTO = 8000
-    else:
-        ROL = "alice"
-        # Alice en cualquier puerto libre del rango, excepto 5001
-        PUERTO = seleccionar_puerto(5000, 5010, excluir=[5001])
-        if PUERTO is None:
-            print("[ERROR] No hay puertos disponibles para Alice.")
-            sys.exit(1)
 
     
     proceso = Process(target=app_open, args=(ROL, PUERTO))
