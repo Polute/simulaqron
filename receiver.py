@@ -12,6 +12,43 @@ C = 3e5  # km/s
 # Memoria local de qubits
 epr_store = {}
 nodo_info = {"parEPR": []}
+import threading, time, math
+
+def monitor_coherence(epr, node_info, conn, my_port, interval=0.5, threshold=1/3):
+    """
+    Periodically recomputes w_out for an EPR until it falls below the threshold.
+    When w_out <= threshold, the EPR is automatically measured.
+    """
+    w_in = float(epr.get("w_gen", 1.0))
+    t_gen_str = epr.get("t_gen", "0")
+    dist_km = float(epr.get("distancia_nodos", 0.0))
+    tcoh = float(node_info.get("tcoh", 10.0))
+
+    while True:
+        # Current timestamp
+        t_recv_str = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
+        t_gen_val, t_recv_val, tdif = calculate_tdiff(t_gen_str, t_recv_str)
+        tesp = dist_km / (2.0/3.0 * C)
+
+        w_out = w_in * math.exp(-(tdif + tesp) / tcoh)
+        epr["w_out"] = w_out  # update internally
+
+        if w_out <= threshold:
+            print(f"[COHERENCE] EPR {epr['id']} reached w={w_out:.3f}, measuring...")
+            measure_epr(epr["id"], node_info, conn, my_port, order="measure")
+            break
+
+        time.sleep(interval)
+
+def start_monitor(epr, node_info, conn, my_port):
+    """
+    Launches the coherence monitor in the background for a given EPR.
+    """
+    threading.Thread(
+        target=monitor_coherence,
+        args=(epr, node_info, conn, my_port),
+        daemon=True
+    ).start()
 
 def calculate_tdiff(ts1: str, ts2: str):
     """
@@ -51,7 +88,6 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
     if estado == "ok":
         try:
-            time.sleep(0.5)
             q = conn.recvEPR()
             # Guardar qubit en memoria interna
             epr_store[idx] = {
@@ -81,6 +117,8 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             resultado_recv["distancia_nodos"] = next(v["distanceKm"] for v in node_info["neighbors"] if v["id"] == vecino)
 
             resultado_recv["listener_port"] = listener_port
+            # Start the background coherence monitor here
+            start_monitor(resultado_recv, node_info, conn, my_port)
         except CQCTimeoutError:
             resultado_recv["estado"] = "timeout"
         except Exception as e:
@@ -256,6 +294,7 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
             epr_msg1["vecino"] = destinatarios[1]   # Alice sees Charlie
             epr_msg1["w_gen"] = w_gen_tuple[0]
             print("Notifying", destinatarios[0], "on port", destinatarios_ports[0])
+            print(epr_msg1)
             requests.post(f"http://localhost:{destinatarios_ports[0]}/parEPR/recv", json=epr_msg1, timeout=2)
 
             epr_msg2 = swapped_epr.copy()
@@ -278,7 +317,7 @@ def socket_listener(node_info, conn, port=9000, my_port=None, emisor_port=None):
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind(("localhost", port))
     server.listen(5)
-    server.settimeout(5.0)   # timeout de 5 segundos
+    server.settimeout(15.0)   # timeout de 15 segundos
     print(f"[RECEIVER] Escuchando órdenes en puerto {port}...")
 
     try:

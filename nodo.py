@@ -180,7 +180,6 @@ def app_open(PUERTO, listener_port):
             print(f"[{origen_id}] Ejecutando protocolo de purificación...")
             my_port = get_port_by_id(node_info["id"])
             emisor_port = get_port_by_id(orden["con"])   # el origen con quien se purifica
-            sleep(2)
             subprocess.run([
                 "python", "purify.py",
                 json.dumps(node_info),
@@ -261,6 +260,7 @@ def app_open(PUERTO, listener_port):
         data = request.get_json()
         pares = nodo_info.setdefault("parEPR", [])
         updated = False
+        print("DATA: ", data, "\n PARES: ", pares)
         for i, epr in enumerate(pares):
             if str(epr.get("id")) == str(data.get("id")):
                 epr.update(data)   # <-- aquí se fusionan los campos nuevos
@@ -268,10 +268,7 @@ def app_open(PUERTO, listener_port):
                 updated = True
                 break
         if not updated:
-            if data.get("vecino") == nodo_info["id"] or data.get("vecino") in [v["id"] for v in nodo_info.get("neighbors", [])]:
-                pares.append(data)
-            else:
-                print(f"[DEBUG] Ignorando EPR {data.get('id')} porque no corresponde a {nodo_info['id']}")
+            pares.append(data)
 
         nodo_info["parEPR"] = pares
         print("Enviando a Emisor y a Master: ",nodo_info)

@@ -12,7 +12,7 @@ body {
     max-width: none;
 }
 
-.columna-izquierda,
+.left-column,
 .columna-centro,
 .columna-derecha {
     flex: 1;
@@ -23,7 +23,7 @@ body {
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
 }
 
-.columna-izquierda {
+.left-column {
     flex: 1.3;
     max-height: 90vh;
     overflow-y: auto;
@@ -59,7 +59,7 @@ h1, h2 {
 .resultado { background-color: #e8f5e9; border-color: #4caf50; }
 .estado { background-color: #e3f2fd; border-color: #2196f3; }
 .contador { background-color: #fff3e0; border-color: #ff9800; }
-.boton {
+.button {
     display: inline-block;
     margin-top: 1em;
     padding: 0.8em 1.5em;
@@ -69,14 +69,14 @@ h1, h2 {
     border-radius: 5px;
     cursor: pointer;
 }
-.boton:hover { background-color: #1976d2; }
+.button:hover { background-color: #1976d2; }
 #loading {
     display: none;
     margin-top: 1em;
     font-style: italic;
     color: #555;
 }
-.boton.activo {
+.button.activo {
     background-color: #1976d2;
 }
 
@@ -276,10 +276,82 @@ h4 {
     .container-flex {
         flex-direction: column;
     }
-    .columna-izquierda,
+    .left-column,
     .columna-centro,
     .columna-derecha {
         width: 100%;
         flex: none;
     }
+}
+/* Sidebar */
+.sidebar {
+  height: 100%;
+  width: 0; /* hidden by default */
+  position: fixed;
+  top: 0;
+  left: 0;
+  background-color: purple;
+  overflow-x: hidden;
+  transition: 0.3s;
+  padding-top: 60px;
+  z-index: 1000;
+}
+
+.sidebar a {
+  padding: 12px 24px;
+  text-decoration: none;
+  font-size: 18px;
+  color: white;
+  display: block;
+}
+
+.sidebar a:hover {
+  background-color: rgba(255,255,255,0.2);
+}
+
+.sidebar .closebtn {
+  position: absolute;
+  top: 10px;
+  right: 20px;
+  font-size: 30px;
+  color: white;
+  cursor: pointer;
+}
+
+.openbtn {
+  font-size: 20px;
+  cursor: pointer;
+  background-color: purple;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+}
+
+.openbtn:hover {
+  background-color: #5a0a5a;
+}
+/* === Day/Night background overrides === */
+body.day {
+  background-color: #f4f4f4;
+}
+
+body.night {
+  background-color: #121212;
+}
+
+/* In night mode, also darken table wrappers and tables */
+body.night #tabla-resultados-wrapper,
+body.night #tabla-resultados {
+  background-color: #222;
+  color: #eee;
+}
+
+body.night #tabla-resultados th {
+  background-color: #333;
+  color: #eee;
+}
+
+body.night #tabla-resultados td {
+  background-color: #222;
+  color: #eee;
 }

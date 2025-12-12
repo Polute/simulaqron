@@ -10,7 +10,7 @@ def pedir_medicion(epr_id, listener_port):
     return json.loads(resp)
 import time
 
-def pick_pair_same_edge(node_info, timeout=5.0, interval=0.2):
+def pick_pair_same_edge(node_info, timeout=7.0, interval=0.2):
     """
     Wait up to `timeout` seconds for two EPRs 'active' on the same edge.
     Returns (epr1, epr2, status):
@@ -32,8 +32,6 @@ def pick_pair_same_edge(node_info, timeout=5.0, interval=0.2):
             key = "-".join(sorted([local_id, v]))
             groups.setdefault(key, []).append(e)
 
-        print("[DEBUG] Groups by edge:", groups)
-
         for key, lst in groups.items():
             if len(lst) < 2:
                 continue
@@ -51,7 +49,13 @@ def pick_pair_same_edge(node_info, timeout=5.0, interval=0.2):
             states = {lst[-2].get("estado"), lst[-1].get("estado")}
             if "active" in states and "EPR not received" in states:
                 return lst[-2], lst[-1], "fallback"
-
+            try:
+                # refrescar node_info desde el endpoint /info
+                resp = requests.get(f"http://localhost:{my_port}/info", timeout=2)
+                node_info = resp.json()
+            except Exception as e:
+                print("[DEBUG] Error refreshing node_info:", e)
+        print("P...")
         # Wait before retrying
         time.sleep(interval)
 
@@ -143,7 +147,7 @@ def purify(node_info, master_id, my_port=None, emitter_port=None):
             "t_gen": epr2.get("t_gen"),
             "t_recv": epr2.get("t_recv"),
             "t_diff": epr2.get("t_diff"),
-            "t_pur": time.strftime("%H:%M.%S", time.localtime()),
+            "t_pur": time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}",
             "w_gen": epr2.get("w_gen"),
             "w_out": w_final,
             "purificado_de": [epr1["id"], epr2["id"]],

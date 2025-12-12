@@ -238,7 +238,6 @@ def app_open(ROL, PUERTO):
     @app.route("/info")
     def info():
         return jsonify(nodo_info)
-
     # Endpoint para actualizar el estado del nodo
     @app.route("/update", methods=["POST"])
     def update():
@@ -343,7 +342,6 @@ def app_open(ROL, PUERTO):
                 continue
 
             puerto = NODOS_PUERTOS[nodo_id]
-            time.sleep(0.1)
             url = f"http://localhost:{puerto}/mandate"  # apuntamos al POST en el nodo
 
             try:

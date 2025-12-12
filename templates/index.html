@@ -2,26 +2,41 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Simulación Cuántica</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_index.css') }}?v=13">
+    <title>Quantum simulation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=8">
 </head>
-<body>
-    <div class="container-flex">
-            <!-- Columna izquierda: parámetros físicos -->
-            <div class="columna-izquierda" style="position: relative;">
-                <h2>Editor de Mapa Cuántico</h2>
+<body class="night">
+    <!-- Sidebar -->
+    <div id="mySidebar" class="sidebar">
+    <span class="closebtn" onclick="closeSidebar()">&times;</span>
+    <a href="#" onclick="showSimulator()">Simulator</a>
+    <a href="#" onclick="showAnalytics()">Analytics</a>
+    </div>
 
-                <div class="controles">
-                    <button id="modoNodo" class="boton">🖌️ Crear Nodos</button>
-                    <button id="modoArista" class="boton">🔗 Crear Aristas</button>
-                    <button id="zoomIn" class="boton">➕</button>
-                    <button id="zoomOut" class="boton">➖</button>
-                    <button id="resetView" class="boton">📍</button>
-                    <button id="btnActualizarNodos">Actualizar nodos</button>
+    <!-- Button to open sidebar -->
+    <button class="openbtn" onclick="openSidebar()">☰ Menu</button>
+
+    <!-- Interactive icon for day/night -->
+    <span id="toggleIcon">🌙</span>
+
+    <!-- Main menu -->
+    <div id="simulatorSection">
+        <div class="container-flex">
+            <!-- Left column: Physics parameters -->
+            <div class="left-column" style="position: relative;">
+                <h2>Quantum Map</h2>
+
+                <div class="controls">
+                    <button id="nodeMode" class="button">🖌️ Create Node</button>
+                    <button id="linkMode" class="button">🔗 Create Link</button>
+                    <button id="zoomIn" class="button">➕</button>
+                    <button id="zoomOut" class="button">➖</button>
+                    <button id="resetView" class="button">📍</button>
+                    <button id="btnUpdateNodes">Update nodes</button>
                 </div>
                 <input type="text" id="nameInput" class="name-input" />
 
-                <div id="mapa-wrapper" style="position: relative;">
+                <div id="map-wrapper" style="position: relative;">
                     <svg id="canvas"></svg>
                     <button id="btnrecibirInfo" style="
                         position: absolute;
@@ -43,7 +58,7 @@
                     <div>
                         <label for="tipo_canal">Tipo de canal cuántico:</label>
                         <select id="tipo_canal" onchange="toggleCanalInput()">
-                            <option value="numero">Número (0–1)</option>
+                            <option value="numero">Número (0-1)</option>
                             <option value="matriz">Matriz 4x4</option>
                         </select>
 
@@ -161,7 +176,7 @@
                     </div>
 
 
-                    <button class="boton" onclick="iniciarSimulacion()">Iniciar Simulación</button>
+                    <button class="button" onclick="iniciarSimulacion()">Iniciar Simulación</button>
                 </div>    
                  
                 <!-- Sección de operaciones más pequeña -->
@@ -177,7 +192,7 @@
 
                     <!-- Workspace horizontal -->
                     <h4>Secuencia de órdenes
-                        <button id="limpiar-workspace" class="boton">Limpiar Workspace</button>
+                        <button id="limpiar-workspace" class="button">Limpiar Workspace</button>
                         <!-- Zona de eliminación de bloques -->
                         <div id="marco-papelera" class="marco-papelera">
                             🗑️
@@ -186,25 +201,125 @@
                     <div id="workspace" class="workspace">
                         <!-- Aquí se soltarán los bloques -->
                     </div>
-                    <button class="boton" onclick="mostrarOrdenes()">Exportar Órdenes</button>
+                    <button class="button" onclick="mostrarOrdenes()">Exportar Órdenes</button>
                     <pre id="ordenesTexto"></pre>
                 </div>
             </div>
             <div class="columna-derecha">
                 <h2>Historial</h2>
-                <select id="modoHistorial" onchange="cargarHistorial()">
-                    <option value="resultados">Resultados</option>
-                    <option value="epr">Pares EPR</option>
-                </select>
                 <div id="tabla-resultados-wrapper">
                     <table id="tabla-resultados">
                         <thead></thead>
                         <tbody></tbody>
                     </table>
                 </div>
-                <button class="boton" onclick="limpiarHistorial()">Limpiar historial</button>
+                <button class="button" onclick="limpiarHistorial()">Limpiar historial</button>
             </div>
+        </div>
     </div>
+    <!-- Analytics section -->
+    <div id="analyticsSection" style="display:none">
+        <h2>Analytics</h2>
+        <div id="nodesContainer"></div>
+    </div>
+
+    <script>
+        function setStylesheet(mode) {
+            const head = document.head;
+            let link = document.getElementById("sectionStyles");
+            if (!link) {
+                link = document.createElement("link");
+                link.rel = "stylesheet";
+                link.id = "sectionStyles";
+                head.appendChild(link);
+            }
+            if (mode === "simulator") {
+                link.href = "{{ url_for('static', filename='css/styles.css') }}?v=9";
+            } else if (mode === "analytics") {
+                link.href = "{{ url_for('static', filename='css/analytics.css') }}?v=9";
+            }
+        }
+
+        // Sidebar
+        function openSidebar() {
+            document.getElementById("mySidebar").style.width = "250px";
+        }
+        function closeSidebar() {
+            document.getElementById("mySidebar").style.width = "0";
+        }
+
+        // Mostrar secciones
+        function showSimulator() {
+            closeSidebar();
+            document.getElementById("simulatorSection").style.display = "block";
+            document.getElementById("analyticsSection").style.display = "none";
+            setStylesheet("simulator"); 
+        }
+        function showAnalytics() {
+            closeSidebar();
+            document.getElementById("simulatorSection").style.display = "none";
+            document.getElementById("analyticsSection").style.display = "block";
+            setStylesheet("analytics"); 
+            loadNodes();
+        }
+
+        // Toggle día/noche
+        const icon = document.getElementById("toggleIcon");
+        const body = document.body;
+        icon.addEventListener("click", () => {
+            body.classList.toggle("day");
+            body.classList.toggle("night");
+            icon.textContent = body.classList.contains("day") ? "🌞" : "🌙";
+        });
+
+        // Cargar nodos en Analytics
+        async function loadNodes() {
+            try {
+                const urls = ["http://localhost:5000/info","http://localhost:5002/info","http://localhost:5003/info"];
+                const container = document.getElementById("nodesContainer");
+                container.innerHTML = "";
+                    for (const url of urls) {
+                    const resp = await fetch(url);
+                    const data = await resp.json();
+                    const card = document.createElement("div");
+                    card.className = "node-card";
+                    card.innerHTML = `
+                        <h3>${data.name} (${data.id})</h3>
+                        <p class="roles"><strong>Roles:</strong> ${data.roles.join(", ")}</p>
+                        <p><strong>Neighbors:</strong> ${
+                        data.neighbors.map(n => `${n.id} (${n.distanceKm} km)`).join(", ")
+                        }</p>
+                        <div class="table-wrapper">
+                        <table class="analytics-table">
+                            <thead>
+                            <tr>
+                                <th>ID</th><th>Neighbor</th><th>Distance</th><th>Status</th>
+                                <th>t_gen</th><th>t_recv</th><th>Δt</th><th>w_out</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            ${data.parEPR.map(p => `
+                                <tr>
+                                <td>${p.id}</td>
+                                <td>${p.vecino}</td>
+                                <td>${p.distancia_nodos}</td>
+                                <td class="estado ${p.estado}">${p.estado}</td>
+                                <td>${p.t_gen}</td>
+                                <td>${p.t_recv}</td>
+                                <td>${p.t_diff}</td>
+                                <td>${p.w_out}</td>
+                                </tr>
+                            `).join("")}
+                            </tbody>
+                        </table>
+                        </div>`;
+                    container.appendChild(card);
+                }
+            } catch (err) {
+                document.getElementById("nodesContainer").textContent = "Error: " + err;
+            }
+        }
+    </script>
     <script>
         // --- DRAG DESDE LA PALETA ---
         document.querySelectorAll(".paleta .block").forEach(block => {
@@ -719,8 +834,6 @@
         }
 
 
-
-
         function crearBloquesDinamicos(nodos) {
             const paleta = document.getElementById("paleta");
 
@@ -871,20 +984,20 @@
             };
             return mapa[id];
         }
-        //-----------------------------------------MAPA-----------------------------------------------
+        //-----------------------------------------MAP-----------------------------------------------
         window.onload = function () {
             const svg = document.getElementById("canvas");
             const nameInput = document.getElementById("nameInput");
-            const modoNodoBtn = document.getElementById("modoNodo");
-            const modoAristaBtn = document.getElementById("modoArista");
+            const nodeModeBtn = document.getElementById("nodeMode");
+            const linkModeBtn = document.getElementById("linkMode");
             const zoomInBtn = document.getElementById("zoomIn");
             const zoomOutBtn = document.getElementById("zoomOut");
             const resetViewBtn = document.getElementById("resetView");
-            const actualizarNodosBtn = document.getElementById("btnActualizarNodos");
+            const updateNodesBtn = document.getElementById("btnUpdateNodes");
             const recibirInfoBtn = document.getElementById("btnrecibirInfo")
 
-            let modoNodo = false;
-            let modoArista = false;
+            let nodeMode = false;
+            let linkMode = false;
             let selectedNode = null, draggingNode = null, linkStart = null;
             let transform = { x: 0, y: 0, k: 1 };
             let draggingMap = false;
@@ -894,18 +1007,18 @@
             draw();
 
 
-            modoNodoBtn.onclick = () => {
-                modoNodo = !modoNodo;
-                modoArista = false;
-                modoNodoBtn.classList.toggle("activo", modoNodo);
-                modoAristaBtn.classList.remove("activo");
+            nodeModeBtn.onclick = () => {
+                nodeMode = !nodeMode;
+                linkMode = false;
+                nodeModeBtn.classList.toggle("activo", nodeMode);
+                linkModeBtn.classList.remove("activo");
             };
 
-            modoAristaBtn.onclick = () => {
-                modoArista = !modoArista;
-                modoNodo = false;
-                modoAristaBtn.classList.toggle("activo", modoArista);
-                modoNodoBtn.classList.remove("activo");
+            linkModeBtn.onclick = () => {
+                linkMode = !linkMode;
+                nodeMode = false;
+                linkModeBtn.classList.toggle("activo", linkMode);
+                nodeModeBtn.classList.remove("activo");
             };
 
             zoomInBtn.onclick = () => {
@@ -1017,7 +1130,7 @@
 
 
             // Enviar todos los cambios a cada nodo
-            actualizarNodosBtn.addEventListener("click", () => {
+            updateNodesBtn.addEventListener("click", () => {
                 nodes.forEach(node => {
                     const puerto = obtenerPuertoDesdeId(node.id);
                     if (!puerto) return;
@@ -1180,7 +1293,7 @@
                     circle.setAttribute("class", "node");
 
                     circle.addEventListener("mousedown", e => {
-                        if (modoArista) {
+                        if (linkMode) {
                             if (linkStart && linkStart !== node) {
                                 createLink(linkStart, node);
                                 linkStart = null;
@@ -1209,13 +1322,13 @@
 
 
         svg.addEventListener("click", e => {
-            if (!modoNodo) return;
+            if (!nodeMode) return;
             const pt = getMousePosition(e);
             createNode(pt.x, pt.y);
         });
 
         svg.addEventListener("mousedown", e => {
-            if (!modoNodo && !modoArista) {
+            if (!nodeMode && !linkMode) {
                 draggingMap = true;
                 dragStart = { x: e.clientX, y: e.clientY };
             }
@@ -1522,23 +1635,25 @@
         // Global map that persists across calls
         const eprMap = new Map();
         function cargarHistorial(historial) {
-            const modo = document.getElementById("modoHistorial").value;
             const tabla = document.getElementById("tabla-resultados");
             const thead = tabla.querySelector("thead");
             const tbody = tabla.querySelector("tbody");
 
-            // reset encabezado
+            // Reset table header and body
             thead.innerHTML = "";
             tbody.innerHTML = "";
 
-            // Si venías de EPR y cambias a otro modo, parar el intervalo
-            if (modo !== "epr" && eprIntervalId !== null) {
+            // Stop any active EPR interval before deciding what to show
+            if (eprIntervalId !== null) {
                 clearInterval(eprIntervalId);
                 eprIntervalId = null;
             }
 
-            if (modo === "resultados") {
-                // encabezado reducido
+            // Check if any entry contains "pre" in its id
+            const containsPre = Array.isArray(history) && history.some(line => line.includes("pre"));
+
+            if (containsPre) {
+                // Show reduced "Results" table
                 thead.innerHTML = `
                     <tr>
                         <th>ID</th>
@@ -1546,8 +1661,8 @@
                     </tr>
                 `;
                 actualizarTabla(historial);
-            } else if (modo === "epr") {
-                // encabezado completo
+            } else {
+                // Show full "EPR Pairs" table
                 thead.innerHTML = `
                     <tr>
                         <th>ID</th>
