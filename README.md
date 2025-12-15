@@ -1,44 +1,48 @@
 ---
 
-## ⚡ Ejecución rápida (con entorno ya configurado)
+# ⚡ Quick Execution (with environment already configured)
 
-Si ya tienes Python 3.10.x y el entorno virtual `simulaqron_env` correctamente instalado y activado, puedes ejecutar el simulador directamente descargando el archivo ZIP con los archivos esenciales:
+If you already have Python 3.10.x and the virtual environment `simulaqron_env` correctly installed and activated, you can run the simulator directly by downloading the ZIP file with the essential files:
 
-1. Extrae el contenido en tu entorno de trabajo
-2. Actualmente, el simulador se ejecuta de dos formas:
+1. Extract the contents into your working environment
+2. Currently, the simulator can be run in two ways:
 
 ```bash
 python app.py master
 ```
-La cual simula la red completa en una máquina local(Puerto 8000)
+This simulates the entire network on a local machine (Port 8000).
 
-Para ejecutar individualmente cada nodo, con info que contienen local, ejecuta:
-
+Run each node individually:
 ```bash
 python nodo.py 
 ```
 
-Realizalo en varias terminales, las cuales se abriran en puertos distintos cada vez que lo ejecutes
+Open several terminals and run this command; each instance will open on a different port.
 
 
-Y para simplemente escuchar lo que hace master, ejecuta:
 
+Listen to the master only:
 ```bash
 python app.py bob
 ```
 
-El cual sirve como nodo receiver donde únicamente recibe el qubit y el historial, también lo puede borrar.
+This acts as a receiver node that only receives the history.
 
+#------------------------------------------------------------
 
-Para configurar el entorno de desarrollo, siga las intrucciones del pdf.
-Recuerde actualizar su requirements txt con:
+Development Environment Setup
+
+Follow the instructions in the provided PDF to configure the development environment.
+Remember to update your requirements file with:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Si te falla simulaqron, ejecuta setup_env.sh, con permisos de ejecución.
-Este borrara el entorno virtual y se te creará de nuevo con los requirements instalados
+If SimulaQron fails, run setup_env.sh with execution permissions:
+```bash
+./setup_env.sh
+```
 
-
-Ya que se agregarán nuevos paquetes periodicamente y según hagan falta.
+This will delete the virtual environment and recreate it with the requirements installed.
+New packages will be added periodically as needed.

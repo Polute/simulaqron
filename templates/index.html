@@ -5,7 +5,7 @@
     <title>Quantum simulation</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=8">
 </head>
-<body class="night">
+<body class="day">
     <!-- Sidebar -->
     <div id="mySidebar" class="sidebar">
     <span class="closebtn" onclick="closeSidebar()">&times;</span>
@@ -17,7 +17,7 @@
     <button class="openbtn" onclick="openSidebar()">☰ Menu</button>
 
     <!-- Interactive icon for day/night -->
-    <span id="toggleIcon">🌙</span>
+    <span id="toggleIcon">🌞</span>
 
     <!-- Main menu -->
     <div id="simulatorSection">
@@ -38,7 +38,7 @@
 
                 <div id="map-wrapper" style="position: relative;">
                     <svg id="canvas"></svg>
-                    <button id="btnrecibirInfo" style="
+                    <button id="btnreceiveInfo" style="
                         position: absolute;
                         top: 20px;
                         right: 20px;
@@ -49,28 +49,28 @@
                         border: none;
                         border-radius: 4px;
                         cursor: pointer;
-                    ">Actualizar info</button>
+                    ">Update info</button>
                 </div>
 
 
-                <h3>Parámetros físicos</h3>
+                <h3>Physics parameters</h3>
                 <div style="display: flex; align-items: flex-start; gap: 40px;">
                     <div>
-                        <label for="tipo_canal">Tipo de canal cuántico:</label>
-                        <select id="tipo_canal" onchange="toggleCanalInput()">
-                            <option value="numero">Número (0-1)</option>
-                            <option value="matriz">Matriz 4x4</option>
+                        <label for="channel_type">Quantum channel definition type:</label>
+                        <select id="channel_type" onchange="toggleCanalInput()">
+                            <option value="number">Number (0-1)</option>
+                            <option value="matrix">Matrix 4x4</option>
                         </select>
 
                         <!-- Input numérico -->
-                        <div id="canal_numero">
-                            <label for="canal_cuantico">Valor:</label>
-                            <input type="number" id="canal_cuantico" name="canal_cuantico" min="0" max="1" step="0.01" value="1.0">
+                        <div id="number_channel">
+                            <label for="quantum_channel">Value:</label>
+                            <input type="number" id="quantum_channel" name="quantum_channel" min="0" max="1" step="0.01" value="1.0">
                         </div>
 
-                        <!-- Matriz 4x4 -->
-                        <div id="canal_matriz" style="display:none; margin-top:5px;">
-                            <label>Canal cuántico (matriz 4x4):</label>
+                        <!-- matrix 4x4 -->
+                        <div id="matrix_channel" style="display:none; margin-top:5px;">
+                            <label>Quantum Channel (matrix 4x4):</label>
                             <table style="border-collapse: collapse; margin-top: 5px;">
                             <tbody>
                                 <tr>
@@ -103,7 +103,7 @@
                     </div>
                 </div>
                 <br><br>
-                <h3>Nodos</h3>
+                <h3>Nodes</h3>
                 <table id="tabla-nodos">
                     <thead>
                         <tr><th>ID</th>
@@ -967,10 +967,10 @@
                 info.style.display = "none";
             }
         });
-        document.getElementById("tipo_canal").addEventListener("change", function() {
+        document.getElementById("channel_type").addEventListener("change", function() {
             const tipo = this.value;
-            document.getElementById("canal_numero").style.display = (tipo === "numero") ? "block" : "none";
-            document.getElementById("canal_matriz").style.display = (tipo === "matriz") ? "block" : "none";
+            document.getElementById("number_channel").style.display = (tipo === "number") ? "block" : "none";
+            document.getElementById("matrix_channel").style.display = (tipo === "matrix") ? "block" : "none";
         });
     </script>
     <script>
@@ -994,7 +994,7 @@
             const zoomOutBtn = document.getElementById("zoomOut");
             const resetViewBtn = document.getElementById("resetView");
             const updateNodesBtn = document.getElementById("btnUpdateNodes");
-            const recibirInfoBtn = document.getElementById("btnrecibirInfo")
+            const receiveInfoBtn = document.getElementById("btnreceiveInfo")
 
             let nodeMode = false;
             let linkMode = false;
@@ -1036,7 +1036,7 @@
                 draw();
             };
             // Recibir información desde el master y actualizar el mapa
-            recibirInfoBtn.addEventListener("click", () => {
+            receiveInfoBtn.addEventListener("click", () => {
                 console.log("f5 es: ", f5);
                 if (f5) {
                     location.reload();
@@ -1597,7 +1597,7 @@
 
 
             const modo_tiempo = document.getElementById("modo_tiempo").value;
-            const canal_cuantico = getCanalCuantico();
+            const canal_cuantico = getQuantum_channel();
 
             fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_links}&distancias=${distancias}&pswap_nodes=${pswap_nodes}&modo_tiempo=${modo_tiempo}&canal_cuantico=${encodeURIComponent(canal_cuantico)}`)
                 .then(response => response.json())
@@ -1842,10 +1842,10 @@
             }
         });
 
-        function getCanalCuantico() {
-            const tipo = document.getElementById("tipo_canal").value;
-            if (tipo === "numero") {
-                return document.getElementById("canal_cuantico").value;
+        function getQuantum_channel() {
+            const tipo = document.getElementById("channel_type").value;
+            if (tipo === "number") {
+                return document.getElementById("quantum_channel").value;
             } else {
                 const matrix = [];
                 for (let i = 0; i < 4; i++) {

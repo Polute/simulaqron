@@ -33,6 +33,7 @@ def select_port(start=5000, end=5010, exclude=None):
 ORDERS = []
 # global flag
 receiver_started = False
+sender_started = False
 
 def app_open(PUERTO, listener_port):
     # Diccionario que mapea puertos a nodos completos
@@ -91,7 +92,7 @@ def app_open(PUERTO, listener_port):
     
 
     def aplicar_orden(orden, node_info):
-        global receiver_started
+        global receiver_started, sender_started
         accion = orden["accion"]
         origen_id = node_info["id"]
         epr_id = orden.get("id")
@@ -103,6 +104,7 @@ def app_open(PUERTO, listener_port):
             destino_id = orden["destino"]
             origen_port = get_port_by_id(origen_id)
             destino_port = get_port_by_id(destino_id)
+
             # Buscar el pgen del vecino cuyo id coincide con destino_id
             pgen_origen = None
             for vecino in node_info.get("neighbors", []):
@@ -111,15 +113,39 @@ def app_open(PUERTO, listener_port):
                     break
 
             print(origen_id, "va a generarEPR con:", destino_id)
-            subprocess.run([
-                "python", "sender.py",
-                origen_id, destino_id,
-                str(origen_port), str(destino_port),
-                pgen_origen,
-                str(epr_id),
-                json.dumps(node_info),
-                str(listener_port)
-            ], check=True)
+
+            if not sender_started:
+                print("[INFO] Starting sender.py for the first time")
+                subprocess.Popen([
+                    "python", "sender.py",
+                    origen_id, destino_id,
+                    str(origen_port), str(destino_port),
+                    pgen_origen,
+                    str(epr_id),
+                    json.dumps(node_info),
+                    str(listener_port+1000)
+                ])
+                sender_started = True
+            else:
+                print("[INFO] sender.py already running, send order via socket")
+                payload = {
+                    "accion": "generate EPR",
+                    "id": epr_id,
+                    "origen": origen_id,
+                    "destino": destino_id,
+                    "node_info": node_info,
+                    "origen_port": origen_port,
+                    "destino_port": destino_port,
+                    "pgen": pgen_origen,
+                    "listener_port": listener_port+1000
+                }
+                # connect to the listener and send the order
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect(("localhost", listener_port+1000))
+                    s.send(json.dumps(payload).encode())
+                    resp = s.recv(4096).decode()
+                    print("[SENDER] Response:", resp)
+
 
         elif accion == "recibe EPR":
             epr_id = orden["id"]  # id del EPR que viene en la ordenente a node_info["parEPR"] y buscar el objeto con ese id
@@ -171,6 +197,7 @@ def app_open(PUERTO, listener_port):
                 }
                 # connect to the listener and send the order
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    print("USING ",listener_port)
                     s.connect(("localhost", listener_port))
                     s.send(json.dumps(payload).encode())
                     resp = s.recv(4096).decode()
@@ -198,7 +225,8 @@ def app_open(PUERTO, listener_port):
                     "destinatarios": orden["con"],
                     "destinatarios_ports": [str(get_port_by_id(n)) for n in orden["con"]],
                     "pswap": str(node_info.get("pswap", 1)),
-                    "listener_port": listener_port
+                    "listener_port": listener_port,
+                    "ports_involved": [str(get_port_by_id(n) + 5000) for n in orden["con"]]
                 }
             # connect to the listener and send the order
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -260,7 +288,7 @@ def app_open(PUERTO, listener_port):
         data = request.get_json()
         pares = nodo_info.setdefault("parEPR", [])
         updated = False
-        print("DATA: ", data, "\n PARES: ", pares)
+        print("DATA: ", data)
         for i, epr in enumerate(pares):
             if str(epr.get("id")) == str(data.get("id")):
                 epr.update(data)   # <-- aquí se fusionan los campos nuevos

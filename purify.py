@@ -1,5 +1,8 @@
 import json, sys, random, time, socket, requests
 
+
+import time
+
 def pedir_medicion(epr_id, listener_port):
     msg = {"accion": "measure", "id": epr_id}
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -8,7 +11,6 @@ def pedir_medicion(epr_id, listener_port):
     resp = s.recv(4096).decode()
     s.close()
     return json.loads(resp)
-import time
 
 def pick_pair_same_edge(node_info, timeout=7.0, interval=0.2):
     """

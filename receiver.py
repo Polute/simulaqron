@@ -14,7 +14,7 @@ epr_store = {}
 nodo_info = {"parEPR": []}
 import threading, time, math
 
-def monitor_coherence(epr, node_info, conn, my_port, interval=0.5, threshold=1/3):
+def monitor_coherence(epr, node_info, conn, my_port, interval=0.01, threshold=1/3):
     """
     Periodically recomputes w_out for an EPR until it falls below the threshold.
     When w_out <= threshold, the EPR is automatically measured.
@@ -34,7 +34,7 @@ def monitor_coherence(epr, node_info, conn, my_port, interval=0.5, threshold=1/3
         epr["w_out"] = w_out  # update internally
 
         if w_out <= threshold:
-            print(f"[COHERENCE] EPR {epr['id']} reached w={w_out:.3f}, measuring...")
+            print(f"[COHERENCE] EPR {epr['id']} reached w={w_out:.3f} in {t_recv_str}, measuring...")
             measure_epr(epr["id"], node_info, conn, my_port, order="measure")
             break
 
@@ -69,11 +69,22 @@ def calculate_tdiff(ts1: str, ts2: str):
     diff = val2 - val1
     return val1, val2, diff
 
+def starting_werner_recalculate_sender(epr_id, result_recv,listener_emiter_port):
+    msg = {"accion": "recalculate", "id": epr_id, "info": result_recv}
+    print("Sending recalculating")
+    print(listener_emiter_port)
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(("localhost", listener_emiter_port))
+    s.send(json.dumps(msg).encode())
+    resp = s.recv(4096).decode()
+    s.close()
+    return json.loads(resp)
+
 def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
-    idx = payload.get("id", 0)
+    epr_id = payload.get("id", 0)
     estado = payload.get("estado", "fallo")
     resultado_recv = {
-        "id": idx,
+        "id": epr_id,
         "vecino": payload.get("vecino"),
         "t_gen": payload.get("t_gen"),
         "t_recv": None,
@@ -90,7 +101,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
         try:
             q = conn.recvEPR()
             # Guardar qubit en memoria interna
-            epr_store[idx] = {
+            epr_store[epr_id] = {
                 "q": q,
                 "emisor_port": emisor_port
             }
@@ -131,7 +142,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
     pares = node_info.get("parEPR", [])
     updated = False
     for i, epr in enumerate(pares):
-        if epr.get("id") == idx:
+        if epr.get("id") == epr_id:
             pares[i] = resultado_recv
             updated = True
             break
@@ -146,6 +157,10 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
         if emisor_port:
             resultado_recv["vecino"] = node_info["id"]
             requests.post(f"http://localhost:{emisor_port}/parEPR/recv", json=resultado_recv, timeout=2)
+            print(time.time())
+            listener_emiter_port = emisor_port + 5000
+            starting_werner_recalculate_sender(epr_id, resultado_recv, listener_emiter_port)
+
     except Exception as e:
         print(f"[RECEIVER] Error notificando endpoints: {e}")
 
@@ -210,10 +225,19 @@ def pick_pair_same_edge_swap(node_info, my_port,timeout=5.0, interval=0.2):
 
     # Timeout reached without finding a valid pair
     return None, None, "none"
+
+def sending_monitor(msg, listener_port):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(("localhost", listener_port))
+    s.send(json.dumps(msg).encode())
+    resp = s.recv(4096).decode()
+    s.close()
+    return json.loads(resp)
+
 def do_swapping(epr1, epr2, id_swap, node_info, conn,
                 destinatarios=None, destinatarios_ports=None,
                 pswap=1.0, listener_port=None,
-                my_port=None):
+                my_port=None, ports_involved=None):
     """
     Perform entanglement swapping between two EPRs.
     """
@@ -265,7 +289,7 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
         "w_gen": w_gen_tuple,
         "w_out": w_out_new,
         "distancia_nodos": distancia_total,
-        "listener_port": listener_port
+        "listener_port": None
     }
     node_info["parEPR"].append(swapped_epr)
 
@@ -278,12 +302,13 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
     }
     try:
         # Después de hacer el swap y notificar a los vecinos
-        countdown_msg = {
-            "accion": "start_countdown",
+        monitor_msg = {
+            "accion": "watch_over",
             "id": id_swap,        # id del nuevo EPR creado
-            "delay": 5,                # segundos de espera
             "my_port": destinatarios_ports[0],   # puerto del primer vecino
-            "other_port": destinatarios_ports[1] # puerto del segundo vecino
+            "other_port": destinatarios_ports[1], # puerto del segundo vecino
+            "EPR_pair": None,
+            "id_before": None
         }
 
     
@@ -293,17 +318,22 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
             epr_msg1 = swapped_epr.copy()
             epr_msg1["vecino"] = destinatarios[1]   # Alice sees Charlie
             epr_msg1["w_gen"] = w_gen_tuple[0]
+            epr_msg1["listener_port"] = ports_involved[0]
             print("Notifying", destinatarios[0], "on port", destinatarios_ports[0])
-            print(epr_msg1)
             requests.post(f"http://localhost:{destinatarios_ports[0]}/parEPR/recv", json=epr_msg1, timeout=2)
+            monitor_msg["EPR_pair"] = epr_msg1
+            monitor_msg["id_before"] = epr1['id']
 
             epr_msg2 = swapped_epr.copy()
             epr_msg2["vecino"] = destinatarios[0]   # Charlie sees Alice
             epr_msg2["w_gen"] = w_gen_tuple[1]
+            epr_msg2["listener_port"] = ports_involved[1]
             print("Notifying", destinatarios[1], "on port", destinatarios_ports[1])
             requests.post(f"http://localhost:{destinatarios_ports[1]}/parEPR/recv", json=epr_msg2, timeout=2)
         if my_port:
             requests.post(f"http://localhost:{my_port}/parEPR/swap", json=result_swap, timeout=2)
+
+        #sending_monitor(monitor_msg, ports_involved[0])
 
     except Exception as e:
         print(f"[SWAP] Error notificando endpoints: {e}")
@@ -312,97 +342,80 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
     return {"status": "ok", "swapped_epr": result_swap}
 
 
-def socket_listener(node_info, conn, port=9000, my_port=None, emisor_port=None):
+def socket_listener(node_info, conn, port, my_port=None, emisor_port=None):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind(("localhost", port))
     server.listen(5)
-    server.settimeout(15.0)   # timeout de 15 segundos
     print(f"[RECEIVER] Escuchando órdenes en puerto {port}...")
 
     try:
         while True:
-            try:
-                conn_sock, addr = server.accept()
-                data = conn_sock.recv(4096).decode()
-                print("[DEBUG RECV] Recibido:", repr(data))
+            conn_sock, addr = server.accept()
+            data = conn_sock.recv(4096).decode()
+            print("[DEBUG RECV] Recibido:", repr(data))
 
-                if not data:
-                    conn_sock.close()
-                    continue
-
-                payload = json.loads(data)
-                if payload.get("accion") == "recibe EPR":
-                    epr_obj       = payload.get("epr_obj")
-                    nodo_info_in  = payload.get("nodo_info", node_info)
-                    my_port_in    = payload.get("my_port", my_port)
-                    emisor_port_in = payload.get("emisor_port", emisor_port)
-                    listener_port_in = payload.get("listener_port", port)
-                    resultado = recibir_epr(epr_obj,
-                                            nodo_info_in,
-                                            conn,
-                                            my_port_in,
-                                            emisor_port_in,
-                                            listener_port_in)
-                    print("[RECEIVER] Initial sync result:", resultado)
-
-                elif payload.get("accion") == "measure":
-                    epr_id = payload["id"]
-                    order = "Consumed"
-                    result = measure_epr(epr_id, node_info, conn, my_port, order)
-                    conn_sock.send(json.dumps(result or {"error": "EPR no encontrado"}).encode())
-
-                elif payload.get("accion") == "do swapping":
-                    id_swap             = payload.get("id", 0)
-                    node_info_in        = payload.get("node_info", node_info)
-                    destinatarios       = payload.get("destinatarios", [])
-                    destinatarios_ports = payload.get("destinatarios_ports", [])
-                    pswap               = float(payload.get("pswap", 1.0))
-                    listener_port_in    = payload.get("listener_port", port)
-                    my_port_in          = payload.get("my_port", my_port)
-
-                    # Use pick_pair_same_edge to filter two active EPRs with different destinatarios
-                    epr1, epr2, status = pick_pair_same_edge_swap(node_info_in, my_port_in)
-
-                    if status != "valid":
-                        print("[RECEIVER] No valid pair of active EPRs for swapping")
-                        conn_sock.send(json.dumps({"error": "No valid pair"}).encode())
-                    else:
-                        print(f"[RECEIVER] Performing swapping for EPRs {epr1['id']} and {epr2['id']} at node {node_info_in['id']}")
-                        print(f"[RECEIVER] Destinatarios: {destinatarios} ports={destinatarios_ports} pswap={pswap}")
-                        # Call do_swapping with the two IDs
-                        result = do_swapping(
-                            epr1=epr1,
-                            epr2=epr2,
-                            id_swap = id_swap, 
-                            node_info=node_info_in,
-                            conn=conn,
-                            destinatarios=destinatarios,
-                            destinatarios_ports=destinatarios_ports,
-                            pswap=pswap,
-                            listener_port=listener_port_in,
-                            my_port=my_port_in
-                        )
-
-                        conn_sock.send(json.dumps(result).encode())
-                        print("[RECEIVER] Swapping result:", result)
-
-
-
+            if not data:
                 conn_sock.close()
+                continue
 
-            except socket.timeout:
-                # Si no se recibió nada en 5 segundos, medir automáticamente todos los activos
-                print("[RECEIVER] Timeout de 5s: midiendo EPRs activos por cuenta propia...")
-                activos = [e for e in node_info.get("parEPR", []) if e.get("estado") == "active"]
-                if not activos:
-                    print("[RECEIVER] No quedan EPRs activos, pero el listener sigue abierto.")
-                for epr in activos:
-                    order = "measure"
-                    result_measure = measure_epr(epr["id"], node_info, conn, my_port, order)
-                    if result_measure:
-                        print(f"[RECEIVER] Medido automáticamente EPR {epr['id']}: {result_measure['medicion']}")
-                # importante: no cerrar ni romper, el bucle continúa
+            payload = json.loads(data)
+            if payload.get("accion") == "recibe EPR":
+                epr_obj       = payload.get("epr_obj")
+                nodo_info_in  = payload.get("nodo_info", node_info)
+                my_port_in    = payload.get("my_port", my_port)
+                emisor_port_in = payload.get("emisor_port", emisor_port)
+                listener_port_in = payload.get("listener_port", port)
+                resultado = recibir_epr(epr_obj,
+                                        nodo_info_in,
+                                        conn,
+                                        my_port_in,
+                                        emisor_port_in,
+                                        listener_port_in)
+                print("[RECEIVER] Initial sync result:", resultado)
+
+            elif payload.get("accion") == "measure":
+                epr_id = payload["id"]
+                order = "Consumed"
+                result = measure_epr(epr_id, node_info, conn, my_port, order)
+                conn_sock.send(json.dumps(result or {"error": "EPR no encontrado"}).encode())
+
+            elif payload.get("accion") == "do swapping":
+                id_swap             = payload.get("id", 0)
+                node_info_in        = payload.get("node_info", node_info)
+                destinatarios       = payload.get("destinatarios", [])
+                destinatarios_ports = payload.get("destinatarios_ports", [])
+                pswap               = float(payload.get("pswap", 1.0))
+                listener_port_in    = payload.get("listener_port", port)
+                my_port_in          = payload.get("my_port", my_port)
+                ports_involved      = payload.get("ports_involved", [])
+                # Use pick_pair_same_edge to filter two active EPRs with different destinatarios
+                epr1, epr2, status = pick_pair_same_edge_swap(node_info_in, my_port_in)
+
+                if status != "valid":
+                    print("[RECEIVER] No valid pair of active EPRs for swapping")
+                    conn_sock.send(json.dumps({"error": "No valid pair"}).encode())
+                else:
+                    print(f"[RECEIVER] Performing swapping for EPRs {epr1['id']} and {epr2['id']} at node {node_info_in['id']}")
+                    print(f"[RECEIVER] Destinatarios: {destinatarios} ports={destinatarios_ports} pswap={pswap}")
+                    # Call do_swapping with the two IDs
+                    result = do_swapping(
+                        epr1=epr1,
+                        epr2=epr2,
+                        id_swap = id_swap, 
+                        node_info=node_info_in,
+                        conn=conn,
+                        destinatarios=destinatarios,
+                        destinatarios_ports=destinatarios_ports,
+                        pswap=pswap,
+                        listener_port=listener_port_in,
+                        my_port=my_port_in,
+                        ports_involved = ports_involved
+                    )
+                    conn_sock.send(json.dumps(result).encode())
+                    print("[RECEIVER] Swapping result:", result)
+
+            conn_sock.close()
 
     except KeyboardInterrupt:
         print("[RECEIVER] Listener interrumpido manualmente, cerrando...")
