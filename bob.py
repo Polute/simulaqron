@@ -12,13 +12,13 @@ from datetime import datetime
 # Bloqueo global para escritura segura en archivos compartidos
 lock = Lock()
 
-def recogerEPR(modo, w_in, i, modo_tiempo, enviados, fidelidades):
+def recogerEPR(modo, w_in, i, time_mode, enviados, fidelidades):
     """
     Recibe un qubit EPR y guarda la medición y fidelidad en archivos compartidos.
     """
 
     # Determinar fidelidad de entrada
-    if modo_tiempo == "simultaneo":
+    if time_mode == "simultaneous":
         w_in_i = w_in
     else:
         try:
@@ -113,7 +113,7 @@ def recogerEPR(modo, w_in, i, modo_tiempo, enviados, fidelidades):
         print(f"[BOB] Resultado #{i} guardado: medición={medicion}, fidelidad={fidelidad_bob}")
 
 
-def run_bob(modo, w_in, num_ParesEPR, modo_tiempo, semaforos):
+def run_bob(modo, w_in, num_PairsEPR, time_mode, semaforos):
     """
     Ejecuta la recepción de múltiples qubits EPR, en paralelo o secuencialmente.
     """
@@ -130,18 +130,18 @@ def run_bob(modo, w_in, num_ParesEPR, modo_tiempo, semaforos):
         except FileNotFoundError:
             fidelidades = []
 
-    if modo_tiempo == "simultaneo":
+    if time_mode == "simultaneous":
         with ThreadPoolExecutor() as executor:
-            for i in range(num_ParesEPR):
+            for i in range(num_PairsEPR):
                 if(enviados[i] == "ok"):
                     print(f"[BOB] Esperando semáforo para qubit #{i}")
                     semaforos[i].acquire()
                     time.sleep(0.01)
-                    executor.submit(recogerEPR, modo, w_in, i, modo_tiempo, enviados, fidelidades)
+                    executor.submit(recogerEPR, modo, w_in, i, time_mode, enviados, fidelidades)
                     time.sleep(0.01)
     else:
-        for i in range(num_ParesEPR):
-            recogerEPR(modo, w_in, i, modo_tiempo, enviados, fidelidades)
+        for i in range(num_PairsEPR):
+            recogerEPR(modo, w_in, i, time_mode, enviados, fidelidades)
 
 
 
@@ -150,11 +150,11 @@ if __name__ == "__main__":
     # Leer argumentos desde línea de comandos
     modo = sys.argv[1]              # "puro", "werner" o "swap"
     w_in = float(sys.argv[2])       # Fidelidad promedio si simultáneo
-    num_ParesEPR = int(sys.argv[3]) # Número de pares EPR
-    modo_tiempo = sys.argv[4]       # "secuencial" o "simultaneo"
+    num_PairsEPR = int(sys.argv[3]) # Número de pares EPR
+    time_mode = sys.argv[4]       # "secuencial" o "simultaneous"
     semaforos_raw = sys.argv[5]     # "no_semaforos" o marcador
 
     semaforos = None
 
     # Ejecutar Bob
-    run_bob(modo, w_in, num_ParesEPR, modo_tiempo, semaforos)
+    run_bob(modo, w_in, num_PairsEPR, time_mode, semaforos)

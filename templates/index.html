@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Quantum simulation</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=8">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v={{ time }}">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+
 </head>
 <body class="day">
     <!-- Sidebar -->
@@ -29,27 +32,13 @@
                 <div class="controls">
                     <button id="nodeMode" class="button">🖌️ Create Node</button>
                     <button id="linkMode" class="button">🔗 Create Link</button>
-                    <button id="zoomIn" class="button">➕</button>
-                    <button id="zoomOut" class="button">➖</button>
                     <button id="resetView" class="button">📍</button>
                     <button id="btnUpdateNodes">Update nodes</button>
                 </div>
                 <input type="text" id="nameInput" class="name-input" />
 
                 <div id="map-wrapper" style="position: relative;">
-                    <svg id="canvas"></svg>
-                    <button id="btnreceiveInfo" style="
-                        position: absolute;
-                        top: 20px;
-                        right: 20px;
-                        z-index: 10;
-                        padding: 6px 12px;
-                        background-color: #4CAF50;
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;
-                    ">Update info</button>
+                    <div id="map"></div>
                 </div>
 
 
@@ -104,70 +93,72 @@
                 </div>
                 <br><br>
                 <h3>Nodes</h3>
-                <table id="tabla-nodos">
+                <table id="nodes-table">
                     <thead>
                         <tr><th>ID</th>
-                            <th>Nombre</th>
+                            <th>Name</th>
                             <th>Roles</th>
-                            <th>pswap</th>
+                            <th>Pswap</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
                 </table>
 
-                <h3>Aristas</h3>
-                <table id="tabla-aristas">
+                <h3>Links</h3>
+                <table id="links-table">
                     <thead>
-                        <tr><th>Origen</th><th>Destino</th><th>Distancia (km)</th><th>pgen</th></tr>
+                        <tr><th>Source</th><th>Target</th><th>Distance (km)</th><th>Pgen</th></tr>
                     </thead>
                     <tbody></tbody>
                 </table>
-                <button id="mostrarTopologia">Mostrar Topología</button>
-                <div id="topologiaTexto" style="white-space: pre-line; margin-top:10px;"></div>
+                <button id="showTopology">Show Topology</button>
+                <div id="topologyText" style="white-space: pre-line; margin-top:10px;"></div>
             </div>
 
 
             <!-- Columna central: simulación -->
-            <div class="columna-centro">
-                <div id="simulacion-header">
-                    <h1>Simulación Cuántica</h1>
-                    <p>Este experimento simula el envío de <strong>2 qubits EPR</strong> desde Alice a Bob, con opción de entrelazamiento puro o con ruido (estado de Werner usando un nodo Repeater).</p>
+            <div class="center-column">
+                <div id="simulation-header">
+                    <h1>Quantum Simulation</h1>
+                    <p>This experiment simulates sending <strong>2 EPR qubits</strong> from Alice to Bob, 
+                        with the option of pure entanglement or entanglement with noise (Werner state using a 
+                        Repeater node).</p>
 
-                    <div class="resultado" id="resultado">
+                    <div class="result" id="result">
                         <strong>Resultado de la medición en Bob:</strong><br>
-                        {{ resultado }}
+                        {{ result }}
                     </div>
 
-                    <div class="estado" id="estado">
-                        <strong>Estado:</strong> Esperando simulación...
+                    <div class="state" id="state">
+                        <strong>State:</strong> Waiting simulation...
                     </div>
 
-                    <div class="contador" id="contador">
-                        <strong>Simulaciones realizadas:</strong> {{ contador }}
+                    <div class="counter" id="counter">
+                        <strong>Simulations carried out:</strong> {{ counter }}
                     </div>
 
-                    <div id="loading">Ejecutando simulación... por favor espera.</div>
-                    <div id="cuenta"></div>
+                    <div id="loading">Running simulation...</div>
+                    <div id="counter2"></div>
 
                     <div style="margin-top: 1em;">
-                        <label for="modo">Modo de envío:</label>
+                        <label for="modo">Sending mode:</label>
                         <select id="modo">
-                            <option value="puro">Entrelazamiento puro (Alice → Bob)</option>
-                            <option value="werner">Entrelazamiento con ruido (Alice → Bob)</option>
-                            <option value="swap">Entanglement Swap (Alice → Charlie ←→ Bob)</option>
+                            <option value="puro">Pure entanglement (Alice → Bob)</option>
+                            <option value="werner">Entanglement with noise (Alice → Bob)</option>
+                            <option value="swap">Entanglement Swapping (Alice → Charlie ←→ Bob)</option>
                         </select>
                     </div>
                     <div style="margin-top: 1em; display: flex; align-items: center; gap: 1em;">
                         <div>
-                            <label for="num_ParesEPR">Número de pares generados:</label><br>
-                            <input type="number" id="num_ParesEPR" name="num_ParesEPR" min="1" max="10" value="2">
+                            <label for="num_PairsEPR">Number of pairs to generate:</label><br>
+                            <input type="number" id="num_PairsEPR" name="num_PairsEPR" min="1" max="10" value="2">
                         </div>
 
                         <div>
-                            <label for="modo_tiempo">Generación:</label><br>
-                            <select id="modo_tiempo" name="modo_tiempo">
-                                <option value="secuencial">Secuencial</option>
-                                <option value="simultaneo">Simultáneo</option>
+                            <label for="time_mode">Generation:</label><br>
+                            <select id="time_mode" name="time_mode">
+                                <option value="sequential">Sequential</option>
+                                <option value="simultaneous">Simultaneous</option>
                             </select>
                             <div id="decoherenciaInfo" style="margin-top: 0.5em; color: #555; display: none;">
                                 En modo <strong>simultáneo</strong>, el tiempo de decoherencia de los pares EPR puede diferir debido a la computación paralela.
@@ -176,44 +167,44 @@
                     </div>
 
 
-                    <button class="button" onclick="iniciarSimulacion()">Iniciar Simulación</button>
+                    <button class="button" onclick="initSimulation()">Start Simulation</button>
                 </div>    
                  
                 <!-- Sección de operaciones más pequeña -->
-                <div class="columna-operaciones">
-                    <h3>Órdenes Cuánticas</h3>
+                <div class="operations-column">
+                    <h3>Quantum orders</h3>
                         <!-- Paleta de bloques disponibles -->
-                        <div id="paleta" class="paleta">
+                        <div id="pallette" class="pallette">
                             <!-- Bloques fijos -->
-                            <div class="block op-doble" draggable="true" data-op="epr">⚛️ Entanglement</div>
-                            <div class="block op-doble" draggable="true" data-op="swap">⚛️ Swapping</div>
-                            <div class="block op-simple" draggable="true" data-op="pur">🧪 Purificación</div>
+                            <div class="block op-double" draggable="true" data-op="epr">⚛️ Entanglement</div>
+                            <div class="block op-double" draggable="true" data-op="swap">🔗 Swapping</div>
+                            <div class="block op-simple" draggable="true" data-op="pur">🧪 Purification</div>
                         </div>
 
                     <!-- Workspace horizontal -->
-                    <h4>Secuencia de órdenes
-                        <button id="limpiar-workspace" class="button">Limpiar Workspace</button>
+                    <h4>Order secuence
+                        <button id="clean-workspace" class="button">Clean Workspace</button>
                         <!-- Zona de eliminación de bloques -->
-                        <div id="marco-papelera" class="marco-papelera">
+                        <div id="trash-frame" class="trash-frame">
                             🗑️
                         </div>
                     </h4>
                     <div id="workspace" class="workspace">
                         <!-- Aquí se soltarán los bloques -->
                     </div>
-                    <button class="button" onclick="mostrarOrdenes()">Exportar Órdenes</button>
-                    <pre id="ordenesTexto"></pre>
+                    <button class="button" onclick="showOrders()">Export Orders</button>
+                    <pre id="ordersText"></pre>
                 </div>
             </div>
-            <div class="columna-derecha">
+            <div class="right-column">
                 <h2>Historial</h2>
-                <div id="tabla-resultados-wrapper">
-                    <table id="tabla-resultados">
+                <div id="results-table-wrapper">
+                    <table id="results-table">
                         <thead></thead>
                         <tbody></tbody>
                     </table>
                 </div>
-                <button class="button" onclick="limpiarHistorial()">Limpiar historial</button>
+                <button class="button" onclick="cleanHistory()">Clean history</button>
             </div>
         </div>
     </div>
@@ -234,9 +225,9 @@
                 head.appendChild(link);
             }
             if (mode === "simulator") {
-                link.href = "{{ url_for('static', filename='css/styles.css') }}?v=9";
+                link.href = "{{ url_for('static', filename='css/styles.css') }}?v={{ time}}";
             } else if (mode === "analytics") {
-                link.href = "{{ url_for('static', filename='css/analytics.css') }}?v=9";
+                link.href = "{{ url_for('static', filename='css/analytics.css') }}?v={{ time }}";
             }
         }
 
@@ -303,7 +294,7 @@
                                 <td>${p.id}</td>
                                 <td>${p.vecino}</td>
                                 <td>${p.distancia_nodos}</td>
-                                <td class="estado ${p.estado}">${p.estado}</td>
+                                <td class="state ${p.state}">${p.state}</td>
                                 <td>${p.t_gen}</td>
                                 <td>${p.t_recv}</td>
                                 <td>${p.t_diff}</td>
@@ -322,7 +313,7 @@
     </script>
     <script>
         // --- DRAG DESDE LA PALETA ---
-        document.querySelectorAll(".paleta .block").forEach(block => {
+        document.querySelectorAll(".pallette .block").forEach(block => {
             block.addEventListener("dragstart", e => {
                 e.dataTransfer.setData("text", block.textContent);
                 e.dataTransfer.setData("op", block.dataset.op);
@@ -336,7 +327,7 @@
 
         // --- WORKSPACE ---
         const workspace = document.getElementById("workspace");
-        const limpiarBtn = document.getElementById("limpiar-workspace");
+        const limpiarBtn = document.getElementById("clean-workspace");
 
         // Historial global de EPR: mantiene todos los pares aunque los nodos se oculten
         let eprHistoryGlobal = [];
@@ -384,7 +375,7 @@
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
 
-        // --- Drop desde paleta ---
+        // --- Drop desde pallette ---
         workspace.addEventListener("drop", e => {
             e.preventDefault();
 
@@ -406,7 +397,7 @@
 
             actualizarBloques();
         });
-        const marcoPapelera = document.getElementById("marco-papelera");
+        const marcoPapelera = document.getElementById("trash-frame");
 
         // Permitir drop
         marcoPapelera.addEventListener("dragover", e => {
@@ -582,7 +573,7 @@
                     }
 
                     if (posiblesCandidatos.length === 0) {
-                        b.textContent = "🧪 Purificación 🚫";
+                        b.textContent = "🧪 Purification 🚫";
                     } else {
                         // Crear selector desplegable con estilo similar a bloques
                         const select = document.createElement("select");
@@ -691,7 +682,7 @@
             return Math.random().toString(36).substr(2, 9); 
         }
         // Exportar órdenes usando el mismo historial
-        function mostrarOrdenes() {
+        function showOrders() {
             const blocks = workspace.querySelectorAll(".block");
             const orders = [];
             const eprHistory = [];
@@ -729,10 +720,10 @@
                     const eprId = generarIdUnico();
 
                     if (!ordersPorNodo[srcId]) ordersPorNodo[srcId] = [];
-                    ordersPorNodo[srcId].push({ id: eprId, accion: "genera EPR", destino: dstId });
+                    ordersPorNodo[srcId].push({ id: eprId, accion: "genera EPR", target: dstId });
 
                     if (!ordersPorNodo[dstId]) ordersPorNodo[dstId] = [];
-                    ordersPorNodo[dstId].push({ id: eprId, accion: "recibe EPR", origen: srcId });
+                    ordersPorNodo[dstId].push({ id: eprId, accion: "recibe EPR", source: srcId });
 
                 }else if (op === "pur") {
                     const dstName = b.dataset.dst;
@@ -820,7 +811,7 @@
             });
 
             // Mostrar en pantalla usando nombres
-            document.getElementById("ordenesTexto").textContent = orders.join("\n");
+            document.getElementById("ordersText").textContent = orders.join("\n");
 
             // Enviar automáticamente al endpoint /mandate usando IDs
             fetch("/mandate", {
@@ -835,13 +826,13 @@
 
 
         function crearBloquesDinamicos(nodos) {
-            const paleta = document.getElementById("paleta");
+            const pallette = document.getElementById("pallette");
 
             nodos.forEach(nodo => {
                 // Evitar bloques duplicados fijos (EPR y Pur)
                 if (nodo.name.includes("epr") || nodo.name.includes("Pur") ||nodo.name.includes("swap")) return;
                 // 🔍 Si ya existe un bloque con este ID, no crearlo de nuevo
-                const yaExiste = paleta.querySelector(`[data-id="${nodo.id}"]`);
+                const yaExiste = pallette.querySelector(`[data-id="${nodo.id}"]`);
                 if (yaExiste) return;
 
                 const block = document.createElement("div");
@@ -870,16 +861,16 @@
                     e.dataTransfer.setData("width", block.offsetWidth);
                 });
 
-                paleta.appendChild(block);
+                pallette.appendChild(block);
             });
         }
         function ajustarColumnasSegunNodos(nodo_info) {
             if (Array.isArray(nodo_info.nodes) && nodo_info.nodes.length > 0) {
                 const todosPre = nodo_info.nodes.every(n => n.id.endsWith("pre"));
 
-                const header = document.getElementById("simulacion-header");
-                const derecha = document.querySelector(".columna-derecha");
-                const operaciones = document.querySelector(".columna-operaciones");
+                const header = document.getElementById("simulation-header");
+                const derecha = document.querySelector(".right-column");
+                const operaciones = document.querySelector(".operations-column");
 
                 if (todosPre) {
                     // mostrar cabecera normalmente
@@ -898,8 +889,13 @@
             }
         }
 
+    </script>
+              <!-- Leaflet JS -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 
-
+      <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
         // Rol recibido desde Flask
         const rol = "{{ rol }}";
         let nodes = [];
@@ -945,7 +941,7 @@
 
 
 
-        document.getElementById("mostrarTopologia").addEventListener("click", () => {
+        document.getElementById("showTopology").addEventListener("click", () => {
             fetch("/topologia")
                 .then(res => res.json())
                 .then(data => {
@@ -953,15 +949,13 @@
                     for (const nodo in data) {
                         texto += `Nodo ${nodo} conectado con: {${data[nodo].join(", ")}}\n`;
                     }
-                    document.getElementById("topologiaTexto").textContent = texto;
+                    document.getElementById("topologyText").textContent = texto;
                 });
         });
-    </script>
 
-    <script>
-        document.getElementById("modo_tiempo").addEventListener("change", function () {
+        document.getElementById("time_mode").addEventListener("change", function () {
             const info = document.getElementById("decoherenciaInfo");
-            if (this.value === "simultaneo") {
+            if (this.value === "simultaneous") {
                 info.style.display = "block";
             } else {
                 info.style.display = "none";
@@ -972,8 +966,7 @@
             document.getElementById("number_channel").style.display = (tipo === "number") ? "block" : "none";
             document.getElementById("matrix_channel").style.display = (tipo === "matrix") ? "block" : "none";
         });
-    </script>
-    <script>
+
         function obtenerPuertoDesdeId(id) {
             const mapa = {
                 "node_alice": 5000,
@@ -984,184 +977,177 @@
             };
             return mapa[id];
         }
-        //-----------------------------------------MAP-----------------------------------------------
+        //-----------------------------------------MAP-----------------------------------------------------
         window.onload = function () {
-            const svg = document.getElementById("canvas");
+            // -------------------- INITIAL SETUP --------------------
+            const mapDiv = document.getElementById("map"); // Leaflet map container
             const nameInput = document.getElementById("nameInput");
             const nodeModeBtn = document.getElementById("nodeMode");
             const linkModeBtn = document.getElementById("linkMode");
-            const zoomInBtn = document.getElementById("zoomIn");
-            const zoomOutBtn = document.getElementById("zoomOut");
             const resetViewBtn = document.getElementById("resetView");
             const updateNodesBtn = document.getElementById("btnUpdateNodes");
-            const receiveInfoBtn = document.getElementById("btnreceiveInfo")
+            const receiveInfoBtn = document.getElementById("btnreceiveInfo");
 
             let nodeMode = false;
             let linkMode = false;
-            let selectedNode = null, draggingNode = null, linkStart = null;
-            let transform = { x: 0, y: 0, k: 1 };
-            let draggingMap = false;
-            let dragStart = { x: 0, y: 0 };
+            let selectedNode = null;
+            let draggingNode = null;
+            let linkStart = null;
 
-            // Llama al renderizado
-            draw();
+            // -------------------- INITIALIZE LEAFLET MAP --------------------
+            console.log("Initializing Leaflet map...");
 
+            const map = L.map('map').setView([40.4168, -3.7038], 11); // Centered in Madrid
+            console.log("Map object created:", map);
 
+            // Add OpenStreetMap tiles
+            const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+            
+            tileLayer.on('tileloadstart', function(e) {
+                console.log("Tile load started:", e.tile.src);
+            });
+
+            tileLayer.on('tileload', function(e) {
+                console.log("Tile loaded:", e.tile.src);
+            });
+
+            tileLayer.on('tileerror', function(e) {
+                console.error("Tile load error:", e.tile.src);
+            });
+
+            // Tell Leaflet to recalc map size
+            map.invalidateSize();
+            console.log("Map invalidateSize called");
+            // Add SVG layer on top of the map for custom nodes and links
+            const svgLayer = L.svg().addTo(map);
+            const svg = d3.select("#map").select("svg");
+            if (nodes.length > 0) {
+                console.log("Drawing initial nodes", nodes);
+                draw();
+            }
+            console.log("SVG layer added:", svg.node());
+            // Optional: add scale control
+            L.control.scale().addTo(map);
+
+            // -------------------- MODE TOGGLING --------------------
             nodeModeBtn.onclick = () => {
                 nodeMode = !nodeMode;
                 linkMode = false;
-                nodeModeBtn.classList.toggle("activo", nodeMode);
-                linkModeBtn.classList.remove("activo");
+                nodeModeBtn.classList.toggle("active", nodeMode);
+                linkModeBtn.classList.remove("active");
             };
 
             linkModeBtn.onclick = () => {
                 linkMode = !linkMode;
                 nodeMode = false;
-                linkModeBtn.classList.toggle("activo", linkMode);
-                nodeModeBtn.classList.remove("activo");
+                linkModeBtn.classList.toggle("active", linkMode);
+                nodeModeBtn.classList.remove("active");
             };
+            // Botón Update info como control de Leaflet
+            const updateBtn = L.control({ position: 'topright' });
 
-            zoomInBtn.onclick = () => {
-                transform.k *= 1.1;
-                draw();
-            };
+            updateBtn.onAdd = function(map) {
+                // Crear el botón
+                const btn = L.DomUtil.create('button', '');
+                btn.innerHTML = "Update info";
 
-            zoomOutBtn.onclick = () => {
-                transform.k *= 0.9;
-                draw();
-            };
+                // Estilos
+                btn.style.padding = "6px 12px";
+                btn.style.backgroundColor = "#4CAF50";
+                btn.style.color = "white";
+                btn.style.border = "none";
+                btn.style.borderRadius = "4px";
+                btn.style.cursor = "pointer";
 
-            resetViewBtn.onclick = () => {
-                transform = { x: 0, y: 0, k: 1 };
-                draw();
-            };
-            // Recibir información desde el master y actualizar el mapa
-            receiveInfoBtn.addEventListener("click", () => {
-                console.log("f5 es: ", f5);
-                if (f5) {
-                    location.reload();
-                    f5 = false;
-                }
+                // Evitar que el clic se propague al mapa
+                L.DomEvent.disableClickPropagation(btn);
 
-                fetch("/actualizar_mapa")
-                    .then(res => res.json())
-                    .then(data => {
-                        console.log("Datos recibidos de /actualizar_mapa:", data);
+                // Acción al hacer clic
+                L.DomEvent.on(btn, 'click', () => {
+                    // Aquí va el código de receiveInfoBtn
+                    if (f5) {
+                        location.reload();
+                        f5 = false;
+                    }
 
-                        // Detectar nodos vivos
-                        const nodosVivos = new Set(data.nodes.map(n => n.id));
+                    fetch("/actualizar_mapa")
+                        .then(res => res.json())
+                        .then(data => {
+                            console.log("Data from /actualizar_mapa:", data);
 
-                        // Eliminar nodos muertos del array local
-                        for (let i = nodes.length - 1; i >= 0; i--) {
-                            if (!nodosVivos.has(nodes[i].id)) {
-                                console.log("Nodo desconectado eliminado:", nodes[i].id || nodes[i].name);
-                                nodes.splice(i, 1);
+                            // Remove dead nodes
+                            const aliveNodes = new Set(data.nodes.map(n => n.id));
+                            for (let i = nodes.length - 1; i >= 0; i--) {
+                                if (!aliveNodes.has(nodes[i].id)) nodes.splice(i, 1);
                             }
-                        }
 
-                        // Merge inteligente: no machacar cambios locales si son más recientes
-                        data.nodes.forEach(remoteNode => {
-                            const localNode = nodes.find(n => n.id === remoteNode.id);
-                            if (localNode) {
-                                if (!localNode.lastUpdated || localNode.lastUpdated < remoteNode.lastUpdated) {
-                                    Object.assign(localNode, remoteNode);
-                                } else {
-                                    console.log(`Manteniendo cambios locales en nodo ${localNode.id || localNode.name}`);
-                                }
-                            } else {
-                                nodes.push(remoteNode);
-                            }
-                        });
+                            // Merge remote nodes with local nodes intelligently
+                            data.nodes.forEach(remoteNode => {
+                                const localNode = nodes.find(n => n.id === remoteNode.id);
+                                if (localNode) {
+                                    if (!localNode.lastUpdated || localNode.lastUpdated < remoteNode.lastUpdated) {
+                                        Object.assign(localNode, remoteNode);
+                                    }
+                                } else nodes.push(remoteNode);
+                            });
 
-                        /// Recalcular links consolidando por lastUpdated
-                        links.length = 0;
-                        const linksDict = {};
-
-                        nodes.forEach(nodo => {
-                            const ts = nodo.lastUpdated || 0;
-                            if (Array.isArray(nodo.neighbors)) {
-                                nodo.neighbors.forEach(vecino => {
-                                    const nodoKey = nodo.id || nodo.name;
-                                    const vecinoKey = vecino.id || vecino.name;
-                                    const par = [nodoKey, vecinoKey].sort().join("-");
-                                    const distancia = vecino.distanceKm;
-                                    const pgen = vecino.pgen
-
-                                    if (!linksDict[par]) {
-                                        linksDict[par] = {
-                                            source: nodoKey,
-                                            target: vecinoKey,
-                                            distanciaKm: distancia,
-                                            pgen : vecino.pgen,
-                                            lastUpdated: ts
-
-                                        };
-                                    } else {
-                                        if (ts > linksDict[par].lastUpdated) {
+                            // Recalculate links
+                            links.length = 0;
+                            const linksDict = {};
+                            nodes.forEach(nodo => {
+                                const ts = nodo.lastUpdated || 0;
+                                if (Array.isArray(nodo.neighbors)) {
+                                    nodo.neighbors.forEach(vecino => {
+                                        const nodoKey = nodo.id || nodo.name;
+                                        const vecinoKey = vecino.id || vecino.name;
+                                        const par = [nodoKey, vecinoKey].sort().join("-");
+                                        if (!linksDict[par] || ts > linksDict[par].lastUpdated) {
                                             linksDict[par] = {
                                                 source: nodoKey,
                                                 target: vecinoKey,
-                                                distanciaKm: distancia,
-                                                pgen : vecino.pgen,
+                                                distanciaKm: vecino.distanceKm,
+                                                pgen: vecino.pgen,
                                                 lastUpdated: ts
                                             };
                                         }
-                                    }
-                                });
-                            }
-                        });
+                                    });
+                                }
+                            });
+                            Object.values(linksDict).forEach(l => {
+                                links.push({ source: l.source, target: l.target, distanciaKm: l.distanciaKm, pgen: l.pgen });
+                            });
 
-                        // convertir a array
-                        Object.values(linksDict).forEach(l => {
-                            links.push({ source: l.source, target: l.target, distanciaKm: l.distanciaKm , pgen : l.pgen});
-                        });
+                            crearBloquesDinamicos(nodes);
+                            draw();
+                            actualizarTablaNodos();
+                            actualizarTablaAristas();
+                        })
+                        .catch(err => console.error("Error fetching nodes:", err));
+                });
 
-                        const paleta = document.getElementById("paleta");
-                        paleta.querySelectorAll('[data-op="node"]').forEach(b => b.remove());
-                        console.log("nodos", nodes);
-                        crearBloquesDinamicos(nodes);
+                return btn;
+            };
 
-                        draw();
-                        actualizarTablaNodos();
-                        actualizarTablaAristas();
-                    })
-                    .catch(err => console.error("Error al recibir info de nodos:", err));
-            });
+            // Añadir el botón al mapa
+            updateBtn.addTo(map);
 
 
-            // Enviar todos los cambios a cada nodo
             updateNodesBtn.addEventListener("click", () => {
                 nodes.forEach(node => {
                     const puerto = obtenerPuertoDesdeId(node.id);
                     if (!puerto) return;
                     const vecinosSimetricos = [];
-                    console.log(node)
                     nodes.forEach(other => {
                         if (other.id !== node.id) {
-                            // Buscar si este nodo ya tiene a "other" como vecino
                             const esteVecino = node.neighbors.find(v => v.id === other.id);
-                            // Buscar si el otro nodo ya tiene a "node" como vecino
                             const otroVecino = other.neighbors.find(v => v.id === node.id);
-
-                            // Solo añadimos si alguno conoce la distancia
-                            const distanciaKm = (esteVecino && esteVecino.distanceKm) ||
-                                                (otroVecino && otroVecino.distanceKm);
-                            //pgen               
-                            const pgen = (esteVecino && esteVecino.pgen) ||
-                                                (otroVecino && otroVecino.pgen);
-
-                            if (distanciaKm !== undefined) {
-                                vecinosSimetricos.push({
-                                    id: other.id,
-                                    distanceKm: distanciaKm,
-                                    pgen: pgen
-
-                                });
-                            }
+                            const distanciaKm = (esteVecino && esteVecino.distanceKm) || (otroVecino && otroVecino.distanceKm);
+                            const pgen = (esteVecino && esteVecino.pgen) || (otroVecino && otroVecino.pgen);
+                            if (distanciaKm !== undefined) vecinosSimetricos.push({ id: other.id, distanceKm: distanciaKm, pgen });
                         }
                     });
-
-                    console.log(vecinosSimetricos)
                     fetch(`http://127.0.0.1:${puerto}/update`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -1172,419 +1158,265 @@
                             roles: node.roles,
                             neighbors: vecinosSimetricos,
                             parEPR: node.parEPR,
-                            lastUpdated: Date.now() // importante: marcar timestamp
+                            lastUpdated: Date.now()
                         })
-                    }).catch(err => console.error(`Error al actualizar nodo ${node.id}:`, err));
+                    }).catch(err => console.error(`Error updating node ${node.id}:`, err));
                 });
-
-                // Esperar un momento y luego refrescar el mapa completo desde master
-                setTimeout(() => {
-                    fetch("/actualizar_mapa")
-                        .then(res => res.json())
-                        .then(data => {
-                            console.log("Datos recibidos de /actualizar_mapa:", data);
-
-                            // Machacar nodes locales con lo que diga el master
-                            nodes.length = 0;
-                            nodes.push(...data.nodes);
-
-                            // Recalcular links
-                            links.length = 0;
-                            nodes.forEach(nodo => {
-                                if (Array.isArray(nodo.neighbors)) {
-                                    nodo.neighbors.forEach(vecino => {
-                                        links.push({
-                                            source: nodo.id,
-                                            target: vecino.id,
-                                            distanciaKm: vecino.distanceKm,
-                                            pgen: vecino.pgen
-                                        });
-                                    });
-                                }
-                            });
-
-                            draw();
-                            actualizarTablaNodos();
-                            actualizarTablaAristas();
-                        })
-                        .catch(err => console.error("Error al actualizar mapa:", err));
-                }, 1500);
             });
 
-            function createNode(x, y) {
+            // -------------------- NODE CREATION --------------------
+            function createNode(lat, lon) {
                 const node = {
-                    id: crypto.randomUUID(),          // identificador único
-                    name: "Nodo_" + Date.now(),       // nombre inicial editable
-                    roles: ["emisor","receptor","repeater"], // roles activos
-                    x, y,
+                    id: crypto.randomUUID(),
+                    name: "node_" + Date.now(),
+                    roles: ["emisor", "receptor", "repeater"],
+                    lat, lon,
                     pswap: 0.8,
                     neighbors: []
                 };
                 nodes.push(node);
                 draw();
-                // Llamada al backend Flask para crear nodo en Simulaqron usando id
+
                 fetch(`/crear_nodos_simulaqron?nodos=${node.id}`)
                     .then(res => res.json())
-                    .then(data => {
-                        console.log("Respuesta del servidor:", data);
-                    })
-                    .catch(err => console.error("Error al crear nodo en Simulaqron:", err));
+                    .then(data => console.log("Server response:", data))
+                    .catch(err => console.error("Error creating node in Simulaqron:", err));
             }
 
-
+            // -------------------- LINK CREATION --------------------
             function createLink(sourceNode, targetNode) {
-                const existe = links.some(link =>
-                    (link.source === sourceNode.id && link.target === targetNode.id) ||
-                    (link.source === targetNode.id && link.target === sourceNode.id)
-                );
-                if (existe) return;
+                const exists = links.some(l => (l.source === sourceNode.id && l.target === targetNode.id) || (l.source === targetNode.id && l.target === sourceNode.id));
+                if (exists) return;
 
                 const distanciaKm = 50;
-                const length = Math.hypot(targetNode.x - sourceNode.x, targetNode.y - sourceNode.y);
-
-                const pgen = 0.9
-                links.push({ source: sourceNode.id, target: targetNode.id, length, distanciaKm, pgen });
-                draw();
+                const pgen = 0.9;
+                links.push({ source: sourceNode.id, target: targetNode.id, distanciaKm, pgen });
 
                 fetch("/modificar_links", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        links: [{ source: sourceNode.id, target: targetNode.id }]
-                    })
+                    body: JSON.stringify({ links: [{ source: sourceNode.id, target: targetNode.id }] })
                 });
-            }
-            function draw() {
-                svg.innerHTML = "";
-                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-                g.setAttribute("transform", `translate(${transform.x},${transform.y}) scale(${transform.k})`);
-                svg.appendChild(g);
 
-                // Dibujar aristas
+                draw();
+            }
+
+            // -------------------- DRAW FUNCTION --------------------
+            function draw() {
+                svg.selectAll("*").remove();
+
+                // Draw links
                 links.forEach(link => {
                     const sourceNode = nodes.find(n => n.id === link.source);
                     const targetNode = nodes.find(n => n.id === link.target);
+                    if (!sourceNode || !targetNode) return;
 
-                    if (!sourceNode) {
-                        console.warn(`Nodo no conectado a la red: ${link.source}`);
-                        return;
-                    }
-                    if (!targetNode) {
-                        console.warn(`Nodo no conectado a la red: ${link.target}`);
-                        return;
-                    }
+                    const sourcePoint = map.latLngToLayerPoint([sourceNode.lat, sourceNode.lon]);
+                    const targetPoint = map.latLngToLayerPoint([targetNode.lat, targetNode.lon]);
 
-                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                    line.setAttribute("x1", sourceNode.x);
-                    line.setAttribute("y1", sourceNode.y);
-                    line.setAttribute("x2", targetNode.x);
-                    line.setAttribute("y2", targetNode.y);
-                    line.setAttribute("class", "link");
-                    g.appendChild(line);
+                    svg.append("line")
+                        .attr("x1", sourcePoint.x)
+                        .attr("y1", sourcePoint.y)
+                        .attr("x2", targetPoint.x)
+                        .attr("y2", targetPoint.y)
+                        .attr("stroke", "#0b3c7a")     // Dark blue
+                        .attr("stroke-width", 3)
+                        .attr("opacity", 0.9);
 
                 });
 
-                // Dibujar nodos
+                // Draw nodes
                 nodes.forEach(node => {
-                    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                    circle.setAttribute("cx", node.x);
-                    circle.setAttribute("cy", node.y);
-                    circle.setAttribute("r", 20);
-                    circle.setAttribute("class", "node");
+                    const point = map.latLngToLayerPoint([node.lat, node.lon]);
 
-                    circle.addEventListener("mousedown", e => {
-                        if (linkMode) {
-                            if (linkStart && linkStart !== node) {
-                                createLink(linkStart, node);
-                                linkStart = null;
-                            } else {
+                    // Circle
+                    svg.append("circle")
+                        .attr("cx", point.x)
+                        .attr("cy", point.y)
+                        .attr("r", 14)                 // Bigger node
+                        .attr("fill", "#054eb5")       // Fixed blue
+                        .attr("opacity", 0.85)
+
+                        .on("mousedown", () => {
+                            if (linkMode) {
+                                if (linkStart && linkStart !== node) createLink(linkStart, node);
                                 linkStart = node;
-                            }
-                        } else {
-                            draggingNode = node;
-                        }
-                    });
+                            } else draggingNode = node;
+                        });
 
-                    g.appendChild(circle);
-
-                    // Mostrar nombre (no id)
-                    const nameLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    nameLabel.setAttribute("x", node.x);
-                    nameLabel.setAttribute("y", node.y + 35);
-                    nameLabel.setAttribute("class", "label");
-                    nameLabel.textContent = node.name;
-                    g.appendChild(nameLabel);
+                    // Label
+                    svg.append("text")
+                        .attr("x", point.x)
+                        .attr("y", point.y - 15)
+                        .attr("text-anchor", "middle")
+                        .text(node.name)
+                        .attr("fill", "black");
                 });
 
                 actualizarTablaNodos();
                 actualizarTablaAristas();
             }
 
+            // -------------------- MAP EVENTS --------------------
+            map.on("click", e => {
+                if (!nodeMode) return;
+                createNode(e.latlng.lat, e.latlng.lng);
+            });
 
-        svg.addEventListener("click", e => {
-            if (!nodeMode) return;
-            const pt = getMousePosition(e);
-            createNode(pt.x, pt.y);
-        });
-
-        svg.addEventListener("mousedown", e => {
-            if (!nodeMode && !linkMode) {
-                draggingMap = true;
-                dragStart = { x: e.clientX, y: e.clientY };
-            }
-        });
-
-        svg.addEventListener("mousemove", e => {
-            if (draggingNode) {
-                const pt = getMousePosition(e);
-                draggingNode.x = pt.x;
-                draggingNode.y = pt.y;
-                draw();
-            } else if (draggingMap) {
-                const dx = e.clientX - dragStart.x;
-                const dy = e.clientY - dragStart.y;
-                transform.x += dx;
-                transform.y += dy;
-                dragStart = { x: e.clientX, y: e.clientY };
-                draw();
-            }
-        });
-
-        svg.addEventListener("mouseup", () => {
-            draggingNode = null;
-            draggingMap = false;
-        });
-
-        svg.addEventListener("mouseleave", () => {
-            draggingNode = null;
-            draggingMap = false;
-        });
-
-
-        nameInput.addEventListener("change", () => {
-            if (selectedNode) {
-                selectedNode.name = nameInput.value;
-                selectedNode.id = nameInput.value;
-                nameInput.style.display = "none";
-                draw();
-            }
-        });
-
-        function getMousePosition(e) {
-            const rect = svg.getBoundingClientRect();
-            return {
-                x: (e.clientX - rect.left - transform.x) / transform.k,
-                y: (e.clientY - rect.top - transform.y) / transform.k
-            };
-        }
-        function actualizarTablaNodos() {
-            const tbody = document.querySelector("#tabla-nodos tbody");
-            tbody.innerHTML = "";
-
-            nodes.forEach(node => {
-                const fila = document.createElement("tr");
-
-                // ID (solo lectura)
-                const idCell = document.createElement("td");
-                idCell.textContent = node.id;
-                fila.appendChild(idCell);
-
-                // Nombre (editable)
-                const nameCell = document.createElement("td");
-                const nameInput = document.createElement("input");
-                nameInput.value = node.name;
-                nameInput.onchange = () => {
-                    const oldName = node.name;
-                    const newName = nameInput.value;
-
-                    // Actualizar el nombre del nodo
-                    node.name = newName;
-                    node.label = newName;
-                    // Actualizar vecinos que lo referencian
-                    nodes.forEach(n => {
-                        n.neighbors.forEach(vecino => {
-                            if (vecino.name === oldName) {
-                                vecino.name = newName;
-                            }
-                        });
-                    });
-
-                    // Actualizar enlaces
-                    links.forEach(link => {
-                        if (link.source === oldName) link.source = newName;
-                        if (link.target === oldName) link.target = newName;
-                    });
-
-                    // Enviar cambio de nombre al backend del nodo
-                    const puerto = obtenerPuertoDesdeId(node.id);
-                    if (puerto) {
-                        fetch(`http://localhost:${puerto}/update`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ name: newName })
-                        });
-                    }
-
+            map.on("mousemove", e => {
+                if (draggingNode) {
+                    draggingNode.lat = e.latlng.lat;
+                    draggingNode.lon = e.latlng.lng;
                     draw();
-                };
-                nameCell.appendChild(nameInput);
-                fila.appendChild(nameCell);
+                }
+            });
 
-                // Roles (checkboxes)
-                const rolesCell = document.createElement("td");
-                ["emisor", "receptor", "repeater"].forEach(role => {
-                    const chk = document.createElement("input");
-                    chk.type = "checkbox";
-                    chk.checked = node.roles.includes(role);
-                    chk.onchange = () => {
-                        if (chk.checked && !node.roles.includes(role)) {
-                            node.roles.push(role);
-                        } else {
-                            node.roles = node.roles.filter(r => r !== role);
-                        }
+            map.on("mouseup", () => {
+                draggingNode = null;
+            });
+
+            map.on("zoom move", draw); // redraw nodes/links on zoom/pan
+
+            // -------------------- NAME EDIT --------------------
+            nameInput.addEventListener("change", () => {
+                if (selectedNode) {
+                    selectedNode.name = nameInput.value;
+                    nameInput.style.display = "none";
+                    draw();
+                }
+            });
+
+            // -------------------- TABLE UPDATES --------------------
+            function actualizarTablaNodos() {
+                const tbody = document.querySelector("#nodes-table tbody");
+                tbody.innerHTML = "";
+                nodes.forEach(node => {
+                    const fila = document.createElement("tr");
+
+                    // ID
+                    const idCell = document.createElement("td");
+                    idCell.textContent = node.id;
+                    fila.appendChild(idCell);
+
+                    // Name
+                    const nameCell = document.createElement("td");
+                    const nameInput = document.createElement("input");
+                    nameInput.value = node.name;
+                    nameInput.onchange = () => {
+                        const oldName = node.name;
+                        node.name = nameInput.value;
+                        nodes.forEach(n => n.neighbors.forEach(v => { if (v.name === oldName) v.name = node.name; }));
+                        links.forEach(l => { if (l.source === oldName) l.source = node.name; if (l.target === oldName) l.target = node.name; });
                         draw();
                     };
-                    const lbl = document.createElement("label");
-                    lbl.textContent = role;
-                    rolesCell.appendChild(chk);
-                    rolesCell.appendChild(lbl);
+                    nameCell.appendChild(nameInput);
+                    fila.appendChild(nameCell);
+
+                    // Roles
+                    const rolesCell = document.createElement("td");
+                    ["emisor", "receptor", "repeater"].forEach(role => {
+                        const chk = document.createElement("input");
+                        chk.type = "checkbox";
+                        chk.checked = node.roles.includes(role);
+                        chk.onchange = () => {
+                            if (chk.checked && !node.roles.includes(role)) node.roles.push(role);
+                            else node.roles = node.roles.filter(r => r !== role);
+                            draw();
+                        };
+                        const lbl = document.createElement("label");
+                        lbl.textContent = role;
+                        rolesCell.appendChild(chk);
+                        rolesCell.appendChild(lbl);
+                    });
+                    fila.appendChild(rolesCell);
+
+                    // pswap
+                    const pswapCell = document.createElement("td");
+                    const pswapInput = document.createElement("input");
+                    pswapInput.type = "number";
+                    pswapInput.step = "0.01";
+                    pswapInput.min = "0";
+                    pswapInput.max = "1";
+                    pswapInput.value = node.pswap || 0.8;
+                    pswapInput.onchange = () => { node.pswap = parseFloat(pswapInput.value); draw(); };
+                    pswapCell.appendChild(pswapInput);
+                    fila.appendChild(pswapCell);
+
+                    tbody.appendChild(fila);
                 });
-                fila.appendChild(rolesCell);
+            }
 
-                
-                tbody.appendChild(fila);
-                // Param pswap
-                const pswapCell = document.createElement("td");
-                const pswapInput = document.createElement("input");
-                pswapInput.type = "number";
-                pswapInput.step = "0.01";
-                pswapInput.min = "0";
-                pswapInput.max = "1";
-                pswapInput.value = node.pswap || 0.9;
-                pswapInput.onchange = () => {
-                    node.pswap = parseFloat(pswapInput.value);
-                    draw();
-                };
-                pswapCell.appendChild(pswapInput);
-                fila.appendChild(pswapCell);
+            function actualizarTablaAristas() {
+                const tbody = document.querySelector("#links-table tbody");
+                tbody.innerHTML = "";
+                const vistos = new Set();
 
-                            
-            });
-        }
+                links.forEach(link => {
+                    const key = [link.source, link.target].sort().join("-");
+                    if (vistos.has(key)) return;
+                    vistos.add(key);
 
-        function actualizarTablaAristas() {
-            const tbody = document.querySelector("#tabla-aristas tbody");
-            tbody.innerHTML = "";
-
-            const vistos = new Set();
-
-            links.forEach(link => {
-                // normalize pair
-                const key = [link.source, link.target].sort().join("-");
-                if (vistos.has(key)) return; // already displayed
-                vistos.add(key);
-
-                const fila = document.createElement("tr");
-
-                const origenCell = document.createElement("td");
-                origenCell.textContent = link.source;
-                fila.appendChild(origenCell);
-
-                const destinoCell = document.createElement("td");
-                destinoCell.textContent = link.target;
-                fila.appendChild(destinoCell);
-
-                // distance column
-                const distCell = document.createElement("td");
-                const distInput = document.createElement("input");
-                distInput.type = "number";
-                distInput.value = link.distanciaKm;
-
-                distInput.onchange = () => {
-                    const nuevaDistancia = parseFloat(distInput.value);
-
-                    // update both symmetric links
-                    links.forEach(l => {
-                        const par = [l.source, l.target].sort().join("-");
-                        if (par === key) {
-                            l.distanciaKm = nuevaDistancia;
-                        }
+                    const fila = document.createElement("tr");
+                    ["source", "target"].forEach(prop => {
+                        const td = document.createElement("td");
+                        td.textContent = link[prop];
+                        fila.appendChild(td);
                     });
 
-                    // update neighbors in both nodes
-                    const origenNode = nodes.find(n => n.name === link.source);
-                    if (origenNode) {
-                        const vecino = origenNode.neighbors.find(v => v.name === link.target);
-                        if (vecino) vecino.distanceKm = nuevaDistancia;
-                    }
-                    const destinoNode = nodes.find(n => n.name === link.target);
-                    if (destinoNode) {
-                        const vecino = destinoNode.neighbors.find(v => v.name === link.source);
-                        if (vecino) vecino.distanceKm = nuevaDistancia;
-                    }
-                };
+                    // Distance
+                    const distCell = document.createElement("td");
+                    const distInput = document.createElement("input");
+                    distInput.type = "number";
+                    distInput.value = link.distanciaKm;
+                    distInput.onchange = () => {
+                        const val = parseFloat(distInput.value);
+                        links.forEach(l => { if ([l.source, l.target].sort().join("-") === key) l.distanciaKm = val; });
+                        nodes.forEach(n => {
+                            if (n.id === link.source) {
+                                const vecino = n.neighbors.find(v => v.id === link.target); if (vecino) vecino.distanceKm = val;
+                            }
+                            if (n.id === link.target) {
+                                const vecino = n.neighbors.find(v => v.id === link.source); if (vecino) vecino.distanceKm = val;
+                            }
+                        });
+                    };
+                    distCell.appendChild(distInput);
+                    fila.appendChild(distCell);
 
-                distCell.appendChild(distInput);
-                fila.appendChild(distCell);
+                    // pgen
+                    const pgenCell = document.createElement("td");
+                    const pgenInput = document.createElement("input");
+                    pgenInput.type = "number";
+                    pgenInput.step = "0.01";
+                    pgenInput.min = "0";
+                    pgenInput.max = "1";
+                    pgenInput.value = link.pgen !== undefined ? link.pgen : "";
+                    pgenInput.onchange = () => {
+                        const val = parseFloat(pgenInput.value);
+                        links.forEach(l => { if ([l.source, l.target].sort().join("-") === key) l.pgen = val; });
+                        nodes.forEach(n => {
+                            if (n.id === link.source) { const vecino = n.neighbors.find(v => v.id === link.target); if (vecino) vecino.pgen = val; }
+                            if (n.id === link.target) { const vecino = n.neighbors.find(v => v.id === link.source); if (vecino) vecino.pgen = val; }
+                        });
+                    };
+                    pgenCell.appendChild(pgenInput);
+                    fila.appendChild(pgenCell);
 
-                // pgen column
-                const pgenCell = document.createElement("td");
-                const pgenInput = document.createElement("input");
-                pgenInput.type = "number";
-                pgenInput.step = "0.01";
-                pgenInput.min = "0";
-                pgenInput.max = "1";
-                pgenInput.value = link.pgen !== undefined ? link.pgen : "";
+                    tbody.appendChild(fila);
+                });
+            }
 
-                pgenInput.onchange = () => {
-                    const nuevoPgen = parseFloat(pgenInput.value);
-
-                    // update both symmetric links
-                    links.forEach(l => {
-                        const par = [l.source, l.target].sort().join("-");
-                        if (par === key) {
-                            l.pgen = nuevoPgen;
-                        }
-                    });
-
-                    // update neighbors in both nodes
-                    const origenNode = nodes.find(n => n.id === link.source);
-                    if (origenNode) {
-                        const vecino = origenNode.neighbors.find(v => v.id === link.target);
-                        if (vecino) vecino.pgen = nuevoPgen;
-                    }
-                    const destinoNode = nodes.find(n => n.id === link.target);
-                    if (destinoNode) {
-                        const vecino = destinoNode.neighbors.find(v => v.id === link.source);
-                        if (vecino) vecino.pgen = nuevoPgen;
-                    }
-                };
-
-                pgenCell.appendChild(pgenInput);
-                fila.appendChild(pgenCell);
-
-                tbody.appendChild(fila);
-            });
-        }
-
-
-
-
-        draw();
-    };
+            draw();
+        };
 
         //-----------------------------------------SIMULACIÓN------------
-        function getDistancia(id) {
-            const link = links.find(l => l.id === id);
-            return link ? link.distanciaKm : 0;
-        }
 
         const nombres_nodos = nodes.map(n => n.id).join(" ");
         fetch(`/crear_nodos_simulaqron?nodos=${nombres_nodos}`);
 
-        function iniciarSimulacion() {
+        function initSimulation() {
             const modo = document.getElementById("modo").value;
-            const num_ParesEPR = document.getElementById("num_ParesEPR").value;
+            const num_PairsEPR = document.getElementById("num_PairsEPR").value;
             console.log("Iniciando simulación única");
 
             const pswap_nodes = nodes.map(n => `${n.name}:${n.swap}`).join(",");
@@ -1596,32 +1428,32 @@
             const pgen_links = links.map(l => `${l.source}:${l.pgen}`).join(",");
 
 
-            const modo_tiempo = document.getElementById("modo_tiempo").value;
+            const time_mode = document.getElementById("time_mode").value;
             const canal_cuantico = getQuantum_channel();
 
-            fetch(`/simular?modo=${modo}&num_ParesEPR=${num_ParesEPR}&pgen_nodos=${pgen_links}&distancias=${distancias}&pswap_nodes=${pswap_nodes}&modo_tiempo=${modo_tiempo}&canal_cuantico=${encodeURIComponent(canal_cuantico)}`)
+            fetch(`/simular?modo=${modo}&num_PairsEPR=${num_PairsEPR}&pgen_nodos=${pgen_links}&distancias=${distancias}&pswap_nodes=${pswap_nodes}&time_mode=${time_mode}&canal_cuantico=${encodeURIComponent(canal_cuantico)}`)
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById("resultado").innerHTML =
-                        "<strong>Resultado de la medición en Bob:</strong><br>" + data.resultado;
-                    document.getElementById("estado").innerHTML =
+                    document.getElementById("result").innerHTML =
+                        "<strong>Resultado de la medición en Bob:</strong><br>" + data.result;
+                    document.getElementById("state").innerHTML =
                         "<strong>Estado:</strong> Información enviada correctamente desde Alice a Bob.";
-                    document.getElementById("contador").innerHTML =
-                        "<strong>Simulaciones realizadas:</strong> " + data.contador;
+                    document.getElementById("counter").innerHTML =
+                        "<strong>Simulaciones realizadas:</strong> " + data.counter;
                     actualizarTabla(data.historial);
                     document.getElementById("loading").style.display = "none";
-                    document.getElementById("cuenta").innerText = "";
+                    document.getElementById("counter2").innerText = "";
                 });
         }
 
 
         function mostrarResultado(data) {
-            document.getElementById("resultado").innerHTML =
-                "<strong>Resultado de la medición en Bob:</strong><br>" + data.resultado;
-            document.getElementById("estado").innerHTML =
+            document.getElementById("result").innerHTML =
+                "<strong>Resultado de la medición en Bob:</strong><br>" + data.result;
+            document.getElementById("state").innerHTML =
                 "<strong>Estado:</strong> Información enviada correctamente desde Alice a Bob.";
-            document.getElementById("contador").innerHTML =
-                "<strong>Simulaciones realizadas:</strong> " + data.contador;
+            document.getElementById("counter").innerHTML =
+                "<strong>Simulaciones realizadas:</strong> " + data.counter;
             actualizarTabla(data.historial);
             document.getElementById("loading").style.display = "none";
         }
@@ -1635,7 +1467,7 @@
         // Global map that persists across calls
         const eprMap = new Map();
         function cargarHistorial(historial) {
-            const tabla = document.getElementById("tabla-resultados");
+            const tabla = document.getElementById("results-table");
             const thead = tabla.querySelector("thead");
             const tbody = tabla.querySelector("tbody");
 
@@ -1713,7 +1545,7 @@
 
 
         function actualizarTabla(historial) {
-            const tbody = document.querySelector("#tabla-resultados tbody");
+            const tbody = document.querySelector("#results-table tbody");
             tbody.innerHTML = "";
 
             if (Array.isArray(historial) && historial.length > 0) {
@@ -1750,17 +1582,17 @@
             if (ultimoHistorialEPR === nuevoJSON) return;
             ultimoHistorialEPR = nuevoJSON;
 
-            const tbody = document.querySelector("#tabla-resultados tbody");
+            const tbody = document.querySelector("#results-table tbody");
             tbody.innerHTML = "";
 
 
             historial.forEach(epr => {
                 const fila = document.createElement("tr");
-                if (epr.estado === "purificado") fila.classList.add("fila-purificada");
+                if (epr.state === "purificado") fila.classList.add("fila-purificada");
 
                 fila.innerHTML = `
                     <td>${epr.id}</td>
-                    <td>${epr.estado}</td>
+                    <td>${epr.state}</td>
                     <td>${epr.link}</td>
                     <td>${epr.w_gen ?? ""}</td>
                     <td>${formatNumber(epr.w_out)}</td>
@@ -1768,8 +1600,8 @@
                     <td>${epr.t_recv ?? ""}</td>
                     <td>${formatNumber(epr.t_diff)}</td>
                     <td>${epr.medicion ?? ""}</td>
-                    <td>${epr.estado === "purificado" ? (epr.purificado_de?.join(", ") ?? "") : ""}</td>
-                    <td>${epr.estado === "purificado" ? (epr.t_pur ?? "") : ""}</td>
+                    <td>${epr.state === "purificado" ? (epr.purificado_de?.join(", ") ?? "") : ""}</td>
+                    <td>${epr.state === "purificado" ? (epr.t_pur ?? "") : ""}</td>
                     <td>${epr.ts_print ? new Date(epr.ts_print).toLocaleTimeString() : ""}</td>
                 `;
                 tbody.appendChild(fila);
@@ -1780,7 +1612,7 @@
 
         
 
-        function limpiarHistorial() {
+        function cleanHistory() {
             // recorrer todos los puertos del 5000 al 5010, saltando el 5001
             (async () => {
                 for (let puerto = 5000; puerto <= 5010; puerto++) {
@@ -1807,11 +1639,11 @@
                 fetch("/limpiar_historial")
                     .then(response => response.json())
                     .then(data => {
-                        document.getElementById("resultado").innerHTML =
+                        document.getElementById("result").innerHTML =
                             "<strong>Resultado de la medición en Bob:</strong><br>Historial borrado.";
-                        document.getElementById("estado").innerHTML =
+                        document.getElementById("state").innerHTML =
                             "<strong>Estado:</strong> Historial limpiado correctamente.";
-                        document.getElementById("contador").innerHTML =
+                        document.getElementById("counter").innerHTML =
                             "<strong>Simulaciones realizadas:</strong> 0";
                         eprMap.clear();
                         ultimoHistorialEPR = null;
@@ -1822,18 +1654,18 @@
             })();
         }
 
-        document.getElementById("num_ParesEPR").addEventListener("change", () => {
-            const nuevoModo = document.getElementById("num_ParesEPR").value;
+        document.getElementById("num_PairsEPR").addEventListener("change", () => {
+            const nuevoModo = document.getElementById("num_PairsEPR").value;
             if (nuevoModo !== modoAnterior) {
                 fetch("/limpieza_docs")
                     .then(response => response.json())
                     .then(data => {
                         if (data.status === "ok") {
-                            document.getElementById("estado").innerHTML =
-                                "<strong>Estado:</strong> Qubits limpiados al cambiar de num_ParesEPR generados.";
+                            document.getElementById("state").innerHTML =
+                                "<strong>Estado:</strong> Qubits limpiados al cambiar de num_PairsEPR generados.";
                             console.log("Qubits limpiados correctamente.");
                         } else {
-                            document.getElementById("estado").innerHTML =
+                            document.getElementById("state").innerHTML =
                                 "<strong>Estado:</strong> Error al limpiar qubits.";
                             console.warn("Error al limpiar qubits.");
                         }

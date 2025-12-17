@@ -84,12 +84,12 @@ body.night .analytics-table tr:nth-child(even) {
 }
 
 /* Estado highlight */
-.analytics-table td.estado {
+.analytics-table td.state {
   font-weight: bold;
 }
-.analytics-table td.estado.measure { color: #2196f3; }
-.analytics-table td.estado.active { color: #4caf50; }
-.analytics-table td.estado.Consumed { color: #ff9800; }
+.analytics-table td.state.measure { color: #2196f3; }
+.analytics-table td.state.active { color: #4caf50; }
+.analytics-table td.state.Consumed { color: #ff9800; }
 
 /* Toggle icon */
 #toggleIcon {

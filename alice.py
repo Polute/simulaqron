@@ -12,7 +12,7 @@ import time
 #  Bloqueo global para escritura segura en archivos compartidos
 lock = Lock()
 
-def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
+def generar_epr(i, modo, pgen, time_mode, semaforos):
     """
     Genera un par EPR con probabilidad pgen y guarda el resultado en archivos compartidos.
     """
@@ -74,7 +74,7 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
                     estado = "fallo"
 
                 # Señal para Bob si estamos en modo simultáneo
-                if modo_tiempo == "simultaneo" and semaforos:
+                if time_mode == "simultaneous" and semaforos:
                     semaforos[i].release()
 
                 id1 = q.get_entInfo().id_AB
@@ -118,18 +118,18 @@ def generar_epr(i, modo, pgen, modo_tiempo, semaforos):
         print(f"[ALICE] Resultado #{i+1} guardado: estado={estado}, fidelidad={fidelidades[i]}")
 
 
-def run_alice(modo, pgen, num_ParesEPR, modo_tiempo, semaforos):
+def run_alice(modo, pgen, num_PairsEPR, time_mode, semaforos):
     """
     Ejecuta la generación de múltiples pares EPR, en paralelo o secuencialmente.
     """
 
-    if modo_tiempo == "simultaneo":
-        with ThreadPoolExecutor(max_workers=num_ParesEPR) as executor:
-            for i in range(num_ParesEPR):
-                executor.submit(generar_epr, i, modo, pgen, modo_tiempo, semaforos)
+    if time_mode == "simultaneous":
+        with ThreadPoolExecutor(max_workers=num_PairsEPR) as executor:
+            for i in range(num_PairsEPR):
+                executor.submit(generar_epr, i, modo, pgen, time_mode, semaforos)
     else:
-        for i in range(num_ParesEPR):
-            generar_epr(i, modo, pgen, modo_tiempo, semaforos)
+        for i in range(num_PairsEPR):
+            generar_epr(i, modo, pgen, time_mode, semaforos)
 
 
 
@@ -138,9 +138,9 @@ if __name__ == "__main__":
     # Leer argumentos desde línea de comandos
     modo = sys.argv[1]              # "puro", "werner" o "swap"
     pgen = float(sys.argv[2])       # Probabilidad de generación
-    num_ParesEPR = int(sys.argv[3]) # Número de pares EPR
-    modo_tiempo = sys.argv[4]       # "secuencial" o "simultaneo"
+    num_PairsEPR = int(sys.argv[3]) # Número de pares EPR
+    time_mode = sys.argv[4]       # "secuencial" o "simultaneous"
     semaforos_raw = sys.argv[5]     # "no_semaforos" o marcador
 
     # Ejecutar Alice
-    run_alice(modo, pgen, num_ParesEPR, modo_tiempo, semaforos_raw)
+    run_alice(modo, pgen, num_PairsEPR, time_mode, semaforos_raw)

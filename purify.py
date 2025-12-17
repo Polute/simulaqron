@@ -39,16 +39,16 @@ def pick_pair_same_edge(node_info, timeout=7.0, interval=0.2):
                 continue
 
             # Case 1: two 'active' EPRs
-            active = [e for e in lst if e.get("estado") == "active"]
+            active = [e for e in lst if e.get("state") == "active"]
             if len(active) >= 2:
                 return active[-2], active[-1], "valid"
 
             # Case 2: last two are 'EPR not received'
-            if lst[-2].get("estado") == "EPR not received" and lst[-1].get("estado") == "EPR not received":
+            if lst[-2].get("state") == "EPR not received" and lst[-1].get("state") == "EPR not received":
                 return lst[-2], lst[-1], "fallback"
 
             # Case 3: one 'active' and one 'EPR not received'
-            states = {lst[-2].get("estado"), lst[-1].get("estado")}
+            states = {lst[-2].get("state"), lst[-1].get("state")}
             if "active" in states and "EPR not received" in states:
                 return lst[-2], lst[-1], "fallback"
             try:
@@ -81,7 +81,7 @@ def send_epr_pu_failed(node_info, master_id, my_port, emitter_port, reason, epr1
 
     new_epr = {
         "id": master_id,
-        "estado": "failed pur" if reason == "No 2 active EPR" else "failed p_pur",
+        "state": "failed pur" if reason == "No 2 active EPR" else "failed p_pur",
         "vecino": neighbor,
         "enlace": link,
         "purificado_de": purified_from
@@ -127,8 +127,8 @@ def purify(node_info, master_id, my_port=None, emitter_port=None):
         print("[PURIFY] No se pudo conectar a uno de los listener ports")
         return
 
-    epr1["estado"], epr1["medicion"] = "medido", res1.get("medicion")
-    epr2["estado"], epr2["medicion"] = "medido", res2.get("medicion")
+    epr1["state"], epr1["medicion"] = "medido", res1.get("medicion")
+    epr2["state"], epr2["medicion"] = "medido", res2.get("medicion")
 
     w1, w2 = epr1.get("w_out"), epr2.get("w_out")
     if w1 is None or w2 is None:
@@ -143,7 +143,7 @@ def purify(node_info, master_id, my_port=None, emitter_port=None):
         nuevo_epr = {
             "id": master_id,
             "vecino": epr2["vecino"],
-            "estado": "purificado",
+            "state": "purificado",
             "medicion": epr2.get("medicion"),
             "distancia_nodos": epr2.get("distancia_nodos"),
             "t_gen": epr2.get("t_gen"),

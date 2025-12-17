@@ -89,16 +89,16 @@ def mostrar_topologia():
         return pseudo_topology
 
     # Normalizar topología: solo vecinos válidos y distintos del propio nodo
-    resultado = {}
+    result = {}
     for nodo, vecinos in topology.items():
         vecinos_filtrados = [
             v for v in vecinos
             if v in node_ids and v != nodo
         ]
-        resultado[nodo] = vecinos_filtrados
+        result[nodo] = vecinos_filtrados
         print(f"Nodo {nodo} conectado con: {{{', '.join(vecinos_filtrados)}}}")
 
-    return resultado
+    return result
 
     
 def retardo(distancia_km):
@@ -137,8 +137,9 @@ PREDEFINED_NODES = [
     {
         "id": "node_alice_pre",
         "name": "Alice_pre",
-        "x": 100,
-        "y": 100,
+        "lat": 40.4373,
+        "lon": -3.8349,
+        "pswap": 0.9,
         "roles": ["emisor", "receptor"],
         "neighbors": [],   # Alice no tiene vecinos iniciales
         "parEPR": []
@@ -146,8 +147,9 @@ PREDEFINED_NODES = [
     {
         "id": "node_bob_pre",
         "name": "Bob_pre",
-        "x": 300,
-        "y": 100,
+        "lat": 40.4210,
+        "lon": -3.7074,
+        "pswap": 0.9,
         "roles": ["receptor", "repeater"],
         "neighbors": [
             {"id": "node_alice_pre", "distanceKm": 50, "pgen": 0.8}
@@ -157,10 +159,10 @@ PREDEFINED_NODES = [
     {
         "id": "node_charlie_pre",
         "name": "Charlie_pre",
-        "x": 200,
-        "y": 250,
-        "pgen": 0.9,
-        "roles": ["emisor", "repeater"],
+        "lat": 40.4830,
+        "lon": -3.3630,
+        "pswap": 0.9,
+        "roles": ["emisor", "receptor", "repeater"],
         "neighbors": [
             {"id": "node_alice_pre", "distanceKm": 70, "pgen": 0.6},
             {"id": "node_bob_pre", "distanceKm": 40, "pgen": 0.9}
@@ -168,6 +170,7 @@ PREDEFINED_NODES = [
         "parEPR": []
     }
 ]
+
 # Reiniciar SimulaQron al iniciar el servidor
 print("[INIT] Reiniciando SimulaQron...")
 subprocess.run(["simulaqron", "reset", "--force"])
@@ -175,7 +178,7 @@ subprocess.run(["simulaqron", "start", "--name", "default", "--force", "-n", "no
 print("[INIT] Inicializando SimulaQron...")
 
 
-contador = 0
+counter = 0
 simulacion_en_curso = False
 def app_open(ROL, PUERTO):
     # Diccionario que mapea puertos a nodos completos
@@ -187,9 +190,9 @@ def app_open(ROL, PUERTO):
     def index():
         try:
             with open("pre_docs/bob_resultado.txt", "r") as f:
-                ultimo_resultado = f.read()
+                last_result = f.read()
         except FileNotFoundError:
-            ultimo_resultado = "Aún no se ha realizado la simulación."
+            last_result = "Aún no se ha realizado la simulación."
 
         try:
             with open("pre_docs/historial_resultados.txt", "r") as h:
@@ -200,8 +203,8 @@ def app_open(ROL, PUERTO):
         if ROL == "bob":
             return render_template(
                 "receiver.html",
-                resultado=ultimo_resultado,
-                contador=len(historial),
+                resultado=last_result,
+                counter=len(historial),
                 historial=historial,
                 rol=ROL,
                 nodo_info=nodo_info,
@@ -227,18 +230,19 @@ def app_open(ROL, PUERTO):
 
             return render_template(
                 "index.html",
-                resultado=ultimo_resultado,
-                contador=len(historial),
+                result=last_result,
+                counter=len(historial),
                 historial=historial,
                 rol=ROL,
-                nodo_info=nodo_info_master
+                nodo_info=nodo_info_master, 
+                time=int(time.time())
             )
 
-    # Endpoint JSON del estado del nodo
+    # Endpoint JSON del state del nodo
     @app.route("/info")
     def info():
         return jsonify(nodo_info)
-    # Endpoint para actualizar el estado del nodo
+    # Endpoint para actualizar el state del nodo
     @app.route("/update", methods=["POST"])
     def update():
         data = request.get_json()
@@ -379,11 +383,11 @@ def app_open(ROL, PUERTO):
 
         # Both GET and POST return the current state
         # Convert inner dicts to lists for JSON response
-        estado = {
+        state = {
             clave: list(valores.values())
             for clave, valores in MASTER_PAR_EPR.items()
         }
-        return jsonify({"status": "ok", "MASTER_PAR_EPR": estado})
+        return jsonify({"status": "ok", "MASTER_PAR_EPR": state})
 
 
     
@@ -531,26 +535,26 @@ def app_open(ROL, PUERTO):
 
         data = request.get_json()
         resultado = data.get("resultado", "Sin resultado")
-        contador = data.get("contador", 0)
+        counter = data.get("counter", 0)
         historial = data.get("historial", "Ninguna operación realizada")
 
         print(f"[BOB] Contador qubit entrelazado recibido: {resultado}")
         print(f"[BOB] Qubit entrelazado recibido: {resultado}")
         print(f"[BOB] Qubits entrelazado recibido hasta ahora: {historial}")
-        print(f"[BOB] Historial actualizado con simulación #{contador}")
+        print(f"[BOB] Historial actualizado con simulación #{counter}")
 
         return render_template(
             "receiver.html", 
             resultado=resultado, 
-            contador=contador, 
+            counter=counter, 
             historial=historial,
             rol=ROL
             )
 
     @app.route("/limpiar_historial")
     def limpiar_historial():
-        global contador, simulacion_en_curso
-        contador = 0
+        global counter, simulacion_en_curso
+        counter = 0
         simulacion_en_curso = False
         MASTER_PAR_EPR.clear()
         # Avisar a todos los nodos conectados
@@ -619,21 +623,21 @@ def app_open(ROL, PUERTO):
 
     @app.route("/simular")
     def simular():
-        global contador, simulacion_en_curso
+        global counter, simulacion_en_curso
 
         if simulacion_en_curso:
             print("[SERVIDOR] Simulación en curso. Ignorando nueva petición.")
             return jsonify({
-                "resultado": "ERROR: Simulación en curso. Espera a que finalice.",
-                "contador": contador,
+                "result": "ERROR: Simulación en curso. Espera a que finalice.",
+                "counter": counter,
                 "historial": []
             })
         simulacion_en_curso = True
         inicio_real = time.time()
         modo = request.args.get("modo", "puro")
-        num_ParesEPR = int(request.args.get("num_ParesEPR", 2))
-        modo_tiempo = request.args.get("modo_tiempo", "secuencial")
-        print(f"[WEB] Modo de tiempo seleccionado: {modo_tiempo}")
+        num_PairsEPR = int(request.args.get("num_PairsEPR", 2))
+        time_mode = request.args.get("time_mode", "sequential")
+        print(f"[WEB] Modo de tiempo seleccionado: {time_mode}")
 
         # --- PGEN por nodo ---
         pgen_nodos_raw = request.args.get("pgen_nodos", "")
@@ -671,7 +675,7 @@ def app_open(ROL, PUERTO):
         # Obtener pgen específico
         pgen_alice = pgen_por_nodo.get("node_alice", 0.8)
         pswap_charlie = pswap_por_nodo.get("Charlie", 0.9)
-        print(f"[WEB] Iniciando simulación en modo: {modo} (p={pgen_alice}, qubits={num_ParesEPR})")
+        print(f"[WEB] Iniciando simulación en modo: {modo} (p={pgen_alice}, qubits={num_PairsEPR})")
         print(f"[WEB] Distancias: AB={dist_ab} km, AC={dist_ac} km, CB={dist_cb} km")
         
         try:
@@ -687,12 +691,12 @@ def app_open(ROL, PUERTO):
             # Operaciones de simulación
 
             if modo in ["puro", "werner", "swap"]:
-                if modo_tiempo == "simultaneo":
+                if time_mode == "simultaneous":
                     manager = Manager()
-                    semaforos = [manager.Semaphore(0) for _ in range(num_ParesEPR)]
+                    semaforos = [manager.Semaphore(0) for _ in range(num_PairsEPR)]
                     if modo == "puro":
                         # Ejecutar Alice
-                        proceso_alice = Process(target=run_alice, args=(modo, 1.0, num_ParesEPR, modo_tiempo, semaforos))
+                        proceso_alice = Process(target=run_alice, args=(modo, 1.0, num_PairsEPR, time_mode, semaforos))
                         proceso_alice.start()
                         time.sleep(retardo(dist_ab))  # Alice → Bob
                         inicio_bob = manager.Event()
@@ -705,14 +709,14 @@ def app_open(ROL, PUERTO):
 
                         # Ejecutar Bob
                         w_in = 1.0
-                        proceso_bob = Process(target=run_bob, args=(modo, w_in, num_ParesEPR, modo_tiempo, semaforos))
+                        proceso_bob = Process(target=run_bob, args=(modo, w_in, num_PairsEPR, time_mode, semaforos))
                         proceso_bob.start()
 
                         proceso_alice.join()
                         proceso_bob.join()
 
                     elif modo == "werner":
-                        proceso_alice = Process(target=run_alice, args=(modo, pgen_alice, num_ParesEPR, modo_tiempo, semaforos))
+                        proceso_alice = Process(target=run_alice, args=(modo, pgen_alice, num_PairsEPR, time_mode, semaforos))
                         proceso_alice.start()
                         time.sleep(retardo(dist_ab))  # Alice → Repeater
 
@@ -724,19 +728,19 @@ def app_open(ROL, PUERTO):
                             valores = [float(w) for w in fidelidades if w != "None"]
                             w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
 
-                        proceso_bob = Process(target=run_bob, args=(modo, w_in, num_ParesEPR, modo_tiempo, semaforos))
+                        proceso_bob = Process(target=run_bob, args=(modo, w_in, num_PairsEPR, time_mode, semaforos))
                         proceso_bob.start()
                         proceso_bob.join()
                         w_out = w_in  # En este modo, fidelidad se conserva
 
                     elif modo == "swap":
-                        proceso_alice = Process(target=run_alice, args=(modo, pgen_alice, num_ParesEPR, modo_tiempo, semaforos))
+                        proceso_alice = Process(target=run_alice, args=(modo, pgen_alice, num_PairsEPR, time_mode, semaforos))
                         proceso_alice.start()
                         time.sleep(retardo(dist_ac))  # Alice → Charlie
 
                         proceso_alice.join()
 
-                        subprocess.run(["python3", "repeater_swap.py", str(num_ParesEPR), str(pswap_charlie)])
+                        subprocess.run(["python3", "repeater_swap.py", str(num_PairsEPR), str(pswap_charlie)])
                         time.sleep(retardo(dist_cb))  # Charlie → Bob
 
                         with open("pre_docs/fidelidad_alice.txt", "r") as f:
@@ -744,20 +748,20 @@ def app_open(ROL, PUERTO):
                             valores = [float(w) for w in fidelidades if w != "None"]
                             w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
 
-                        proceso_bob = Process(target=run_bob, args=(modo, w_in, num_ParesEPR, modo_tiempo, semaforos))
+                        proceso_bob = Process(target=run_bob, args=(modo, w_in, num_PairsEPR, time_mode, semaforos))
                         proceso_bob.start()
                         proceso_bob.join()
                         w_out = w_in  # Bob calculará el producto con su propio w
                 else:
                     if modo in ["puro", "werner", "swap"]:
                         if modo == "puro":
-                            subprocess.run(["python3", "alice.py", modo, str(1.0), str(num_ParesEPR), modo_tiempo, "no_semaforos"])
+                            subprocess.run(["python3", "alice.py", modo, str(1.0), str(num_PairsEPR), time_mode, "no_semaforos"])
                             time.sleep(retardo(dist_ab))  # Alice → Bob
                             w_out = 1.0
-                            subprocess.run(["python3", "bob.py", modo, str(w_out), str(num_ParesEPR), modo_tiempo, "no_semaforos"])
+                            subprocess.run(["python3", "bob.py", modo, str(w_out), str(num_PairsEPR), time_mode, "no_semaforos"])
 
                         elif modo == "werner":
-                            subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_ParesEPR), modo_tiempo, "no_semaforos"])
+                            subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_PairsEPR), time_mode, "no_semaforos"])
                             time.sleep(retardo(dist_ab))  # Alice → Repeater
 
                             # Leer fidelidad generada por Alice
@@ -766,14 +770,14 @@ def app_open(ROL, PUERTO):
                                 valores = [float(w) for w in fidelidades if w != "None"]
                                 w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
 
-                            subprocess.run(["python3", "bob.py", modo, str(w_in), str(num_ParesEPR), modo_tiempo,"no_semaforos"])
+                            subprocess.run(["python3", "bob.py", modo, str(w_in), str(num_PairsEPR), time_mode,"no_semaforos"])
                             w_out = w_in  # En este modo, fidelidad se conserva
 
                         elif modo == "swap":
-                            subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_ParesEPR), modo_tiempo, "no_semaforos"])
+                            subprocess.run(["python3", "alice.py", modo, str(pgen_alice), str(num_PairsEPR), time_mode, "no_semaforos"])
                             time.sleep(retardo(dist_ac))  # Alice → Charlie
 
-                            subprocess.run(["python3", "repeater_swap.py", str(num_ParesEPR), str(pswap_charlie)])
+                            subprocess.run(["python3", "repeater_swap.py", str(num_PairsEPR), str(pswap_charlie)])
                             time.sleep(retardo(dist_cb))  # Charlie → Bob
 
                             # Leer fidelidad generada por Alice
@@ -782,7 +786,7 @@ def app_open(ROL, PUERTO):
                                 valores = [float(w) for w in fidelidades if w != "None"]
                                 w_in = round(sum(valores) / len(valores), 3) if valores else 0.0
 
-                            subprocess.run(["python3", "bob.py", modo, str(w_in), str(num_ParesEPR), modo_tiempo,"no_semaforos"])
+                            subprocess.run(["python3", "bob.py", modo, str(w_in), str(num_PairsEPR), time_mode,"no_semaforos"])
                             w_out = w_in  # Bob calculará el producto con su propio w
 
             else:
@@ -861,27 +865,27 @@ def app_open(ROL, PUERTO):
                         fidelidades_corregidas.append(f"w{idx+1}=None")
 
                 # Construir resultado compacto
-                resultado = (
+                result = (
                     f"[{','.join(mediciones)}]"
                     f"({','.join(fidelidades_corregidas)})"
-                    f"(modo={modo},num_ParesEPR={num_ParesEPR})"
+                    f"(modo={modo},num_PairsEPR={num_PairsEPR})"
                 )
 
                 # Verificar si hubo error
-                if "ERROR" in resultado.upper():
-                    print("[SERVIDOR] Error detectado en resultado. Deteniendo simulación.")
+                if "ERROR" in result.upper():
+                    print("[SERVIDOR] Error detectado en result. Deteniendo simulación.")
                     simulacion_en_curso = False
                     return jsonify({
-                        "resultado": resultado,
-                        "contador": contador,
+                        "result": result,
+                        "counter": counter,
                         "historial": []
                     })
 
                 # Actualizar historial
-                contador += 1
+                counter += 1
                 with open("pre_docs/historial_resultados.txt", "a") as h:
                     h.write(
-                        f"{contador}: {resultado} "
+                        f"{counter}: {result} "
                         f"(estimado={tiempo_estimado:.6f}s, real={tiempo_real:.6f}s"
                     )
                     if modo != "puro":
@@ -889,7 +893,7 @@ def app_open(ROL, PUERTO):
                     h.write(")\n")
 
             except FileNotFoundError:
-                resultado = "ERROR: No se pudo leer el resultado."
+                result = "ERROR: No se pudo leer el resultado."
 
             # Leer historial completo
             try:
@@ -905,8 +909,8 @@ def app_open(ROL, PUERTO):
             if ROL == "master":
                 try:
                     requests.post("http://localhost:5001/actualizar_historial", json={
-                        "resultado": resultado,
-                        "contador": len(historial),
+                        "result": result,
+                        "counter": len(historial),
                         "historial": historial
                     })
                     print("[MASTER] Historial enviado a Bob.")
@@ -915,8 +919,8 @@ def app_open(ROL, PUERTO):
 
             # Devolver todo junto en un único mensaje
             return jsonify({
-                "resultado": resultado,
-                "contador": contador,
+                "result": result,
+                "counter": counter,
                 "historial": historial
             })
 
@@ -924,8 +928,8 @@ def app_open(ROL, PUERTO):
             simulacion_en_curso = False
             print(f"[ERROR] Fallo en la simulación: {e}")
             return jsonify({
-                "resultado": "ERROR: Fallo interno en la simulación.",
-                "contador": contador,
+                "result": "ERROR: Fallo interno en la simulación.",
+                "counter": counter,
                 "historial": []
             })
     print(f"[SERVIDOR] Iniciando servidor en el puerto {PUERTO} con rol {ROL}...")

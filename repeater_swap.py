@@ -4,14 +4,14 @@ from cqc.pythonLib import CQCConnection
 import time
 import math
 
-def entanglement_swap(num_ParesEPR, pswap):
+def entanglement_swap(num_PairsEPR, pswap):
     with CQCConnection("node_charlie_pre") as repeater:
         try:
             with open("pre_docs/qubit_enviado.txt", "r") as f:
                 enviados = f.read().strip().split(",")
         except FileNotFoundError:
             enviados = []
-        for i in range(num_ParesEPR):
+        for i in range(num_PairsEPR):
             if enviados[i] != "ok":
                 print(f"[SWAP] Qubit #{i+1} no fue enviado por Alice (fallo en pgen)")
                 continue
@@ -88,6 +88,6 @@ def entanglement_swap(num_ParesEPR, pswap):
                     print(f"[SWAP] Error en swapping #{i+1}: {e}")
 
 if __name__ == "__main__":
-    num_ParesEPR = int(sys.argv[1])
+    num_PairsEPR = int(sys.argv[1])
     pswap = float(sys.argv[2])
-    entanglement_swap(num_ParesEPR, pswap)
+    entanglement_swap(num_PairsEPR, pswap)
