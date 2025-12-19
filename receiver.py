@@ -254,7 +254,7 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
     # Guardar el resultado del swap con su metadata
     epr_store[id_swap] = {"q": q1, "emisor_port": None}  
 
-    order = "Swapped"
+    order = "swapped"
 
     measure_epr(epr1["id"], node_info, conn, my_port, order)
     measure_epr(epr2["id"], node_info, conn, my_port, order)
@@ -285,9 +285,9 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
 
     # Notificar endpoints
     result_swap = {
-        "id": f"{epr1['id']}_{epr2['id']}",
+        "id": f"{str(epr1['id'])}_{str(epr2['id'])}",
         "vecino": swapped_epr["vecino"],
-        "state": "swapped",
+        "state": "swapper",
     }
     try:
         # Después de hacer el swap y notificar a los vecinos
@@ -322,7 +322,7 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
         if my_port:
             requests.post(f"http://localhost:{my_port}/parEPR/swap", json=result_swap, timeout=2)
 
-        #sending_monitor(monitor_msg, ports_involved[0])
+        sending_monitor(monitor_msg, ports_involved[0])
 
     except Exception as e:
         print(f"[SWAP] Error notificando endpoints: {e}")
@@ -378,7 +378,7 @@ def socket_listener(node_info, conn, port, my_port=None, emisor_port=None):
                         conn_sock.send(json.dumps(result or {"error": "EPR not found"}).encode())
 
                     elif accion == "do swapping":
-                        id_swap = payload.get("id", 0)
+                        id_swap = str(payload.get("id", 0))
                         node_info_in = payload.get("node_info", node_info)
                         destinatarios = payload.get("destinatarios", [])
                         destinatarios_ports = payload.get("destinatarios_ports", [])

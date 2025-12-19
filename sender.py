@@ -72,6 +72,12 @@ def generar_epr(emisor, receptor, conn, emisor_port, receptor_port,
         return
 
     try:
+        print("[DEBUG] conn object:", conn)
+        print("[DEBUG] conn.name:", getattr(conn, "name", None))
+        print("[DEBUG] conn._name:", getattr(conn, "_name", None))
+        print("[DEBUG] conn._appID:", getattr(conn, "_appID", None))
+
+
         q = conn.createEPR(receptor)
         epr_store[epr_id] = {"q": q, "w_out": 1.0, "other_port": receptor_port}
     except CQCNoQubitError:
@@ -153,6 +159,7 @@ def recalculate_werner(epr_id, result_recv, conn,
         if w_out <= threshold:
             print(f"[COHERENCE] EPR {epr_id} reached w={w_out:.3f} in {t_now}, measuring...")
             if epr_id_before is not None and my_port and other_port:
+                print(f"[COHERENCE] EPR {epr_id} reached w={w_out:.3f} in {t_now}, measuring...")
                 measure_epr_sender(epr_id_before, epr_id, result_recv,
                                    conn, my_port, other_port, order="measure")
             break
@@ -263,8 +270,9 @@ if __name__ == "__main__":
     epr_id        = sys.argv[6]
     node_info     = json.loads(sys.argv[7])
     listener_port = int(sys.argv[8])
-
+    print(emisor)
     with CQCConnection(emisor) as conn:
+        print("In emiter.py")
         generar_epr(
             emisor, receptor, conn,
             emisor_port, receptor_port,

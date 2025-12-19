@@ -1,0 +1,69 @@
+{
+  "5000": {
+    "id": "node_rectorado_upm",
+    "name": "Rectorado UPM",
+    "lat": 40.448240,
+    "lon": -3.717599,
+    "pswap": 0.85,
+    "roles": ["emisor", "receptor", "repeater"],
+    "neighbors": [],
+    "parEPR": []
+  },
+
+  "5002": {
+    "id": "node_cedint_upm",
+    "name": "Cedint UPM",
+    "lat": 40.4042562,
+    "lon": -3.8355074,
+    "pswap": 0.90,
+    "roles": ["emisor", "receptor", "repeater"],
+    "neighbors": [
+      { 
+        "id": "node_rectorado_upm", 
+        "lat": 40.448240, 
+        "lon": -3.717599, 
+        "distanceKm": 23.3, 
+        "pgen": 0.85 
+      }
+    ],
+    "parEPR": []
+  },
+
+  "5003": {
+    "id": "node_etsiinf_upm",
+    "name": "ETSIINF UPM",
+    "lat": 40.406194,
+    "lon": -3.8390397,
+    "pswap": 0.88,
+    "roles": ["emisor", "receptor", "repeater"],
+    "neighbors": [
+      { 
+        "id": "node_cedint_upm", 
+        "lat": 40.4042562, 
+        "lon": -3.8355074, 
+        "distanceKm": 1, 
+        "pgen": 0.9 
+      }
+    ],
+    "parEPR": []
+  },
+
+  "5004": {
+    "id": "node_cait_upm",
+    "name": "CAIT UPM",
+    "lat": 40.4079790,
+    "lon": -3.8346741,
+    "pswap": 0.92,
+    "roles": ["emisor", "receptor"],
+    "neighbors": [
+      { 
+        "id": "node_etsiinf_upm", 
+        "lat": 40.406194, 
+        "lon": -3.8390397, 
+        "distanceKm": 1, 
+        "pgen": 0.9 
+      }
+    ],
+    "parEPR": []
+  }
+}

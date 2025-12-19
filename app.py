@@ -107,31 +107,6 @@ def retardo(distancia_km):
 
 def parse_timestamp(ts):
     return datetime.strptime(ts, "%M:%S.%f")
-def construir_links_desde_nodos(nodos):
-    """
-    A partir de la lista de nodos (cada uno con 'neighbors'),
-    devuelve una lista de enlaces con source, target y distanciaKm.
-    """
-    links = []
-    for nodo in nodos:
-        source = nodo.get("id") or nodo.get("name")  # usa id si existe, si no name
-        for vecino in nodo.get("neighbors", []):
-            target = vecino.get("id") or vecino.get("name")
-            distancia = vecino.get("distanceKm", 0)
-
-            # Evitar duplicados (Alice->Bob y Bob->Alice)
-            existe = any(
-                (l["source"] == source and l["target"] == target) or
-                (l["source"] == target and l["target"] == source)
-                for l in links
-            )
-            if not existe:
-                links.append({
-                    "source": source,
-                    "target": target,
-                    "distanciaKm": distancia
-                })
-    return links
 # Nodos predefinidos (con IDs distintos para no colisionar)
 PREDEFINED_NODES = [
     {
@@ -305,29 +280,38 @@ def app_open(ROL, PUERTO):
                         print(f"Vecino {vecino_id} ignorado: no está en nodos actuales")
 
 
-        # Consolidar links
+        # Consolidate links keyed by sorted node pairs (no sourceLat/sourceLon)
         links_dict = {}
-        for nodo in nodos:
-            nodo_id = nodo["id"]
-            ts_nodo = nodo.get("lastUpdated", 0)
-            for vecino in nodo.get("neighbors", []):
-                vecino_id = vecino.get("id")
-                if vecino_id in vecinos_dict[nodo_id]:
-                    par = tuple(sorted([nodo_id, vecino_id]))
-                    distancia = vecino.get("distanceKm", 0)
-                    pgen = vecino.get("pgen", 1)
-                    if par not in links_dict:
-                        links_dict[par] = {"distanciaKm": distancia, "pgen": pgen, "lastUpdated": ts_nodo}
-                    else:
-                        if ts_nodo > links_dict[par]["lastUpdated"]:
-                            links_dict[par]["distanciaKm"] = distancia
-                            links_dict[par]["pgen"] = pgen
-                            links_dict[par]["lastUpdated"] = ts_nodo
+        for node in nodos:
+            ts = node.get("lastUpdated", 0)
+            for neighbor in node.get("neighbors", []):
+                sid, tid = node["id"], neighbor.get("id")
+                if not tid:
+                    continue
+                pair = tuple(sorted([sid, tid]))
+                if pair not in links_dict or ts > links_dict[pair]["lastUpdated"]:
+                    links_dict[pair] = {
+                        "distanciaKm": neighbor.get("distanceKm", 0),
+                        "pgen": neighbor.get("pgen", 1),
+                        "lastUpdated": ts,
+                        # carry only neighbor (target) coordinates if present
+                        "targetLat": neighbor.get("lat"),
+                        "targetLon": neighbor.get("lon")
+                    }
 
+        # Final link list (no sourceLat/sourceLon)
         links = [
-            {"source": par[0], "target": par[1], "distanciaKm": info["distanciaKm"], "pgen": info["pgen"]}
-            for par, info in links_dict.items()
+            {
+                "source": pair[0],
+                "target": pair[1],
+                "distanciaKm": info["distanciaKm"],
+                "pgen": info["pgen"],
+                "targetLat": info["targetLat"],
+                "targetLon": info["targetLon"]
+            }
+            for pair, info in links_dict.items()
         ]
+
         
         return jsonify({"nodes": nodos, "links": links})
 

@@ -9,6 +9,7 @@ import subprocess
 import requests
 import queue
 event_queue = queue.Queue()
+import os
 
 def port_available(port: int) -> bool:
     """Returns True if the port is free on localhost."""
@@ -44,53 +45,79 @@ receiver_started = False
 sender_started = False
 
 def app_open(PUERTO, listener_port):
-    # Diccionario que mapea puertos a nodos completos
+    # Json that contains all the nodes in the network
     PORT_NODE_MAP = {
         5000: {
-            "id": "node_alice",
-            "name": "Alice",
-            "lat": 40.4373,
-            "lon": -3.8349,
-            "roles": ["emisor", "receptor"],
-            "neighbors": [], 
+            "id": "node_rectorado_upm",
+            "name": "Rectorado UPM",
+            "lat": 40.448240,
+            "lon": -3.717599,
+            "pswap": 0.85,
+            "roles": ["emisor", "receptor", "repeater"],
+            "neighbors": [],
             "parEPR": []
         },
+
         5002: {
-            "id": "node_bob",
-            "name": "Bob",
-            "lat": 40.4210,
-            "lon": -3.7074,
-            "roles": ["receptor", "repeater"],
+            "id": "node_cedint_upm",
+            "name": "Cedint UPM",
+            "lat": 40.4042562,
+            "lon": -3.8355074,
+            "pswap": 0.90,
+            "roles": ["emisor", "receptor", "repeater"],
             "neighbors": [
-                {"id": "node_alice", "distanceKm": 50, "pgen": 0.7}
+            { 
+                "id": "node_rectorado_upm", 
+                "lat": 40.448240, 
+                "lon": -3.717599, 
+                "distanceKm": 23.3, 
+                "pgen": 0.85 
+            }
             ],
             "parEPR": []
         },
+
         5003: {
-            "id": "node_charlie",
-            "name": "Charlie",
-            "lat": 40.4830,
-            "lon": -3.3630,
-            "roles": ["emisor", "repeater", "receptor"],
+            "id": "node_etsiinf_upm",
+            "name": "ETSIINF UPM",
+            "lat": 40.406194,
+            "lon": -3.8390397,
+            "pswap": 0.88,
+            "roles": ["emisor", "receptor", "repeater"],
             "neighbors": [
-                {"id": "node_bob", "distanceKm": 40, "pgen": 0.8}
+            { 
+                "id": "node_cedint_upm", 
+                "lat": 40.4042562, 
+                "lon": -3.8355074, 
+                "distanceKm": 1, 
+                "pgen": 0.9 
+            }
             ],
             "parEPR": []
         },
+
         5004: {
-            "id": "node_eve",
-            "name": "Eve",
-            "lat": 40.3900,
-            "lon": -3.7030,
-            "roles": ["emisor", "repeater", "receptor"],
+            "id": "node_cait_upm",
+            "name": "CAIT UPM",
+            "lat": 40.4079790,
+            "lon": -3.8346741,
+            "pswap": 0.92,
+            "roles": ["emisor", "receptor"],
             "neighbors": [
-                {"id": "node_charlie", "distanceKm": 30, "pgen": 0.9}
+            { 
+                "id": "node_etsiinf_upm", 
+                "lat": 40.406194, 
+                "lon": -3.8390397, 
+                "distanceKm": 1, 
+                "pgen": 0.9 
+            }
             ],
             "parEPR": []
         }
     }
 
     nodo_info = PORT_NODE_MAP.get(PUERTO, {"id": "node_unknown", "name": "Desconocido", "neighbors": []})
+    print(nodo_info)
 
     # --- Auxiliar: obtener puerto a partir del id ---
     def get_port_by_id(node_id: str) -> int:
@@ -125,6 +152,7 @@ def app_open(PUERTO, listener_port):
 
             if not sender_started:
                 print("[INFO] Starting sender.py for the first time")
+                print(node_info)
                 subprocess.Popen([
                     "python", "sender.py",
                     source_id, target_id,
@@ -317,6 +345,7 @@ def app_open(PUERTO, listener_port):
         print("Enviando a Emisor y a Master: ",nodo_info)
         notificar_master_parEPR(nodo_info)
         return jsonify({"status": "updated", "parEPR": nodo_info["parEPR"]})
+    
     @app.route("/parEPR/failed_pur", methods=["POST"])
     def parEPR_failed_pur():
         data = request.get_json()
@@ -372,26 +401,25 @@ def app_open(PUERTO, listener_port):
     @app.route("/update", methods=["POST"])
     def update():
         data = request.get_json()
-
+        print(data)
         for key in ["id", "name", "pswap", "roles", "neighbors", "parEPR"]:
             if key in data:
                 nodo_info[key] = data[key]
 
         source = data.get("source")
         target = data.get("target")
-        distancia = data.get("distanciaKm")
-        pgen = data.get("pgen")
-        if source and target and distancia is not None:
-            if nodo_info.get("id") == source:
-                for v in nodo_info.get("neighbors", []):
-                    if v.get("id") == target:
-                        v["distanceKm"] = distancia
-                        v["pgen"] = pgen
-            if nodo_info.get("id") == target:
-                for v in nodo_info.get("neighbors", []):
-                    if v.get("id") == source:
-                        v["distanceKm"] = distancia
-                        v["pgen"] = pgen
+        fields = ["distanceKm", "pgen", "lat", "lon"]
+
+        if source and target:
+            for node_id, neighbor_id in [(source, target), (target, source)]:
+                if nodo_info.get("id") == node_id:
+                    for v in nodo_info.get("neighbors", []):
+                        if v.get("id") == neighbor_id:
+                            for f in fields:
+                                if f in data:
+                                    v[f] = data[f]
+
+
 
             vecino_id = target if nodo_info["id"] == source else source
             vecino_port = get_port_by_id(vecino_id)
@@ -401,6 +429,7 @@ def app_open(PUERTO, listener_port):
                 print(f"Error propagando actualización a {vecino_id}: {e}")
 
         nodo_info["lastUpdated"] = data.get("lastUpdated", time())
+        event_queue.put("update")
         return jsonify({"status": "ok", "nodo_info": nodo_info})
 
     @app.route("/mandate", methods=["POST"])
@@ -425,7 +454,7 @@ def app_open(PUERTO, listener_port):
         return jsonify({"status": "ok", "ORDERS": ORDERS})
     
 
-    @app.route("/mandate/stream")
+    @app.route("/updates/stream")
     def mandate_stream():
         def event_stream():
             msg = event_queue.get()  #  espera bloqueante

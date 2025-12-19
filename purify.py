@@ -143,7 +143,7 @@ def purify(node_info, master_id, my_port=None, emitter_port=None):
         nuevo_epr = {
             "id": master_id,
             "vecino": epr2["vecino"],
-            "state": "purificado",
+            "state": "purified",
             "medicion": epr2.get("medicion"),
             "distancia_nodos": epr2.get("distancia_nodos"),
             "t_gen": epr2.get("t_gen"),

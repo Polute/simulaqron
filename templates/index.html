@@ -263,53 +263,56 @@
             icon.textContent = body.classList.contains("day") ? "🌞" : "🌙";
         });
 
-        // Cargar nodos en Analytics
         async function loadNodes() {
-            try {
-                const urls = ["http://localhost:5000/info","http://localhost:5002/info","http://localhost:5003/info"];
-                const container = document.getElementById("nodesContainer");
-                container.innerHTML = "";
-                    for (const url of urls) {
-                    const resp = await fetch(url);
-                    const data = await resp.json();
-                    const card = document.createElement("div");
-                    card.className = "node-card";
-                    card.innerHTML = `
-                        <h3>${data.name} (${data.id})</h3>
-                        <p class="roles"><strong>Roles:</strong> ${data.roles.join(", ")}</p>
-                        <p><strong>Neighbors:</strong> ${
-                        data.neighbors.map(n => `${n.id} (${n.distanceKm} km)`).join(", ")
-                        }</p>
-                        <div class="table-wrapper">
-                        <table class="analytics-table">
-                            <thead>
-                            <tr>
-                                <th>ID</th><th>Neighbor</th><th>Distance</th><th>Status</th>
-                                <th>t_gen</th><th>t_recv</th><th>Δt</th><th>w_out</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            ${data.parEPR.map(p => `
-                                <tr>
-                                <td>${p.id}</td>
-                                <td>${p.vecino}</td>
-                                <td>${p.distancia_nodos}</td>
-                                <td class="state ${p.state}">${p.state}</td>
-                                <td>${p.t_gen}</td>
-                                <td>${p.t_recv}</td>
-                                <td>${p.t_diff}</td>
-                                <td>${p.w_out}</td>
-                                </tr>
-                            `).join("")}
-                            </tbody>
-                        </table>
-                        </div>`;
-                    container.appendChild(card);
+            const urls = ["http://localhost:5000/info", "http://localhost:5002/info", "http://localhost:5003/info"];
+            const container = document.getElementById("nodesContainer");
+            container.innerHTML = "";
+
+            for (const url of urls) {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    // Stop immediately if one fetch fails
+                    container.textContent = `Error fetching ${url}: ${resp.status} ${resp.statusText}`;
+                    return; // stop the function
                 }
-            } catch (err) {
-                document.getElementById("nodesContainer").textContent = "Error: " + err;
+                const data = await resp.json();
+
+                const card = document.createElement("div");
+                card.className = "node-card";
+                card.innerHTML = `
+                    <h3>${data.name} (${data.id})</h3>
+                    <p class="roles"><strong>Roles:</strong> ${data.roles.join(", ")}</p>
+                    <p><strong>Neighbors:</strong> ${
+                        data.neighbors.map(n => `${n.id} (${n.distanceKm} km)`).join(", ")
+                    }</p>
+                    <div class="table-wrapper">
+                    <table class="analytics-table">
+                        <thead>
+                        <tr>
+                            <th>ID</th><th>Neighbor</th><th>Distance</th><th>Status</th>
+                            <th>t_gen</th><th>t_recv</th><th>Δt</th><th>w_out</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        ${data.parEPR.map(p => `
+                            <tr>
+                            <td>${p.id}</td>
+                            <td>${p.vecino}</td>
+                            <td>${p.distancia_nodos}</td>
+                            <td class="state ${p.state}">${p.state}</td>
+                            <td>${p.t_gen}</td>
+                            <td>${p.t_recv}</td>
+                            <td>${p.t_diff}</td>
+                            <td>${p.w_out}</td>
+                            </tr>
+                        `).join("")}
+                        </tbody>
+                    </table>
+                    </div>`;
+                container.appendChild(card);
             }
         }
+
     </script>
     <script>
         // --- DRAG DESDE LA PALETA ---
@@ -904,7 +907,6 @@
         if (rol === "master") {
             const nodo_info = JSON.parse('{{ nodo_info|tojson|safe }}');
             console.log("Objeto nodo_info recibido:", nodo_info);
-
             if (nodo_info.nodes && nodo_info.nodes.length > 0) {
                 // Inicializar nodos desde el backend (ya incluye predefinidos si hace falta)
                 nodes = nodo_info.nodes;
@@ -916,10 +918,13 @@
                 nodes.forEach(nodo => {
                     if (Array.isArray(nodo.neighbors)) {
                         nodo.neighbors.forEach(vecino => {
+                            if (!vecino) return; // skip null/undefined neighbors
                             const link = {
                                 source: nodo.id,
                                 target: vecino.id,
                                 distanciaKm: vecino.distanceKm,
+                                lat: vecino.lat,
+                                lon: vecino.lon,
                                 pgen: vecino.pgen
                             };
                             links.push(link);
@@ -969,11 +974,10 @@
 
         function obtenerPuertoDesdeId(id) {
             const mapa = {
-                "node_alice": 5000,
-                "node_bob": 5002,
-                "node_charlie": 5003,
-                "node_eve": 5004
-
+                "node_rectorado_upm": 5000,
+                "node_cedint_upm": 5002,
+                "node_etsiinf_upm": 5003,
+                "node_cait_upm": 5004
             };
             return mapa[id];
         }
@@ -1107,6 +1111,8 @@
                                             linksDict[par] = {
                                                 source: nodoKey,
                                                 target: vecinoKey,
+                                                targetLat: vecino.lat,
+                                                targetLon: vecino.lon,
                                                 distanciaKm: vecino.distanceKm,
                                                 pgen: vecino.pgen,
                                                 lastUpdated: ts
@@ -1116,7 +1122,8 @@
                                 }
                             });
                             Object.values(linksDict).forEach(l => {
-                                links.push({ source: l.source, target: l.target, distanciaKm: l.distanciaKm, pgen: l.pgen });
+                                links.push({ source: l.source, target: l.target, targetLat: l.lat,
+                                                targetLon: l.lon, distanciaKm: l.distanciaKm, pgen: l.pgen });
                             });
 
                             crearBloquesDinamicos(nodes);
@@ -1137,6 +1144,7 @@
             updateNodesBtn.addEventListener("click", () => {
                 nodes.forEach(node => {
                     const puerto = obtenerPuertoDesdeId(node.id);
+                    console.log(puerto);
                     if (!puerto) return;
                     const vecinosSimetricos = [];
                     nodes.forEach(other => {
@@ -1145,9 +1153,19 @@
                             const otroVecino = other.neighbors.find(v => v.id === node.id);
                             const distanciaKm = (esteVecino && esteVecino.distanceKm) || (otroVecino && otroVecino.distanceKm);
                             const pgen = (esteVecino && esteVecino.pgen) || (otroVecino && otroVecino.pgen);
-                            if (distanciaKm !== undefined) vecinosSimetricos.push({ id: other.id, distanceKm: distanciaKm, pgen });
+                            // default: target coords
+                            let lat = other.lat;
+                            let lon = other.lon;
+
+                            // if they coincide with the current node, switch
+                            if (lat === node.lat && lon === node.lon) {
+                                lat = node.lat;
+                                lon = node.lon;
+                            }
+                            if (distanciaKm !== undefined) vecinosSimetricos.push({ id: other.id, distanceKm: distanciaKm, lat, lon, pgen });
                         }
                     });
+                    console.log(vecinosSimetricos);
                     fetch(`http://127.0.0.1:${puerto}/update`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -1588,7 +1606,7 @@
 
             historial.forEach(epr => {
                 const fila = document.createElement("tr");
-                if (epr.state === "purificado") fila.classList.add("fila-purificada");
+                if (epr.state === "purified") fila.classList.add("fila-purificada");
 
                 fila.innerHTML = `
                     <td>${epr.id}</td>
@@ -1600,8 +1618,8 @@
                     <td>${epr.t_recv ?? ""}</td>
                     <td>${formatNumber(epr.t_diff)}</td>
                     <td>${epr.medicion ?? ""}</td>
-                    <td>${epr.state === "purificado" ? (epr.purificado_de?.join(", ") ?? "") : ""}</td>
-                    <td>${epr.state === "purificado" ? (epr.t_pur ?? "") : ""}</td>
+                    <td>${epr.state === "purified" ? (epr.purificado_de?.join(", ") ?? "") : ""}</td>
+                    <td>${epr.state === "purified" ? (epr.t_pur ?? "") : ""}</td>
                     <td>${epr.ts_print ? new Date(epr.ts_print).toLocaleTimeString() : ""}</td>
                 `;
                 tbody.appendChild(fila);

@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Nodo {{ nodo_info.name }}</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -39,12 +41,16 @@
             background-color: #eeeeee;
         }
 
-        #canvas {
+        #map-wrapper {
+            position: relative;
+            height: 600px;
+        }
+        #map {
             width: 100%;
-            height: 400px;
-            border: 1px solid #ccc;
-            background-color: #f0f0f0;
-            cursor: grab;
+            height: 100%;
+        }
+        svg {
+            overflow: visible;
         }
 
         .link {
@@ -117,16 +123,23 @@
             Mapa del Nodo {{ nodo_info.name }}
             <button onclick="window.open('/info', '_blank')">Ver JSON del Nodo</button>
         </h2>
-        <svg id="canvas"></svg>
+        <div id="map-wrapper">
+            <div id="map"></div>
+        </div>
 
-        <h3>Información del Nodo</h3>
+        <!-- Leaflet JS -->
+        <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+        <!-- D3.js -->
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+
+        <h3>Nodo Info</h3>
         <table id="tabla-nodo">
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Nombre</th>
-                    <th>Roles</th>
-                    <th>pswap</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Pswap</th>
                 </tr>
             </thead>
             <tbody>
@@ -145,10 +158,10 @@
             </tbody>
         </table>
 
-        <h3>Vecinos</h3>
+        <h3>Links</h3>
         <table id="tabla-aristas">
             <thead>
-                <tr><th>Source</th><th>Target</th><th>Distancia (km)</th><th>pgen</th></tr>
+                <tr><th>Source</th><th>Target</th><th>Distance (km)</th><th>Pgen</th></tr>
             </thead>
             <tbody>
                 {% for vecino in nodo_info.get("neighbors", []) %}
@@ -156,8 +169,8 @@
                     <tr>
                         <td>{{ nodo_info.id }}</td>
                         <td>{{ vecino.id }}</td>
-                        <td><input type="number" class="distInput" value="{{ vecino.distanceKm }}"></td>
-                        <td><input type="number" class="pgenInput" value="{{ vecino.pgen }}"></td>
+                        <td><input type="number" class="distInput" step="0.1" value="{{ vecino.distanceKm }}"></td>
+                        <td><input type="number" class="pgenInput" min="0" max="1" step="0.01" value="{{ vecino.pgen }}"></td>
                     </tr>
                     {% endif %}
                 {% endfor %}
@@ -170,317 +183,340 @@
 </div>
 
 <script>
-window.onload = function () {
-    const nodo = JSON.parse('{{ nodo_info|tojson|safe }}');
-    const nodo_id = nodo.id;
-    const svg = document.getElementById("canvas");
-    const ns = "http://www.w3.org/2000/svg";
+    window.onload = function () {
+        // Parse nodo_info from backend
+        const nodo = JSON.parse('{{ nodo_info|tojson|safe }}');
 
-    function actualizarNodo() {
-        fetch("/info")
-            .then(res => res.json())
-            .then(data => {
-                console.log("Datos recibidos de /info:", data);
-                // actualizar nodo global
-                Object.assign(nodo, data);
+        // Inicializar mapa Leaflet
+        const map = L.map('map').setView([nodo.lat, nodo.lon], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
 
-                // actualizar inputs
-                document.getElementById("nameInput").value = data.name;
-                document.getElementById("pswapInput").value = data.pswap || 0;
-                document.querySelectorAll(".roleChk").forEach(chk => {
-                    chk.checked = data.roles.includes(chk.value);
-                });
+        // Añadir capa SVG para D3
+        const svgLayer = L.svg().addTo(map);
+        const svg = d3.select("#map").select("svg");
 
-                // actualizar tabla vecinos
-                const tbody = document.querySelector("#tabla-aristas tbody");
-                tbody.innerHTML = "";
-                data.neighbors.forEach((vecino, idx) => {
-                    const tr = document.createElement("tr");
-                    tr.innerHTML = `
-                        <td>${data.id}</td>
-                        <td>${vecino.name || vecino.id}</td>
-                        <td><input type="number" class="distInput" value="${vecino.distanceKm}"></td>
-                        <td><input type="number" class="pgenInput" value="${vecino.pgen}"></td>
-                    `;
-                    tbody.appendChild(tr);
+        // Arrays globales de nodos y enlaces
+        let nodes = [nodo];
+        let links = [];
 
-                    // seleccionar el input recién creado
-                    const input = tr.querySelector(".distInput");
-
-                    // enganchar eventos al input
-                    input.addEventListener("focus", pausarActualizaciones);
-                    input.addEventListener("blur", reanudarActualizaciones);
-                    input.addEventListener("change", e => {
-                        const nuevaDistancia = parseFloat(e.target.value);
-                        nodo.neighbors[idx].distanceKm = new_Distance;
-                        nodo.neighbors[idx].pgen = new_pgen;
-
-                        const vecinoid = nodo.neighbors[idx].id;
-
-                        // enviar actualización al backend
-                        fetch("/update", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                source: nodo.id,
-                                target: vecinoid,
-                                distanciaKm: new_Distance,
-                                pgen: new_pgen,
-                                lastUpdated: Date.now()
-                            })
-                        });
-                    });
-                });
-
-                drawMapa();
-            })
-            .catch(console.error);
-    }
-
-
-
-
-    // Actualizar nombre del nodo
-    document.getElementById("nameInput").addEventListener("change", e => {
-        fetch("/update", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: e.target.value, lastUpdated: Date.now() })
+        // Si el nodo tiene vecinos, añadirlos como nodos y enlaces
+        nodo.neighbors.forEach((vecino, i) => {
+            // Si no tiene lat/lon, asignar aleatorio alrededor
+            if (!vecino.lat || !vecino.lon) {
+                const radius = 0.01; // ~1 km
+                let angle;
+                if (nodo.neighbors.length === 2) {
+                    angle = i === 0 ? 0 : Math.PI;
+                } else {
+                    angle = Math.random() * 2 * Math.PI;
+                }
+                vecino.lat = nodo.lat + radius * Math.cos(angle);
+                vecino.lon = nodo.lon + radius * Math.sin(angle);
+            }
+            nodes.push(vecino);
+            links.push({ source: nodo.id, target: vecino.id });
         });
-    });
 
+        let draggingNode = null;
+        let linkStart = null;
 
-    // Actualizar pswap
-    document.getElementById("pswapInput").addEventListener("change", e => {
-        fetch("/update", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pswap: parseFloat(e.target.value), lastUpdated: Date.now() })
-        });
-    });
+        // -------------------- DRAW FUNCTION --------------------
+        function draw() {
+            svg.selectAll("*").remove();
 
-    // Actualizar roles
-    document.querySelectorAll(".roleChk").forEach(chk => {
-        chk.addEventListener("change", () => {
-            const roles = Array.from(document.querySelectorAll(".roleChk"))
-                .filter(c => c.checked)
-                .map(c => c.value);
-            fetch("/update", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ roles, lastUpdated: Date.now() })
+            // Dibujar enlaces
+            links.forEach(link => {
+                const sourceNode = nodes.find(n => n.id === link.source);
+                const targetNode = nodes.find(n => n.id === link.target);
+                if (!sourceNode || !targetNode) return;
+
+                const sourcePoint = map.latLngToLayerPoint([sourceNode.lat, sourceNode.lon]);
+                const targetPoint = map.latLngToLayerPoint([targetNode.lat, targetNode.lon]);
+
+                svg.append("line")
+                    .attr("x1", sourcePoint.x)
+                    .attr("y1", sourcePoint.y)
+                    .attr("x2", targetPoint.x)
+                    .attr("y2", targetPoint.y)
+                    .attr("stroke", "#0b3c7a")
+                    .attr("stroke-width", 3)
+                    .attr("opacity", 0.9);
             });
-        });
-    });
 
-    // Preparar vecinos con posiciones iniciales
-    const vecinos = nodo.neighbors.map((vecino, i) => {
-        const angle = (2 * Math.PI * i) / nodo.neighbors.length;
-        return {
-            ...vecino,
-            x: nodo.x + 100 * Math.cos(angle),
-            y: nodo.y + 100 * Math.sin(angle)
-        };
-    });
+            // Dibujar nodos
+            nodes.forEach(node => {
+                const point = map.latLngToLayerPoint([node.lat, node.lon]);
 
-    function drawMapa() {
-        svg.innerHTML = "";
+                // Círculo
+                svg.append("circle")
+                    .attr("cx", point.x)
+                    .attr("cy", point.y)
+                    .attr("r", 14)
+                    .attr("fill", "#054eb5")
+                    .attr("opacity", 0.85);
 
-        // Recalcular posiciones de vecinos en cada redibujo
-        const vecinos = nodo.neighbors.map((vecino, i) => {
-            const angle = (2 * Math.PI * i) / nodo.neighbors.length;
-            return {
-                ...vecino,
-                x: nodo.x + 100 * Math.cos(angle),
-                y: nodo.y + 100 * Math.sin(angle)
-            };
-        });
+                // Etiqueta
+                svg.append("text")
+                    .attr("x", point.x)
+                    .attr("y", point.y - 15)
+                    .attr("text-anchor", "middle")
+                    .text(node.name || node.id)
+                    .attr("fill", "black");
+            });
+        }
 
-        // Nodo central
-        const centralCircle = document.createElementNS(ns, "circle");
-        centralCircle.setAttribute("cx", nodo.x);
-        centralCircle.setAttribute("cy", nodo.y);
-        centralCircle.setAttribute("r", 20);
-        centralCircle.setAttribute("fill", "lightblue");
-        centralCircle.style.cursor = "grab";
-        svg.appendChild(centralCircle);
+        // -------------------- MAP EVENTS --------------------
 
-        const centralLabel = document.createElementNS(ns, "text");
-        centralLabel.setAttribute("x", nodo.x);
-        centralLabel.setAttribute("y", nodo.y + 40);
-        centralLabel.setAttribute("text-anchor", "middle");
-        centralLabel.textContent = nodo.id;
-        svg.appendChild(centralLabel);
-
-        // Vecinos y enlaces
-        vecinos.forEach((vecino, i) => {
-            const line = document.createElementNS(ns, "line");
-            line.setAttribute("x1", nodo.x);
-            line.setAttribute("y1", nodo.y);
-            line.setAttribute("x2", vecino.x);
-            line.setAttribute("y2", vecino.y);
-            line.setAttribute("stroke", "#999");
-            line.setAttribute("stroke-width", "2");
-            svg.appendChild(line);
-
-            const vCircle = document.createElementNS(ns, "circle");
-            vCircle.setAttribute("cx", vecino.x);
-            vCircle.setAttribute("cy", vecino.y);
-            vCircle.setAttribute("r", 15);
-            vCircle.setAttribute("fill", "orange");
-            vCircle.style.cursor = "grab";
-            svg.appendChild(vCircle);
-
-            const vLabel = document.createElementNS(ns, "text");
-            vLabel.setAttribute("x", vecino.x);
-            vLabel.setAttribute("y", vecino.y + 25);
-            vLabel.setAttribute("text-anchor", "middle");
-            vLabel.textContent = vecino.id;
-            svg.appendChild(vLabel);
-        });
-
-        // Arrastrar nodo central
-        let draggingCentral = false;
-        let offsetX = 0, offsetY = 0;
-
-        centralCircle.addEventListener("mousedown", e => {
-            draggingCentral = true;
-            offsetX = e.offsetX - nodo.x;
-            offsetY = e.offsetY - nodo.y;
-        });
-
-        svg.addEventListener("mousemove", e => {
-            if (draggingCentral) {
-                nodo.x = e.offsetX - offsetX;
-                nodo.y = e.offsetY - offsetY;
-                drawMapa(); // redibuja con nuevas posiciones
+        map.on("mousemove", e => {
+            if (draggingNode) {
+                draggingNode.lat = e.latlng.lat;
+                draggingNode.lon = e.latlng.lng;
+                draw();
             }
         });
 
-        svg.addEventListener("mouseup", () => draggingCentral = false);
-        svg.addEventListener("mouseleave", () => draggingCentral = false);
-
-        // Arrastrar vecinos
-        const circles = svg.querySelectorAll("circle");
-        const labels = svg.querySelectorAll("text");
-        const lines = svg.querySelectorAll("line");
-
-        vecinos.forEach((vecino, i) => {
-            let isDragging = false;
-            let offsetX, offsetY;
-            const circle = circles[i + 1];
-            const label = labels[i + 1];
-            const line = lines[i];
-
-            circle.addEventListener("mousedown", e => {
-                isDragging = true;
-                offsetX = e.offsetX - vecino.x;
-                offsetY = e.offsetY - vecino.y;
-            });
-
-            svg.addEventListener("mousemove", e => {
-                if (!isDragging) return;
-                vecino.x = e.offsetX - offsetX;
-                vecino.y = e.offsetY - offsetY;
-                circle.setAttribute("cx", vecino.x);
-                circle.setAttribute("cy", vecino.y);
-                label.setAttribute("x", vecino.x);
-                label.setAttribute("y", vecino.y + 25);
-                line.setAttribute("x2", vecino.x);
-                line.setAttribute("y2", vecino.y);
-            });
-
-            svg.addEventListener("mouseup", () => isDragging = false);
-            svg.addEventListener("mouseleave", () => isDragging = false);
+        map.on("mouseup", () => {
+            draggingNode = null;
         });
-    }
+
+        map.on("zoom move", draw);
 
 
-    drawMapa();
+        // Primer dibujo
+        draw();
+        let lastInfo = [];  // Local cache of the last info of the node
+        function actualizarNodo() {
+            fetch("/info")
+                .then(res => res.json())
+                .then(data => {
+                    console.log("Datos recibidos de /info:", data);
+                    // Comparar con las últimas
+                    const info = JSON.stringify(data);
+                    const otherInfo = JSON.stringify(lastInfo);
+                    draw()
+                    if(info != otherInfo){
+                        Object.assign(nodo, data);
+                        // Update nodes and links for the map overlay
+                        nodes = [nodo]; // main node
+                        links = [];
 
-    const preOrdenes = document.getElementById("ordenesNodo");
-    let ultimasOrdenes = [];  // cache local de las últimas órdenes
+                        data.neighbors.forEach(vecino => {
+                            // Assign temporary coordinates if missing
+                            if (!vecino.lat || !vecino.lon) {
+                                const radius = 0.01;
+                                const angle = Math.random() * 2 * Math.PI;
+                                vecino.lat = nodo.lat + radius * Math.cos(angle);
+                                vecino.lon = nodo.lon + radius * Math.sin(angle);
+                            }
 
-    function actualizarOrdenes() {
-        fetch("/orders")
-            .then(res => res.json())
-            .then(data => {
-                if (!data || data.length === 0) {
-                    preOrdenes.textContent = "No hay órdenes aún.";
-                    return;
-                }
+                            nodes.push(vecino);
+                            links.push({ source: nodo.id, target: vecino.id });
+                        });
 
-                // Mostrar las órdenes
-                preOrdenes.textContent = data
-                    .map((o, i) => `${i + 1}. ${JSON.stringify(o)}`)
-                    .join("\n");
+                        // Now redraw the map overlay
+                        draw();
 
-                // Comparar con las últimas
-                const nuevasOrdenes = JSON.stringify(data);
-                const anterioresOrdenes = JSON.stringify(ultimasOrdenes);
+                        // preserve client-side coordinates
+                        if (draggingNode) {
+                            nodo.lat = draggingNode.lat;
+                            nodo.lon = draggingNode.lon;
+                        }
+                        draw();
 
-                if (nuevasOrdenes !== anterioresOrdenes) {
-                    console.log("Órdenes nuevas detectadas, aplicando...");
-                    console.log("Tiene un sleep de 500 ms");
-                    data.forEach((orden, idx) => {
-                        setTimeout(() => {
-                            fetch("/operations", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify(orden)
-                            }).catch(err => console.error("Error aplicando orden:", err));
-                        }, idx * 500); // ⏱ cada orden se retrasa 0.2s respecto a la anterior
-                    });
-                    ultimasOrdenes = data;
-                } else {
-                    console.log("Órdenes iguales, no se reenvían");
-                }
-            })
-            .catch(err => {
-                console.error("Error al obtener órdenes:", err);
-                preOrdenes.textContent = "Error al obtener órdenes.";
-            });
-    }
+                        // Node inputs
+                        document.getElementById("nameInput").value = data.name;
+                        document.getElementById("pswapInput").value = data.pswap || 0;
+                        document.querySelectorAll(".roleChk").forEach(chk => {
+                            chk.checked = data.roles.includes(chk.value);
+                        });
+
+                        // Attach node listeners
+                        document.getElementById("nameInput").onchange = e =>
+                            updateEntity({ type: "node", field: "name", value: e.target.value });
+
+                        document.getElementById("pswapInput").onchange = e =>
+                            updateEntity({ type: "node", field: "pswap", value: parseFloat(e.target.value) });
+
+                        document.querySelectorAll(".roleChk").forEach(chk => {
+                            chk.onchange = () => {
+                                const roles = Array.from(document.querySelectorAll(".roleChk"))
+                                    .filter(c => c.checked)
+                                    .map(c => c.value);
+                                updateEntity({ type: "node", field: "roles", value: roles });
+                            };
+                        });
+
+                        // Neighbor table
+                        const tbody = document.querySelector("#tabla-aristas tbody");
+
+                        // Keep existing rows if they exist, otherwise create new ones
+                        data.neighbors.forEach(vecino => {
+                            // Look for an existing row by vecino.id
+                            let tr = tbody.querySelector(`tr[data-id='${vecino.id}']`);
+                            if (!tr) {
+                                // Create a new row
+                                tr = document.createElement("tr");
+                                tr.dataset.id = vecino.id; // key to identify later
+                                tr.innerHTML = `
+                                    <td>${data.id}</td>
+                                    <td>${vecino.name || vecino.id}</td>
+                                    <td><input type="number" class="distInput" step="0.1"></td>
+                                    <td><input type="number" class="pgenInput" min="0" max="1" step="0.01"></td>
+                                `;
+                                tbody.appendChild(tr);
+
+                                const distInput = tr.querySelector(".distInput");
+                                const pgenInput = tr.querySelector(".pgenInput");
+
+                                // Attach handlers directly to the inputs
+                                distInput.onchange = () =>
+                                    updateEntity({ type: "neighbor", field: "distanceKm", value: parseFloat(distInput.value), neighborId: vecino.id });
+
+                                pgenInput.onchange = () =>
+                                    updateEntity({ type: "neighbor", field: "pgen", value: parseFloat(pgenInput.value), neighborId: vecino.id });
+                            }
+
+                            // Update input values only if the user is not focused on them
+                            const distInput = tr.querySelector(".distInput");
+                            const pgenInput = tr.querySelector(".pgenInput");
+                            if (document.activeElement !== distInput) distInput.value = vecino.distanceKm;
+                            if (document.activeElement !== pgenInput) pgenInput.value = vecino.pgen;
+                        });
 
 
-    const evtSource = new EventSource("/mandate/stream");
-    evtSource.onmessage = function(event) {
-        if (event.data === "mandate") {
-            console.log("Mandato detectado, refrescando órdenes...");
-            actualizarOrdenes();
+                        // Finally, redraw nodes and safely update lastInfo
+                        draw();
+                        lastInfo = JSON.parse(JSON.stringify(data));
+
+                    }
+                })
+                .catch(console.error);
         }
+
+
+
+        function updateEntity({ type, field, value, neighborId = null }) {
+            // Pause polling immediately
+            pausarActualizaciones();
+
+            const payload = {
+                lastUpdated: Date.now()
+            };
+
+            if (type === "node") {
+                payload[field] = value;
+            }
+
+            if (type === "neighbor") {
+                console.log("Cambiando distancia2");
+                payload.source = nodo.id;
+                payload.target = neighborId;
+                payload[field] = value;
+                console.log("Payload",payload);
+            }
+
+            return fetch("/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            })
+            .catch(err => console.error("Update error:", err))
+            .finally(() => {
+                // Resume polling after update finishes
+                reanudarActualizaciones();
+            });
+        }
+
+        const preOrdenes = document.getElementById("ordenesNodo");
+        let ultimasOrdenes = [];  // cache local de las últimas órdenes
+
+        function actualizarOrdenes() {
+            fetch("/orders")
+                .then(res => res.json())
+                .then(data => {
+                    if (!data || data.length === 0) {
+                        preOrdenes.textContent = "No hay órdenes aún.";
+                        return;
+                    }
+
+                    // Mostrar las órdenes
+                    preOrdenes.textContent = data
+                        .map((o, i) => `${i + 1}. ${JSON.stringify(o)}`)
+                        .join("\n");
+
+                    // Comparar con las últimas
+                    const nuevasOrdenes = JSON.stringify(data);
+                    const anterioresOrdenes = JSON.stringify(ultimasOrdenes);
+
+                    if (nuevasOrdenes !== anterioresOrdenes) {
+                        console.log("Órdenes nuevas detectadas, aplicando...");
+                        console.log("Tiene un sleep de 500 ms");
+                        data.forEach((orden, idx) => {
+                            setTimeout(() => {
+                                fetch("/operations", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify(orden)
+                                }).catch(err => console.error("Error aplicando orden:", err));
+                            }, idx * 500); // ⏱ cada orden se retrasa 0.2s respecto a la anterior
+                        });
+                        ultimasOrdenes = data;
+                    } else {
+                        console.log("Órdenes iguales, no se reenvían");
+                    }
+                })
+                .catch(err => {
+                    console.error("Error al obtener órdenes:", err);
+                    preOrdenes.textContent = "Error al obtener órdenes.";
+                });
+        }
+
+
+        const evtSource = new EventSource("/updates/stream");
+        evtSource.onmessage = function(event) {
+            if (event.data === "mandate") {
+                console.log("Mandato detectado, refrescando órdenes...");
+                actualizarOrdenes();
+            }
+            else if(event.data === "update"){
+                console.log("Updates detected, changing info...");
+                actualizarNodo();
+                draw();
+                
+            }
+        };
+
+
+
+        // Llamada inicial
+        actualizarOrdenes();
+        actualizarNodo();
+
+        // Guardar los IDs de los intervalos
+        let nodoInterval = setInterval(actualizarNodo, 2000);
+
+        // Funciones para pausar y reanudar
+        function pausarActualizaciones() {
+            clearInterval(nodoInterval);
+        // clearInterval(ordenesInterval);
+            console.log("Actualizaciones pausadas");
+        }
+
+        function reanudarActualizaciones() {
+            nodoInterval = setInterval(actualizarNodo, 2000);
+        // ordenesInterval = setInterval(actualizarOrdenes, 2000);
+            console.log("Actualizaciones reanudadas");
+        }
+
+        // Detectar cuando el usuario escribe en un input
+        document.querySelectorAll("input, textarea").forEach(el => {
+            el.addEventListener("focus", pausarActualizaciones);
+            el.addEventListener("blur", reanudarActualizaciones);
+        });
     };
 
-
-    // Llamada inicial
-    actualizarOrdenes();
-    actualizarNodo();
-
-    // Guardar los IDs de los intervalos
-    let nodoInterval = setInterval(actualizarNodo, 2000);
-   // let ordenesInterval = setInterval(actualizarOrdenes, 2000);
-
-    // Funciones para pausar y reanudar
-    function pausarActualizaciones() {
-        clearInterval(nodoInterval);
-       // clearInterval(ordenesInterval);
-        console.log("Actualizaciones pausadas");
-    }
-
-    function reanudarActualizaciones() {
-        nodoInterval = setInterval(actualizarNodo, 2000);
-       // ordenesInterval = setInterval(actualizarOrdenes, 2000);
-        console.log("Actualizaciones reanudadas");
-    }
-
-    // Detectar cuando el usuario escribe en un input
-    document.querySelectorAll("input, textarea").forEach(el => {
-        el.addEventListener("focus", pausarActualizaciones);
-        el.addEventListener("blur", reanudarActualizaciones);
-    });
-
-
-    };
 </script>
 </body>
 </html>
