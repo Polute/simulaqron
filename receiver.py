@@ -23,7 +23,7 @@ def monitor_coherence(epr, node_info, conn, my_port, interval=0.01, threshold=1/
     w_in = float(epr.get("w_gen", 1.0))
     t_gen_str = epr.get("t_gen", "0")
     dist_km = float(epr.get("distancia_nodos", 0.0))
-    tcoh = float(node_info.get("tcoh", 10.0))
+    tcoh = float(node_info.get("tcoh", 5.0))
 
     while True:
         # Current timestamp
@@ -117,7 +117,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             t_gen_val, t_recv_val, tdif = calculate_tdiff(t_gen_str, t_recv_str)
 
             dist_km = float(node_info.get("distkm", 0.0))
-            tcoh = float(node_info.get("tcoh", 1.0))
+            tcoh = float(node_info.get("tcoh", 5.0))
             tesp = dist_km / (2.0/3.0 * C)
 
             w_out = w_in * math.exp(-(tdif + tesp) / tcoh)
@@ -376,7 +376,11 @@ def socket_listener(node_info, conn, port, my_port=None, emisor_port=None):
                         order = "Consumed"
                         result = measure_epr(epr_id, node_info, conn, my_port, order)
                         conn_sock.send(json.dumps(result or {"error": "EPR not found"}).encode())
-
+                    elif accion == "monitor_werner":
+                        print("PUR WERNER MONITOR")
+                        pur_epr = payload.get("new_epr", []), 
+                        node_info = payload.get("node_info", []), 
+                        start_monitor(pur_epr, node_info, conn, my_port)
                     elif accion == "do swapping":
                         id_swap = str(payload.get("id", 0))
                         node_info_in = payload.get("node_info", node_info)

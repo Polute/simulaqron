@@ -146,15 +146,17 @@ def recalculate_werner(epr_id, result_recv, conn,
     """Continuously update Werner fidelity until threshold is reached."""
     w_in = float(result_recv.get("w_gen", 1.0))
     t_gen = result_recv.get("t_gen", "0")
-    tcoh = float(result_recv.get("tcoh", 10.0))
+    tcoh = float(result_recv.get("tcoh", 5.0))
+    print(f"[SENDER] Recalculating werner from {epr_id}")
 
     while True:
         t_now = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
         tdif = calculate_tdiff(t_gen, t_now)
         w_out = w_in * math.exp(-tdif / tcoh)
-
         if epr_id in epr_store:
             epr_store[epr_id]["w_out"] = w_out
+        else:
+            epr_store[epr_id] = {"q": None, "w_out": w_out, "other_port": receptor_port}
 
         if w_out <= threshold:
             print(f"[COHERENCE] EPR {epr_id} reached w={w_out:.3f} in {t_now}, measuring...")

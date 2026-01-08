@@ -1,16 +1,42 @@
-import json, sys, random, time, socket, requests
+import json, sys, random, time, socket, requests, math
 
 
 import time
 
-def pedir_medicion(epr_id, listener_port):
-    msg = {"accion": "measure", "id": epr_id}
+def ask_consumed(epr_id, listener_port, accion):
+    msg = {"accion": accion, "id": epr_id}
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect(("localhost", listener_port))
     s.send(json.dumps(msg).encode())
     resp = s.recv(4096).decode()
     s.close()
     return json.loads(resp)
+def monitor_werner(pur_epr, node_info, listener_port):
+    print(["PURIFY: Iniciating monitor werner to receiver"])
+    print(listener_port)
+    msg = {"accion": "monitor_werner", "pur_epr": pur_epr, "node_info": node_info}
+    try:
+        with socket.create_connection(("localhost", listener_port), timeout=3) as s:
+            s.send(json.dumps(msg).encode())
+            resp = s.recv(4096).decode()
+            return json.loads(resp)
+    except Exception as e:
+        print(f"[SOCKET ERROR] Could not connect to {listener_port}: {e}")
+        return None
+
+def starting_werner_recalculate_sender(epr_id, result_recv, listener_emiter_port):
+    print(["PURIFY: Iniciating monitor werner to sender"])
+    msg = {"accion": "recalculate", "id": epr_id, "info": result_recv}
+    print("Sending recalculating from pur")
+    print(listener_emiter_port)
+    try:
+        with socket.create_connection(("localhost", listener_emiter_port), timeout=3) as s:
+            s.send(json.dumps(msg).encode())
+            resp = s.recv(4096).decode()
+            return json.loads(resp)
+    except Exception as e:
+        print(f"[SOCKET ERROR] Could not connect to {listener_emiter_port}: {e}")
+        return None
 
 def pick_pair_same_edge(node_info, timeout=7.0, interval=0.2):
     """
@@ -58,6 +84,7 @@ def pick_pair_same_edge(node_info, timeout=7.0, interval=0.2):
             except Exception as e:
                 print("[DEBUG] Error refreshing node_info:", e)
         print("P...")
+        print(node_info)
         # Wait before retrying
         time.sleep(interval)
 
@@ -65,7 +92,7 @@ def pick_pair_same_edge(node_info, timeout=7.0, interval=0.2):
     return None, None, "none"
 
 
-def send_epr_pu_failed(node_info, master_id, my_port, emitter_port, reason, epr1=None, epr2=None):
+def send_epr_pu_failed(node_info, pur_id, my_port, emitter_port, reason, epr1=None, epr2=None):
     neighbor = None
     if epr2 and "vecino" in epr2:
         neighbor = epr2["vecino"]
@@ -80,11 +107,12 @@ def send_epr_pu_failed(node_info, master_id, my_port, emitter_port, reason, epr1
         purified_from.append(epr2["id"])
 
     new_epr = {
-        "id": master_id,
+        "id": pur_id,
         "state": "failed pur" if reason == "No 2 active EPR" else "failed p_pur",
         "vecino": neighbor,
         "enlace": link,
-        "purificado_de": purified_from
+        "purificado_de": purified_from,
+        "t_pur": time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}",
     }
 
     node_info.setdefault("parEPR", []).append(new_epr)
@@ -100,13 +128,24 @@ def send_epr_pu_failed(node_info, master_id, my_port, emitter_port, reason, epr1
 
     print("[PURIFY] Purification failed; failed EPR registered:", json.dumps(new_epr, indent=2))
 
+def calculate_tdiff(ts1: str, ts2: str) -> float:
+    """Compute time difference ts2 - ts1 for timestamps MM:SS.mmm."""
+    def parse_ts(ts: str) -> float:
+        try:
+            minutes, rest = ts.split(":")
+            seconds, millis = rest.split(".")
+            return int(minutes) * 60 + int(seconds) + int(millis) / 1000.0
+        except Exception:
+            return 0.0
 
-def purify(node_info, master_id, my_port=None, emitter_port=None):
+    return parse_ts(ts2) - parse_ts(ts1)
+
+def purify(node_info, pur_id, my_port=None, emitter_port=None):
     epr1, epr2, status = pick_pair_same_edge(node_info)
 
     if status != "valid":
         reason = "No 2 active EPR"
-        send_epr_pu_failed(node_info, master_id, my_port, emitter_port, reason, epr1, epr2)
+        send_epr_pu_failed(node_info, pur_id, my_port, emitter_port, reason, epr1, epr2)
         print("[PURIFY] No valid pair of active EPRs on the same edge")
         return
 
@@ -121,8 +160,8 @@ def purify(node_info, master_id, my_port=None, emitter_port=None):
         return
 
     try:
-        res1 = pedir_medicion(epr1["id"], lp1)
-        res2 = pedir_medicion(epr2["id"], lp2)
+        res1 = ask_consumed(epr1["id"], lp1, "measure")
+        res2 = ask_consumed(epr2["id"], lp2, "measure")
     except ConnectionRefusedError:
         print("[PURIFY] No se pudo conectar a uno de los listener ports")
         return
@@ -134,14 +173,28 @@ def purify(node_info, master_id, my_port=None, emitter_port=None):
     if w1 is None or w2 is None:
         print("[PURIFY] Faltan w_out para calcular p_pur")
         return
+    t_gen1 = epr1.get("t_gen")
+    t_gen2 = epr1.get("t_gen")
+    tcoh = float(epr1.get("t_coh", 10.0))
 
-    p_pur = (1 + (w1 * w2)) / 2
+    t_now = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
+    
+    tdif1 = calculate_tdiff(t_gen1, t_now)
+    tdif2 = calculate_tdiff(t_gen1, t_now)
+    w_out1 = w1 * math.exp(-tdif1 / tcoh)
+    w_out2 = w2 * math.exp(-tdif2 / tcoh)  
+
+    p_pur = (1 + (w_out1 * w_out2)) / 2
     if random.random() <= p_pur:
-        mejora = (w1 + w2 + 4 * w1 * w2) / (6*p_pur)
+        print(f"[PURIFY] P_pur = {p_pur}")
+        print(f"[PURIFY] w_out1 = {w_out2}")
+        print(f"[PURIFY] w_out2 = {w_out2}")
+        mejora = (w1 + w2 + 4 * w_out1 * w_out2) / (6*p_pur)
+        print(f"[PURIFY] Upgrade = {mejora}")
         w_final = mejora
 
-        nuevo_epr = {
-            "id": master_id,
+        new_epr = {
+            "id": pur_id,
             "vecino": epr2["vecino"],
             "state": "purified",
             "medicion": epr2.get("medicion"),
@@ -156,28 +209,30 @@ def purify(node_info, master_id, my_port=None, emitter_port=None):
             # opcional: no tiene listener_port porque ya está medido
         }
 
-        node_info["parEPR"].append(nuevo_epr)
+        node_info["parEPR"].append(new_epr)
         try:
             if my_port:
-                requests.post(f"http://localhost:{my_port}/parEPR/recv", json=nuevo_epr, timeout=2)
-            if emisor_port:
-                requests.post(f"http://localhost:{emisor_port}/parEPR/recv", json=nuevo_epr, timeout=2)
+                requests.post(f"http://localhost:{my_port}/parEPR/recv", json=new_epr, timeout=2)
+                monitor_werner(new_epr, node_info, my_port+5000)
+            if emiter_port:
+                requests.post(f"http://localhost:{emiter_port}/parEPR/recv", json=new_epr, timeout=2)
+                starting_werner_recalculate_sender(pur_id, new_epr, emiter_port+5000)
         except Exception as e:
             print(f"[PURIFY] Error notificando endpoints: {e}")
 
-        print("[PURIFY] Nuevo EPR purificado creado:", json.dumps(nuevo_epr, indent=2))
+        print("[PURIFY] Nuevo EPR purificado creado:", json.dumps(new_epr, indent=2))
     else:
         reason="Ppur failed"
         print(f"[PURIFY] Ppur: {p_pur}")
-        send_epr_pu_failed(node_info, master_id, my_port, emisor_port, reason, epr1, epr2)
+        send_epr_pu_failed(node_info, pur_id, my_port, emiter_port, reason, epr1, epr2)
         
 
 
 
 if __name__ == "__main__":
     node_info = json.loads(sys.argv[1])
-    master_id = sys.argv[2]
+    pur_id = sys.argv[2]
     my_port = int(sys.argv[3])
-    emisor_port = int(sys.argv[4])
-    purify(node_info, master_id, my_port, emisor_port)
+    emiter_port = int(sys.argv[4])
+    purify(node_info, pur_id, my_port, emiter_port)
 

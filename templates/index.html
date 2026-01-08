@@ -1139,6 +1139,42 @@
 
             // Añadir el botón al mapa
             updateBtn.addTo(map);
+            // Fullscreen button as a Leaflet control
+            const fullscreenBtn = L.control({ position: 'topright' });
+
+            fullscreenBtn.onAdd = function(map) {
+                const btn = L.DomUtil.create('button', '');
+                btn.innerHTML = "Fullscreen";
+
+                // Styles
+                btn.style.padding = "6px 12px";
+                btn.style.backgroundColor = "#2196F3";
+                btn.style.color = "white";
+                btn.style.border = "none";
+                btn.style.borderRadius = "4px";
+                btn.style.cursor = "pointer";
+                btn.style.marginLeft = "5px";
+
+                // Prevent map click propagation
+                L.DomEvent.disableClickPropagation(btn);
+
+                // Toggle fullscreen
+                L.DomEvent.on(btn, 'click', () => {
+                    const wrapper = document.getElementById("map-wrapper");
+
+                    if (!document.fullscreenElement) {
+                        wrapper.requestFullscreen().catch(err => {
+                            console.error("Fullscreen error:", err);
+                        });
+                    } else {
+                        document.exitFullscreen();
+                    }
+                });
+
+                return btn;
+            };
+
+            fullscreenBtn.addTo(map);
 
 
             updateNodesBtn.addEventListener("click", () => {
