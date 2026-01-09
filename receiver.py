@@ -23,7 +23,7 @@ def monitor_coherence(epr, node_info, conn, my_port, interval=0.01, threshold=1/
     w_in = float(epr.get("w_gen", 1.0))
     t_gen_str = epr.get("t_gen", "0")
     dist_km = float(epr.get("distancia_nodos", 0.0))
-    tcoh = float(node_info.get("tcoh", 5.0))
+    tcoh = float(node_info.get("tcoh", 10.0))
 
     while True:
         # Current timestamp
@@ -117,7 +117,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             t_gen_val, t_recv_val, tdif = calculate_tdiff(t_gen_str, t_recv_str)
 
             dist_km = float(node_info.get("distkm", 0.0))
-            tcoh = float(node_info.get("tcoh", 5.0))
+            tcoh = float(node_info.get("tcoh", 10.0))
             tesp = dist_km / (2.0/3.0 * C)
 
             w_out = w_in * math.exp(-(tdif + tesp) / tcoh)
@@ -177,7 +177,7 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
 
         print("ID DEL EPR:", epr_id, "y su emisor:", emisor_port)
         
-        if order != "swapped":
+        if order != "swapped" or order != "consumed":
             m = q.measure()
         else:
             m = None
@@ -371,7 +371,7 @@ def socket_listener(node_info, conn, port, my_port=None, emisor_port=None):
                         )
                         print("[RECEIVER] Initial sync result:", resultado)
 
-                    elif accion == "measure":
+                    elif accion == "purified":
                         epr_id = payload.get("id")
                         order = "Consumed"
                         result = measure_epr(epr_id, node_info, conn, my_port, order)

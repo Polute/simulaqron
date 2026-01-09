@@ -146,7 +146,7 @@ def recalculate_werner(epr_id, result_recv, conn,
     """Continuously update Werner fidelity until threshold is reached."""
     w_in = float(result_recv.get("w_gen", 1.0))
     t_gen = result_recv.get("t_gen", "0")
-    tcoh = float(result_recv.get("tcoh", 5.0))
+    tcoh = float(result_recv.get("tcoh", 8.0))
     print(f"[SENDER] Recalculating werner from {epr_id}")
 
     while True:

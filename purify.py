@@ -112,7 +112,7 @@ def send_epr_pu_failed(node_info, pur_id, my_port, emitter_port, reason, epr1=No
         "vecino": neighbor,
         "enlace": link,
         "purificado_de": purified_from,
-        "t_pur": time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}",
+        "t_pur": time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
     }
 
     node_info.setdefault("parEPR", []).append(new_epr)
@@ -158,31 +158,31 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
     if not lp1 or not lp2:
         print("[PURIFY] Faltan listener_port en los EPR seleccionados")
         return
-
-    try:
-        res1 = ask_consumed(epr1["id"], lp1, "measure")
-        res2 = ask_consumed(epr2["id"], lp2, "measure")
-    except ConnectionRefusedError:
-        print("[PURIFY] No se pudo conectar a uno de los listener ports")
-        return
-
-    epr1["state"], epr1["medicion"] = "medido", res1.get("medicion")
-    epr2["state"], epr2["medicion"] = "medido", res2.get("medicion")
-
+    
     w1, w2 = epr1.get("w_out"), epr2.get("w_out")
     if w1 is None or w2 is None:
         print("[PURIFY] Faltan w_out para calcular p_pur")
         return
     t_gen1 = epr1.get("t_gen")
-    t_gen2 = epr1.get("t_gen")
+    t_gen2 = epr2.get("t_gen")
     tcoh = float(epr1.get("t_coh", 10.0))
 
     t_now = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
     
     tdif1 = calculate_tdiff(t_gen1, t_now)
-    tdif2 = calculate_tdiff(t_gen1, t_now)
+    tdif2 = calculate_tdiff(t_gen2, t_now)
     w_out1 = w1 * math.exp(-tdif1 / tcoh)
-    w_out2 = w2 * math.exp(-tdif2 / tcoh)  
+    w_out2 = w2 * math.exp(-tdif2 / tcoh) 
+    try:
+        if w_out1 < w_out2:
+            id_upgrade_epr = epr2["id"]
+            res1 = ask_consumed(epr1["id"], lp1, "purified")
+        else: 
+            id_upgrade_epr = epr1["id"]
+            res2 = ask_consumed(epr2["id"], lp1, "purified")
+    except ConnectionRefusedError:
+        print("[PURIFY] No se pudo conectar a uno de los listener ports")
+        return 
 
     p_pur = (1 + (w_out1 * w_out2)) / 2
     if random.random() <= p_pur:
@@ -192,12 +192,25 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
         mejora = (w1 + w2 + 4 * w_out1 * w_out2) / (6*p_pur)
         print(f"[PURIFY] Upgrade = {mejora}")
         w_final = mejora
-
-        new_epr = {
-            "id": pur_id,
-            "vecino": epr2["vecino"],
+        new_epr = { 
+            "id": pur_id, 
+            "vecino": epr2["vecino"], 
             "state": "purified",
             "medicion": epr2.get("medicion"),
+            "distancia_nodos": epr2.get("distancia_nodos"),
+            "t_gen": "", 
+            "t_recv": "", 
+            "t_diff": "", 
+            "w_gen": [w_out1,w_out2], 
+            "w_out": w_final, 
+            "purificado_de": [epr1["id"], epr2["id"]], 
+            "t_pur": time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}" 
+            }
+        upgraded_epr = {
+            "id": pur_id,
+            "vecino": epr2["vecino"],
+            "state": "ac",
+            "medicion": "",
             "distancia_nodos": epr2.get("distancia_nodos"),
             "t_gen": epr2.get("t_gen"),
             "t_recv": epr2.get("t_recv"),
@@ -213,9 +226,11 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
         try:
             if my_port:
                 requests.post(f"http://localhost:{my_port}/parEPR/recv", json=new_epr, timeout=2)
+                requests.post(f"http://localhost:{my_port}/parEPR/recv", json=upgraded_epr, timeout=2)
                 monitor_werner(new_epr, node_info, my_port+5000)
             if emiter_port:
                 requests.post(f"http://localhost:{emiter_port}/parEPR/recv", json=new_epr, timeout=2)
+                requests.post(f"http://localhost:{my_port}/parEPR/recv", json=upgraded_epr, timeout=2)
                 starting_werner_recalculate_sender(pur_id, new_epr, emiter_port+5000)
         except Exception as e:
             print(f"[PURIFY] Error notificando endpoints: {e}")
