@@ -101,4 +101,6 @@ plt.yticks(fontsize=16)
 
 plt.grid(True)
 plt.gca().invert_xaxis()  # show 10 → 1
+plt.savefig("plot.png")
 plt.show()
+

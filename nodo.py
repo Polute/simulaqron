@@ -41,8 +41,7 @@ def wait_for_listener(port, timeout=5.0, interval=0.01):
     return False
 ORDERS = []
 # global flag
-receiver_started = False
-sender_started = False
+worker_started = False
 
 def app_open(PUERTO, listener_port):
     # Json that contains all the nodes in the network
@@ -128,43 +127,51 @@ def app_open(PUERTO, listener_port):
     
 
     def aplicar_orden(orden, node_info):
-        global receiver_started, sender_started
+        global worker_started
         accion = orden["accion"]
         source_id = node_info["id"]
         epr_id = orden.get("id")
 
-        print("APLICO ORDEN!!!")
-        print("La cual tiene de node info: ",node_info)
+        print("APPLYING ORDER!!!")
+        print("Order sees node_info as:", node_info)
 
+        # --------------------------------------------------
+        # Generate EPR (this node is the sender)
+        # --------------------------------------------------
         if accion in ["genera EPR", "generar"]:
             target_id = orden["target"]
             source_port = get_port_by_id(source_id)
             target_port = get_port_by_id(target_id)
 
-            # Buscar el pgen del vecino cuyo id coincide con target_id
+            # Find pgen of the neighbor whose id matches target_id
             pgen_source = None
-            for vecino in node_info.get("neighbors", []):
-                if vecino["id"] == target_id:
-                    pgen_source = str(vecino["pgen"])
+            for neighbor in node_info.get("neighbors", []):
+                if neighbor["id"] == target_id:
+                    pgen_source = str(neighbor["pgen"])
                     break
 
-            print(source_id, "va a generarEPR con:", target_id)
+            print(source_id, "will generate EPR with:", target_id)
 
-            if not sender_started:
-                print("[INFO] Starting sender.py for the first time")
+            if not worker_started:
+                print("[INFO] Starting worker.py in sender_init mode for the first time")
                 print(node_info)
                 subprocess.Popen([
-                    "python", "sender.py",
-                    source_id, target_id,
-                    str(source_port), str(target_port),
-                    pgen_source,
+                    "python", "worker.py",
+                    "sender_init",
+                    source_id,             # emitter id
+                    target_id,             # receiver id
+                    str(source_port),      # my_port (this node)
+                    str(target_port),      # target_port (other node)
+                    pgen_source,           # pgen
                     str(epr_id),
                     json.dumps(node_info),
-                    str(listener_port+1000)
+                    str(listener_port)
                 ])
-                sender_started = True
+                worker_started = True
             else:
-                print("[INFO] sender.py already running, send order via socket")
+                print("[INFO] Sender already running, sending order via socket")
+                print("Lo hace en: ")
+                print(listener_port)
                 payload = {
                     "accion": "generate EPR",
                     "id": epr_id,
@@ -174,55 +181,62 @@ def app_open(PUERTO, listener_port):
                     "source_port": source_port,
                     "target_port": target_port,
                     "pgen": pgen_source,
-                    "listener_port": listener_port+1000
+                    "listener_port": listener_port
                 }
-                if wait_for_listener(listener_port+1000):
-                    # connect to the listener and send the order
+                if wait_for_listener(listener_port):
+                    # Connect to the sender listener and send the order
                     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                        s.connect(("localhost", listener_port+1000))
+                        s.connect(("localhost", listener_port))
                         s.send(json.dumps(payload).encode())
                         resp = s.recv(4096).decode()
                         print("[SENDER] Response:", resp)
 
-
+        # --------------------------------------------------
+        # Receive EPR (this node receives an EPR created by another node)
+        # --------------------------------------------------
         elif accion == "recibe EPR":
-            epr_id = orden["id"]  # id del EPR que viene en la ordenente a node_info["parEPR"] y buscar el objeto con ese id
-            epr_list = node_info["parEPR"]
-            timeout = 5.0   # segundos máximos de espera
-            interval = 0.1  # intervalo entre intentos
+            epr_id = orden["id"]  # EPR id specified in the order
+            timeout = 5.0         # max wait time in seconds
+            interval = 0.1        # polling interval
             start = time()
             epr_obj = None
-            print("Buscando")
+
+            print("Searching for EPR in node_info['parEPR']...")
             while time() - start < timeout:
-                epr_obj = next((e for e in node_info["parEPR"] if str(e["id"]) == str(epr_id)), None)
+                epr_obj = next(
+                    (e for e in node_info.get("parEPR", []) if str(e["id"]) == str(epr_id)),
+                    None
+                )
                 print("...\n")
                 if epr_obj:
-                    print(f"[RECEIVER] EPR {epr_id} encontrado")
+                    print(f"[RECEIVER] EPR {epr_id} found")
                     break
                 sleep(interval)
 
             if epr_obj is None:
-                print(f"[RECEIVER] Timeout esperando EPR {epr_id}")
+                print(f"[RECEIVER] Timeout waiting for EPR {epr_id}")
                 return
 
             my_port = get_port_by_id(node_info["id"])
             emisor_port = get_port_by_id(orden["source"])
 
-            print(f"[RECEIVER] Procesando EPR {epr_id} entre {node_info['id']}:{my_port} y {orden['source']}:{emisor_port}")
+            print(f"[RECEIVER] Processing EPR {epr_id} between {node_info['id']}:{my_port} "
+                f"and {orden['source']}:{emisor_port}")
 
-            if not receiver_started:
-                print("[INFO] Starting receiver.py for the first time")
+            if not worker_started:
+                print("[INFO] Starting worker.py in receiver_init mode for the first time")
                 subprocess.Popen([
-                    "python", "receiver.py",
+                    "python", "worker.py",
+                    "receiver_init",
                     json.dumps(epr_obj),
                     json.dumps(node_info),
                     str(my_port),
                     str(emisor_port),
                     str(listener_port)
                 ])
-                receiver_started = True
+                worker_started = True
             else:
-                print("[INFO] receiver.py already running, send order via socket")
+                print("[INFO] Receiver already running, sending order via socket")
                 payload = {
                     "accion": "recibe EPR",
                     "id": epr_id,
@@ -234,18 +248,21 @@ def app_open(PUERTO, listener_port):
                     "listener_port": listener_port
                 }
                 if wait_for_listener(listener_port):
-                    # connect to the listener and send the order
+                    # Connect to the receiver listener and send the order
                     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                        print("USING ",listener_port)
+                        print("USING", listener_port)
                         s.connect(("localhost", listener_port))
                         s.send(json.dumps(payload).encode())
                         resp = s.recv(4096).decode()
                         print("[RECEIVER] Response:", resp)
 
+        # --------------------------------------------------
+        # Purification protocol
+        # --------------------------------------------------
         elif accion in ["purifica", "purificar"]:
-            print(f"[{source_id}] Ejecutando protocolo de purificación...")
+            print(f"[{source_id}] Running purification protocol...")
             my_port = get_port_by_id(node_info["id"])
-            emisor_port = get_port_by_id(orden["con"])   # el source con quien se purifica
+            emisor_port = get_port_by_id(orden["con"])   # node with which we purify
             subprocess.run([
                 "python", "purify.py",
                 json.dumps(node_info),
@@ -254,30 +271,38 @@ def app_open(PUERTO, listener_port):
                 str(emisor_port)
             ], check=True)
 
+        # --------------------------------------------------
+        # Swapping protocol
+        # --------------------------------------------------
         elif accion in ["swap", "swapping"]:
-            print(f"[{source_id}] Ejecutando swapping...")
+            print(f"[{source_id}] Running swapping protocol...")
             payload = {
-                    "accion": "do swapping",
-                    "id": epr_id,
-                    "source": node_info["id"],
-                    "node_info": node_info,
-                    "destinatarios": orden["con"],
-                    "destinatarios_ports": [str(get_port_by_id(n)) for n in orden["con"]],
-                    "pswap": str(node_info.get("pswap", 1)),
-                    "listener_port": listener_port,
-                    "ports_involved": [str(get_port_by_id(n) + 5000) for n in orden["con"]]
-                }
+                "accion": "do swapping",
+                "id": epr_id,
+                "source": node_info["id"],
+                "node_info": node_info,
+                "destinatarios": orden["con"],
+                "destinatarios_ports": [str(get_port_by_id(n)) for n in orden["con"]],
+                "pswap": str(node_info.get("pswap", 1)),
+                "listener_port": listener_port,
+                "ports_involved": [str(get_port_by_id(n) + 4000) for n in orden["con"]]
+            }
             if wait_for_listener(listener_port):
-                # connect to the listener and send the order
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.connect(("localhost", listener_port))
                     s.send(json.dumps(payload).encode())
                     resp = s.recv(4096).decode()
                     print("[RECEIVER] Response:", resp)
+
+        # --------------------------------------------------
+        # Swap received (just logs for now)
+        # --------------------------------------------------
         elif accion in ["swap recibido"]:
-            print("Intento de swap entre: ",orden["con"])
+            print("Swap attempt between:", orden["con"])
+
         else:
-            raise ValueError(f"Acción desconocida: {accion}")
+            raise ValueError(f"Unknown action: {accion}")
+
 
     app = Flask(__name__)
     CORS(app)
