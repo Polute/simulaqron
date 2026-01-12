@@ -130,26 +130,12 @@ def generar_epr(emisor, receptor, conn, emisor_port, receptor_port,
 # Werner decay monitor (sender side)
 # --------------------------------------------------
 
-def monitor_werner_swap(epr_id, node_info, conn, target_port, my_port=None, order=None):
+def monitor_werner_swap(new_id, old_id, new_epr, order):
     """
-    Measure a qubit locally, update local node_info, and notify the target node via HTTP.
+    Erase the old_epr used for swapping, 
+    monitor a qubit locally from a swapping, update local node_info, and notify master.
     """
-    entry = epr_store.get(epr_id)
-    if not entry:
-        return {"error": "EPR not found"}
-
-    q = entry["q"]
-
-    # Perform measurement
-    m = q.measure()
-
-    # Update local state
-    for epr in node_info.get("parEPR", []):
-        if epr["id"] == epr_id:
-            epr["state"] = order
-            epr["medicion"] = m
-
-    del epr_store[epr_id]
+    del epr_store[old_id]
 
     result_measure = {"id": epr_id, "medicion": m, "state": order}
 
@@ -157,8 +143,6 @@ def monitor_werner_swap(epr_id, node_info, conn, target_port, my_port=None, orde
     try:
         if my_port:
             requests.post(f"http://localhost:{my_port}/parEPR/recv", json=result_measure, timeout=2)
-        if target_port:
-            requests.post(f"http://localhost:{target_port}/parEPR/recv", json=result_measure, timeout=2)
     except Exception as e:
         print(f"[MEASURE_SENDER] Error notifying endpoints: {e}")
 
@@ -193,16 +177,7 @@ def recalculate_werner(epr_id, result_recv, conn,
         # Threshold reached → measure previous EPR if requested
         if w_out <= threshold:
             print(f"[COHERENCE] EPR {epr_id} reached w={w_out:.3f} at {t_now}, measuring...")
-            if epr_id_before is not None and my_port and other_port:
-                monitor_werner_swap(
-                    epr_id_before,
-                    node_info,
-                    conn,
-                    target_port=other_port,
-                    my_port=my_port,
-                    order="measure"
-                )
-            elif role == "receiver":
+            if role == "receiver":
                 print(f"Measuring {epr_id}")
                 measure_epr(epr_id, node_info, conn, my_port, order="measure")
             break
@@ -465,12 +440,11 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
     }
     try:
         monitor_msg = {
-            "accion": "watch_over",
-            "id": id_swap,                      # ID of the new swapped EPR
-            "my_port": destinatarios_ports[0],  # first neighbor HTTP port
-            "other_port": destinatarios_ports[1],  # second neighbor HTTP port
-            "EPR_pair": None,
-            "id_before": None
+            "accion": "watch_over_and _kill",
+            "new_id": id_swap,
+            "old_id" : None,
+            "new_epr": swapped_epr.copy,
+            "order": None
         }
 
         if destinatarios_ports and len(destinatarios_ports) == 2 and len(destinatarios) == 2:
@@ -482,9 +456,6 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
             print("Notifying", destinatarios[0], "on port", destinatarios_ports[0])
             requests.post(f"http://localhost:{destinatarios_ports[0]}/parEPR/recv", json=epr_msg1, timeout=2)
 
-            monitor_msg["EPR_pair"] = epr_msg1
-            monitor_msg["id_before"] = epr1['id']
-
             epr_msg2 = swapped_epr.copy()
             epr_msg2["vecino"] = destinatarios[0]
             epr_msg2["w_gen"] = w_gen_tuple[1]
@@ -495,8 +466,13 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
         if my_port:
             requests.post(f"http://localhost:{my_port}/parEPR/swap", json=result_swap, timeout=2)
 
-        # Ask the first neighbor to start monitoring the swapped EPR
+        # Updating their EPR and watch over it, making one of them measured it if it reaches the threshold
+        monitor_msg["old_id"] = epr1["id"]
+        monitor_msg["order"] = "measured" 
         sending_monitor(monitor_msg, ports_involved[0])
+        monitor_msg["old_id"] = epr2["id"]
+        monitor_msg["order"] = "just_watch_over" 
+        sending_monitor(monitor_msg, ports_involved[1])
 
     except Exception as e:
         print(f"[SWAP] Error notifying endpoints: {e}")
@@ -598,7 +574,7 @@ def handle_client_unified(conn_sock,
         # --------------------------------------------------
         # WATCH OVER (swapped EPR monitor)
         # --------------------------------------------------
-        elif accion == "watch_over":
+        elif accion == "watch_over_and _kill":
             start_monitor(
                 payload["id"],              # new swapped EPR id
                 payload.get("EPR_pair"),    # metadata of the new EPR
