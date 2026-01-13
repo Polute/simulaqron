@@ -133,7 +133,12 @@ def app_open(PUERTO, listener_port):
         epr_id = orden.get("id")
 
         print("APPLYING ORDER!!!")
-        print("Order sees node_info as:", node_info)
+        print("\n===== DEBUG: FULL parEPR DUMP =====")
+        for e in node_info.get("parEPR", []):
+            print(f"ID: {e.get('id')}")
+            for k, v in e.items():
+                print(f"   {k}: {v}")
+        print("====================================\n")
 
         # --------------------------------------------------
         # Generate EPR (this node is the sender)
@@ -172,6 +177,8 @@ def app_open(PUERTO, listener_port):
                 print("[INFO] Sender already running, sending order via socket")
                 print("Lo hace en: ")
                 print(listener_port)
+                
+
                 payload = {
                     "accion": "generate EPR",
                     "id": epr_id,
@@ -427,7 +434,7 @@ def app_open(PUERTO, listener_port):
     def update():
         data = request.get_json()
         print(data)
-        for key in ["id", "name", "pswap", "roles", "neighbors", "parEPR"]:
+        for key in ["id", "name", "pswap", "roles", "neighbors"]:
             if key in data:
                 nodo_info[key] = data[key]
 
@@ -456,6 +463,14 @@ def app_open(PUERTO, listener_port):
         nodo_info["lastUpdated"] = data.get("lastUpdated", time())
         event_queue.put("update")
         return jsonify({"status": "ok", "nodo_info": nodo_info})
+    @app.route("/history", methods=["POST"])
+    def update_history():
+        data = request.get_json()
+        print(data)
+        for key in ["parEPR"]:
+            if key in data:
+                nodo_info[key] = data[key]
+
 
     @app.route("/mandate", methods=["POST"])
     def receive_mandate():

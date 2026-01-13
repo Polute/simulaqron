@@ -5,6 +5,9 @@ import time
 
 def ask_consumed(epr_id, listener_port, accion):
     msg = {"accion": accion, "id": epr_id}
+    # Ensure listener_port is an int 
+    listener_port = int(listener_port)
+    
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect(("localhost", listener_port))
     s.send(json.dumps(msg).encode())
@@ -227,11 +230,11 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
             if my_port:
                 requests.post(f"http://localhost:{my_port}/parEPR/recv", json=new_epr, timeout=2)
                 requests.post(f"http://localhost:{my_port}/parEPR/recv", json=upgraded_epr, timeout=2)
-                monitor_werner(new_epr, node_info, my_port+5000)
+                monitor_werner(new_epr, node_info, my_port+4000)
             if emiter_port:
                 requests.post(f"http://localhost:{emiter_port}/parEPR/recv", json=new_epr, timeout=2)
                 requests.post(f"http://localhost:{my_port}/parEPR/recv", json=upgraded_epr, timeout=2)
-                starting_werner_recalculate_sender(pur_id, new_epr, emiter_port+5000)
+                starting_werner_recalculate_sender(pur_id, new_epr, emiter_port+4000)
         except Exception as e:
             print(f"[PURIFY] Error notificando endpoints: {e}")
 
