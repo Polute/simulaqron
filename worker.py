@@ -99,10 +99,12 @@ def generar_epr(emisor, receptor, conn, emisor_port, receptor_port,
         return
 
     try:
-        print("[DEBUG] conn object:", conn)
-        print("[DEBUG] conn.name:", getattr(conn, "name", None))
-        print("[DEBUG] conn._name:", getattr(conn, "_name", None))
-        print("[DEBUG] conn._appID:", getattr(conn, "_appID", None))
+        print("\n================ SIMULAQRON DEBUG ================")
+        print("[DEBUG] Attempting createEPR")
+        print("[DEBUG] Local node:", conn.name)
+        print("[DEBUG] Target node (raw):", repr(receptor))
+        print("==================================================\n")
+
 
         q = conn.createEPR(receptor)
         epr_store[epr_id] = {"q": q, "w_out": 1.0, "other_port": receptor_port}
@@ -138,6 +140,7 @@ def recalculate_werner(epr_id, result_recv, conn,
     Continuously update Werner fidelity until threshold is reached.
     This runs on the node that owns the qubit in epr_store[epr_id].
     """
+
     w_in = float(result_recv.get("w_out", 1.0)) #Recalculates from the last updated Werner
     t_gen = result_recv.get("t_gen", "0")
     tcoh = float(result_recv.get("tcoh", 10.0))
@@ -164,6 +167,8 @@ def recalculate_werner(epr_id, result_recv, conn,
             if role in ("receiver", "kill_if_reached"):
                 print(f"Measuring {epr_id}")
                 measure_epr(epr_id, node_info, conn, my_port, order="measure")
+            elif role == "no_kill":
+                print(f"Changing state{epr_id}")
             break
 
         time.sleep(interval)
@@ -197,11 +202,10 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
         print("EPR ID:", epr_id, ", my_port", my_port,", other_port", other_port)
 
         # Only skip measurement if truly marked as 'swapped' OR 'consumed'
-        if order not in ("swapped", "consumed"):
+        if order not in ("swapped", "consumed", "no_kill"):
             m = q.measure()
         else:
             m = None
-
         for epr in node_info["parEPR"]:
             if epr["id"] == epr_id:
                 epr["state"] = order
@@ -216,7 +220,7 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
             if other_port:
                 requests.post(f"http://localhost:{other_port}/parEPR/recv", json=result_measure, timeout=2)
         except Exception as e:
-            print(f"[RECEIVER] Error notifying endpoints: {e}")
+            print(f"[ORDER] Error notifying endpoints of a measure with ports: {my_port}, {other_port} with this msg: {result_measure} and error: {e}")
 
         return result_measure
 
@@ -321,31 +325,48 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             starting_werner_recalculate_sender(epr_id, resultado_recv, listener_emiter_port)
 
     except Exception as e:
-        print(f"[RECEIVER] Error notifying endpoints: {e}")
+        print(f"[RECEIVER] Error notifying endpoints of a receiving with ports: {my_port}, {emisor_port} with this msg: {resultado_recv} and error: {e}")
 
     return resultado_recv
 
 
-
 def pick_pair_same_edge_swap(node_info, my_port, timeout=5.0, interval=0.01):
     """
-    Wait up to `timeout` seconds for two 'active' EPRs on the same node,
-    but each one must have a different neighbor.
-    Returns (epr1, epr2, status):
-      status = "valid" -> two 'active' with different neighbors
-      status = "none"  -> no usable pair
+    Pick two 'active' EPRs on this node that:
+      - have different neighbors
+      - have NOT been used already in a previous swap (swapper).
     """
     start = time.time()
+
     while time.time() - start < timeout:
-        active = [e for e in node_info.get("parEPR", []) if e.get("state") == "active"]
+        par = node_info.get("parEPR", [])
+
+        # 1) Collect all EPR ids that have already been used in a swapper
+        used_ids = set()
+        for e in par:
+            if e.get("state") == "swapper":
+                parts = str(e.get("id", "")).split("_")
+                used_ids.update(parts)
+
+        # 2) Active EPRs that have not been used in any swapper
+        active = [
+            e for e in par
+            if e.get("state") == "active" and e.get("id") not in used_ids
+        ]
+
+        # 3) Look for a pair with different neighbors
         for e1, e2 in combinations(active, 2):
             if e1.get("vecino") != e2.get("vecino"):
                 return e1, e2, "valid"
+
+        # 4) Refresh node_info and retry
         try:
             node_info = requests.get(f"http://localhost:{my_port}/info", timeout=2).json()
         except Exception:
             pass
+
         time.sleep(interval)
+
     return None, None, "none"
 
 
@@ -478,7 +499,7 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
             "other_port": int(destinatarios_ports[0])
         }
 
-
+        print(f"Mando el watch a estos puertos: {ports_involved}")
         sending_monitor(monitor_msg_A, str(ports_involved[0]))
         sending_monitor(monitor_msg_B, str(ports_involved[1]))
 
@@ -550,22 +571,26 @@ def handle_client_unified(conn_sock,
         # RECALCULATE (sender-side monitor start)
         # --------------------------------------------------
         elif accion == "recalculate":
-            start_monitor(
-                payload["id"],
-                payload["info"],
-                conn,
-                node_info,
-                role = "sender",
-                my_port=my_port,
-                other_port=payload.get("other_port")
-            )
-            conn_sock.send(json.dumps({"status": "monitor started"}).encode())
+            if payload["info"] != "active":
+                 print("[LISTENER] Ignoring recalculate because EPR is not active") 
+                 conn_sock.send(json.dumps({"status": "monitor ignored"}).encode())
+            else:
+                start_monitor(
+                    payload["id"],
+                    payload["info"],
+                    conn,
+                    node_info,
+                    role = "sender",
+                    my_port=my_port,
+                    other_port=payload.get("other_port")
+                )
+                conn_sock.send(json.dumps({"status": "monitor started"}).encode())
 
         # --------------------------------------------------
         # WATCH OVER (swapped EPR monitor)
         # --------------------------------------------------
         elif accion == "watch_over":
-            other_port=payload.get("other_port"),
+            other_port=payload.get("other_port")
             old_id=payload.get("old_id", None)
             print(f"Watching over {payload['id']}, that was {old_id} before")
             

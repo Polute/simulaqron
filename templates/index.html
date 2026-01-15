@@ -211,6 +211,12 @@
     <!-- Analytics section -->
     <div id="analyticsSection" style="display:none">
         <h2>Analytics</h2>
+        <!-- Control to choose number of nodes --> 
+         <div style="margin-bottom: 15px;"> 
+            <label for="numNodesInput"><strong>Number of nodes:</strong></label> 
+            <input type="number" id="numNodesInput" value="3" min="1" style="width:60px;"> 
+            <button id="updateNodesBtn">Update</button> 
+        </div>
         <div id="nodesContainer"></div>
     </div>
 
@@ -254,7 +260,7 @@
             loadNodes();
         }
 
-        // Toggle día/noche
+        // Day/Night toggle
         const icon = document.getElementById("toggleIcon");
         const body = document.body;
         icon.addEventListener("click", () => {
@@ -263,18 +269,40 @@
             icon.textContent = body.classList.contains("day") ? "🌞" : "🌙";
         });
 
+        // Build URLs dynamically
+        function buildUrls(num) {
+            const urls = [];
+            for (let i = 0; i < num; i++) {
+                if (i === 0) urls.push("http://localhost:5000/info");
+                else urls.push(`http://localhost:${5001 + i}/info`);
+            }
+            return urls;
+        }
+
+        // Button to update number of nodes
+        document.getElementById("updateNodesBtn").addEventListener("click", async () => {
+            await loadNodes();
+        });
+
+        // Load nodes based on input
         async function loadNodes() {
-            const urls = ["http://localhost:5000/info", "http://localhost:5002/info", "http://localhost:5003/info"];
+            const num = parseInt(document.getElementById("numNodesInput").value, 10);
+            const urls = buildUrls(num);
+            await renderNodes(urls);
+        }
+
+        // Render node cards
+        async function renderNodes(urls) {
             const container = document.getElementById("nodesContainer");
             container.innerHTML = "";
 
             for (const url of urls) {
                 const resp = await fetch(url);
                 if (!resp.ok) {
-                    // Stop immediately if one fetch fails
                     container.textContent = `Error fetching ${url}: ${resp.status} ${resp.statusText}`;
-                    return; // stop the function
+                    return;
                 }
+
                 const data = await resp.json();
 
                 const card = document.createElement("div");
@@ -312,6 +340,8 @@
                 container.appendChild(card);
             }
         }
+
+
 
     </script>
     <script>
@@ -1689,7 +1719,7 @@
                     }
                 }
 
-                // limpiar historial en el master solo si se completó el bucle
+                // limpiar historial en el master
                 fetch("/limpiar_historial")
                     .then(response => response.json())
                     .then(data => {

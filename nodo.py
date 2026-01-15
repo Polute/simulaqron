@@ -470,6 +470,7 @@ def app_open(PUERTO, listener_port):
         for key in ["parEPR"]:
             if key in data:
                 nodo_info[key] = data[key]
+        return jsonify({"status": "ok"})
 
 
     @app.route("/mandate", methods=["POST"])
