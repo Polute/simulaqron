@@ -179,10 +179,10 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
     try:
         if w_out1 < w_out2:
             id_upgrade_epr = epr2["id"]
-            res1 = ask_consumed(epr1["id"], lp1, "purified")
+            ask_consumed(epr1["id"], lp1, "purified")
         else: 
             id_upgrade_epr = epr1["id"]
-            res2 = ask_consumed(epr2["id"], lp1, "purified")
+            ask_consumed(epr2["id"], lp1, "purified")
     except ConnectionRefusedError:
         print("[PURIFY] No se pudo conectar a uno de los listener ports")
         return 
@@ -195,7 +195,7 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
         mejora = (w1 + w2 + 4 * w_out1 * w_out2) / (6*p_pur)
         print(f"[PURIFY] Upgrade = {mejora}")
         w_final = mejora
-        new_epr = { 
+        operation_log = { 
             "id": pur_id, 
             "vecino": epr2["vecino"], 
             "state": "purified",
@@ -210,9 +210,9 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
             "t_pur": time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}" 
             }
         upgraded_epr = {
-            "id": pur_id,
+            "id": id_upgrade_epr,
             "vecino": epr2["vecino"],
-            "state": "ac",
+            "state": "active",
             "medicion": "",
             "distancia_nodos": epr2.get("distancia_nodos"),
             "t_gen": epr2.get("t_gen"),
@@ -225,16 +225,16 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
             # opcional: no tiene listener_port porque ya está medido
         }
 
-        node_info["parEPR"].append(new_epr)
+        node_info["parEPR"].append(operation_log)
         try:
             if my_port:
-                requests.post(f"http://localhost:{my_port}/parEPR/recv", json=new_epr, timeout=2)
+                requests.post(f"http://localhost:{my_port}/parEPR/recv", json=operation_log, timeout=2)
                 requests.post(f"http://localhost:{my_port}/parEPR/recv", json=upgraded_epr, timeout=2)
-                monitor_werner(new_epr, node_info, my_port+4000)
+                monitor_werner(upgraded_epr, node_info, my_port+4000)
             if emiter_port:
-                requests.post(f"http://localhost:{emiter_port}/parEPR/recv", json=new_epr, timeout=2)
+                requests.post(f"http://localhost:{emiter_port}/parEPR/recv", json=operation_log, timeout=2)
                 requests.post(f"http://localhost:{my_port}/parEPR/recv", json=upgraded_epr, timeout=2)
-                starting_werner_recalculate_sender(pur_id, new_epr, emiter_port+4000)
+                starting_werner_recalculate_sender(pur_id, upgraded_epr, emiter_port+4000)
         except Exception as e:
             print(f"[PURIFY] Error notificando endpoints: {e}")
 

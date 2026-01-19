@@ -246,6 +246,8 @@ def app_open(ROL, PUERTO):
         ids_actuales = [n["id"] for n in nodos]
         todos_pre = all(n["id"].endswith("pre") for n in nodos)
 
+        subprocess.Popen("simulaqron", "set", "max-qubits", "1000")
+
         # Arrancar nodos según cantidad
         if len(ids_actuales) < 4 and todos_pre:
             # Arrancar todos los nodos juntos con sus IDs reales
