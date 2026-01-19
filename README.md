@@ -1,124 +1,234 @@
----
+# 🧬 Quantum Network Simulator
 
-# ⚡ Quick Execution (with environment already configured)
+## ⚡ Quick Execution (Environment Already Configured)
 
-If you already have Python 3.10.x and the virtual environment `simulaqron_env` correctly installed and activated, you can run the simulator directly by downloading the ZIP file with the essential files:
+If you already have Python 3.10.x and the virtual environment `simulaqron_env` installed and activated, you can run the simulator immediately.
 
-1. Extract the contents into your working environment
-2. Currently, the simulator can be run in two ways:
-
+### Run the master (local full‑network simulation)
 ```bash
 python app.py master
 ```
-This simulates the entire network on a local machine (Port 8000).
+This launches the master on port **8000** and simulates the entire network locally.
 
-Run each node individually:
+### Run individual nodes
+Open several terminals and run:
 ```bash
-python nodo.py 
+python nodo.py
 ```
+Each instance will automatically bind to a different port.
 
-Open several terminals and run this command; each instance will open on a different port.
-
-
-
-Listen to the master only:
+### Run only the master listener (history receiver)
 ```bash
 python app.py bob
 ```
 
-This acts as a receiver node that only receives the history.
+---
 
-#------------------------------------------------------------
+# 🛠️ Development Environment Setup
 
-Development Environment Setup
-
-Follow the instructions in the provided PDF to configure the development environment.
-Remember to update your requirements file with:
-
+Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-If SimulaQron fails, run setup_env.sh with execution permissions:
+If SimulaQron fails to start, rebuild the environment:
 ```bash
+chmod +x setup_env.sh
 ./setup_env.sh
 ```
 
-This will delete the virtual environment and recreate it with the requirements installed.
-New packages will be added periodically as needed.
+This recreates the virtual environment and installs all required packages.
 
-# Use of the Simulator
+---
 
-The simulator is designed so that anyone, even without extensive technical knowledge, can operate it effectively.
+# 🧭 Information Model of the System
 
-Once the main master program is running and the nodes have been deployed across the network, they are automatically detected. However, as a basic connectivity check, the master page requires two manual actions:
+The simulator organizes all node‑related data into **three categories**.  
+This helps clarify what each component knows and what information is exchanged during quantum operations.
 
-1. **Update Info** – refreshes the SimulaQron CQC network and retrieves the latest state of all nodes.  
-2. **Update Nodes** – sends this updated information to every node, allowing them to open their communication channels. Nodes do not communicate with each other unless the master explicitly authorizes it.
+## 📌 Information Categories
 
-## Interface Overview
+### **1. Local Information**
+Private data stored inside each node.  
+Not shared unless required by a protocol.
 
-### Left Panel
-The left side of the interface displays:
-- The interactive map  
-- The update buttons  
-- The physical and logical parameters of each node as detected by the master  
+Includes:
+- `id` — internal node identifier  
+- `name` — human‑readable label  
+- `latitude`, `longitude` — geographic coordinates  
+- `pswap` — swapping success probability  
+- `roles` — emitter / receiver / repeater  
+- `eprPairs` — local EPR memory (active, swapped, measured, failed…)  
+- Qubit lifetime and internal timers  
+- Any operational parameter that belongs only to the node  
 
-These parameters can be modified in two ways:
-- From the master page, followed by **Update Nodes**, or  
-- From the node’s own page, which the master detects when **Update Info** is pressed.
+### **2. Global Information**
+Data required to maintain a coherent view of the network.
 
-### Operations Panel (Center)
+Includes:
+- Network topology  
+- Distances between nodes  
+- Physical parameters (attenuation, pgen, etc.)  
+- Node availability  
+- Routing metadata  
 
-The central area of the interface is dedicated to operations. In future versions, a dedicated architecture‑input system will be available. For now, the simulator displays a set of modular blocks grouped into two categories:
+Important:  
+Nodes only know their **direct neighbors**.  
+The **master** is the only component that knows the full topology.
 
-- **Node blocks** – automatically created and updated according to the current network topology  
-- **Operation blocks** – representing:
-  - EPR generation  
-  - Entanglement swapping  
-  - Purification  
+### **3. Transactional Information**
+Generated dynamically during protocol execution.
 
-#### EPR Generation
-To generate an EPR pair between two nodes:
-1. Place the source node block  
-2. Add the "Generate EPR" operation block  
-3. Place the destination node block  
+Includes:
+- Classical signals  
+- Measurement results  
+- EPR generation and reception messages  
+- Purification attempts  
+- Swapping notifications  
+- Event logs  
+- Resource requests  
 
-The only requirement is that the source and destination nodes must be connected in the network topology.
+This information flows between:
+- Nodes  
+- Master  
+- Neighboring nodes  
+- Listener ports  
 
-#### Entanglement Swapping
-Swapping requires a node to act as a repeater. This node must have previously received two EPR pairs from two different emitters.
+---
 
-The structure is:
-- Repeater node  
-- Swap operation block  
-- Emitter node 1  
-- Emitter node 2  
+# 🧩 Node Attributes (Simplified Overview)
 
-#### Purification
-Purification acts on an existing EPR link. To simplify the process, purification becomes available whenever two EPR pairs exist between the same emitter and receiver.
+Each node maintains a set of attributes that describe its state, capabilities and relationships with the rest of the network.
 
-The user simply:
-1. Places the purification block  
-2. Selects the EPR pair to purify  
+- **id** (local): unique identifier  
+- **name** (local): descriptive name  
+- **latitude**, **longitude** (local): geographic coordinates  
+- **pswap** (local): swapping success probability  
+- **roles** (local): emitter / receiver / repeater  
+- **neighbors** (global + transactional): list of direct neighbors with distance, pgen, and coordinates  
+- **distanceKm** (global): distance to each neighbor  
+- **pgen** (transactional): EPR generation success probability  
+- **eprPairs** (local + transactional): list of stored EPR pairs  
 
-### Exporting Operations
+---
 
-Once all desired operations are arranged, pressing **Export Orders** sends the instructions to the appropriate nodes. The master handles all routing and distribution.
+# 🧩 EPR Message Attributes
 
-### Right Panel: Operation History
+Messages exchanged during EPR generation, reception, purification and swapping include:
 
-The right side of the interface displays the operation history. This log is updated dynamically based on the results sent back by each node.
+### **EPR Generation**
+- `id`  
+- `neighbor`  
+- `t_gen`  
+- `w_gen`  
 
-Using this information, users can analyze:
-- The performance of each operation  
-- The impact of modifying physical parameters  
-- The behavior of the network under different configurations  
+### **EPR Reception**
+- `id`  
+- `neighbor`  
+- `t_gen`  
+- `t_recv`  
+- `t_diff`  
+- `w_gen`  
+- `w_out`  
+- `state`  
+- `measurement`  
+- `distanceNodes`  
+- `listener_port`  
 
-An additional window shows the operations in which each individual node has participated.
+### **Purification**
+- `id`  
+- `neighbor`  
+- `state`  
+- `t_pur`  
+- `w_gen`  
+- `w_out`  
+- `purified_from`  
 
-### Development Status
+### **Entanglement Swapping**
+For nodes not performing the swap:
+- `id`  
+- `neighbor`  
+- `state`  
+- `t_gen`, `t_recv`, `t_diff`  
+- `w_gen`, `w_out`  
+- `distanceNodes`  
+- `listener_port`  
 
-The simulator is under active development. Functionality and visual components may change frequently, and some features may temporarily stop working between stable releases.
+For the repeater:
+- `id` (combination of the two consumed EPRs)  
+- `state` = `swapper`  
+- `neighbor` = list of the two remote endpoints  
 
+---
 
+# 🧩 Special Attribute: `listener_port`
+
+- Port where each node listens for further commands (generation, purification, swapping, monitoring, etc.)
+- Activated after the node generates or receives its first EPR
+- Shared between the node, its neighbors, and the master
+
+---
+
+# 🖥️ Using the Simulator
+
+Once the master is running and the nodes are deployed, they are detected automatically.  
+Before running operations, the master interface requires two manual actions:
+
+1. **Update Info** – refreshes the SimulaQron CQC network and retrieves the latest node state.  
+2. **Update Nodes** – sends this updated information to all nodes so they can open their communication channels.
+
+Nodes do not communicate with each other until the master authorizes it.
+
+---
+
+# 🧱 Interface Overview
+
+## Left Panel
+Displays:
+- Interactive map  
+- Update buttons  
+- Physical and logical parameters of each node  
+
+These parameters can be edited either:
+- From the master page (then press **Update Nodes**)  
+- From the node’s own page (detected when pressing **Update Info**)  
+
+---
+
+# 🔧 Operations Panel (Center)
+
+Contains modular blocks representing the available operations:
+
+### EPR Generation
+1. Place the source node  
+2. Add the “Generate EPR” block  
+3. Place the destination node  
+
+### Entanglement Swapping
+Requires a repeater node with two active EPRs from different neighbors.
+
+### Purification
+Available when two EPRs exist between the same pair of nodes.
+
+---
+
+# 📤 Exporting Operations
+
+Press **Export Orders** to send all configured operations to the corresponding nodes.  
+The master handles routing and distribution.
+
+---
+
+# 📜 Operation History (Right Panel)
+
+Shows:
+- Real‑time logs of all executed operations  
+- Results returned by each node  
+- A per‑node breakdown of participation in operations  
+
+---
+
+# 🚧 Development Status
+
+The simulator is under active development.  
+Features and UI elements may change frequently, and some components may be temporarily unstable between releases.

@@ -217,14 +217,7 @@ def app_open(ROL, PUERTO):
     @app.route("/info")
     def info():
         return jsonify(nodo_info)
-    # Endpoint para actualizar el state del nodo
-    @app.route("/update", methods=["POST"])
-    def update():
-        data = request.get_json()
-        for key in ["id", "name", "pswap", "roles", "neighbors", "parEPR"]:
-            if key in data:
-                nodo_info[key] = data[key]
-        return jsonify({"status": "ok", "nodo_info": nodo_info})
+    
     NODOS_PUERTOS = {}  # nodo_name -> puerto
 
     @app.route("/actualizar_mapa")
@@ -252,6 +245,8 @@ def app_open(ROL, PUERTO):
 
         ids_actuales = [n["id"] for n in nodos]
         todos_pre = all(n["id"].endswith("pre") for n in nodos)
+
+        subprocess.Popen("simulaqron", "set", "max-qubits", "1000")
 
         # Arrancar nodos según cantidad
         if len(ids_actuales) < 4 and todos_pre:
@@ -541,26 +536,6 @@ def app_open(ROL, PUERTO):
         counter = 0
         simulacion_en_curso = False
         MASTER_PAR_EPR.clear()
-        # Avisar a todos los nodos conectados
-        for nodo_id, puerto in NODOS_PUERTOS.items():
-            url = f"http://localhost:{puerto}/update"
-            try:
-                res = requests.post(
-                    url,
-                    json={
-                        "id": nodo_id,
-                        "parEPR": [],          # <-- vaciar historial de EPR
-                        "lastUpdated": int(time.time() * 1000)
-                    },
-                    timeout=2
-                )
-                if res.status_code == 200:
-                    print(f"[INFO] Historial EPR limpiado en nodo {nodo_id}")
-                else:
-                    print(f"[WARN] Error limpiando nodo {nodo_id}: {res.status_code}")
-            except Exception as e:
-                print(f"[ERROR] Excepción limpiando nodo {nodo_id}: {e}")
-
         try:
             open("pre_docs/fidelidad_alice.txt", "w").close()
             open("pre_docs/fidelidad_bob.txt", "w").close()

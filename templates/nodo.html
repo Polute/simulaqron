@@ -166,7 +166,7 @@
             <tbody>
                 {% for vecino in nodo_info.get("neighbors", []) %}
                     {% if vecino %}
-                    <tr>
+                    <tr data-id="{{ vecino.id }}">
                         <td>{{ nodo_info.id }}</td>
                         <td>{{ vecino.id }}</td>
                         <td><input type="number" class="distInput" step="0.1" value="{{ vecino.distanceKm }}"></td>
@@ -295,7 +295,6 @@
                     // Comparar con las últimas
                     const info = JSON.stringify(data);
                     const otherInfo = JSON.stringify(lastInfo);
-                    draw()
                     if(info != otherInfo){
                         Object.assign(nodo, data);
                         // Update nodes and links for the map overlay
@@ -315,15 +314,12 @@
                             links.push({ source: nodo.id, target: vecino.id });
                         });
 
-                        // Now redraw the map overlay
-                        draw();
 
                         // preserve client-side coordinates
                         if (draggingNode) {
                             nodo.lat = draggingNode.lat;
                             nodo.lon = draggingNode.lon;
                         }
-                        draw();
 
                         // Node inputs
                         document.getElementById("nameInput").value = data.name;

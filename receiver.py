@@ -28,7 +28,7 @@ def monitor_coherence(epr, node_info, conn, my_port, interval=0.01, threshold=1/
     while True:
         # Current timestamp
         t_recv_str = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
-        t_gen_val, t_recv_val, tdif = calculate_tdiff(t_gen_str, t_recv_str)
+        tdif = calculate_tdiff(t_gen_str, t_recv_str)
         tesp = dist_km / (2.0/3.0 * C)
 
         w_out = w_in * math.exp(-(tdif + tesp) / tcoh)
@@ -68,7 +68,7 @@ def calculate_tdiff(ts1: str, ts2: str):
     val1 = parse_ts(ts1)
     val2 = parse_ts(ts2)
     diff = val2 - val1
-    return val1, val2, diff
+    return diff
 
 def starting_werner_recalculate_sender(epr_id, result_recv,listener_emiter_port):
     msg = {"accion": "recalculate", "id": epr_id, "info": result_recv}
@@ -114,7 +114,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             t_gen_str = payload.get("t_gen", "0")
             t_recv_str = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
 
-            t_gen_val, t_recv_val, tdif = calculate_tdiff(t_gen_str, t_recv_str)
+            tdif = calculate_tdiff(t_gen_str, t_recv_str)
 
             dist_km = float(node_info.get("distkm", 0.0))
             tcoh = float(node_info.get("tcoh", 10.0))
@@ -262,7 +262,7 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
     # Calcular campos derivados
     t_gen_str = epr1.get("t_gen")
     t_recv_str = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
-    t_gen_val, t_recv_val, tdif = calculate_tdiff(t_gen_str, t_recv_str)
+    tdif = calculate_tdiff(t_gen_str, t_recv_str)
     w_gen_tuple = (epr1.get("w_out"), epr2.get("w_out"))
     w_out_new = (w_gen_tuple[0] * w_gen_tuple[1]) if all(w_gen_tuple) else None
     distancia_total = (epr1.get("distancia_nodos") or 0) + (epr2.get("distancia_nodos") or 0)

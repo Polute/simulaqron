@@ -71,8 +71,6 @@ x3bbe2x1_l94de4o9e	swapper	node_cedint_upm-['node_rectorado_upm','node_etsiinf_u
 cx3bbe2x1	swapped	node_etsiinf_upm-node_cedint_upm	1	0.75333	23:28.003	23:30.269	2.26600	0
 l94de4o9e	swapped	node_rectorado_upm-node_cedint_upm	1	0.86016	23:28.002	23:29.206	1.20400	1
 6cq03trzg	active	node_rectorado_upm-node_etsiinf_upm	0.7533309606262788	0.64798	23:28.003	23:30.365	2.36200	""
-8yrfirqlh	measure	node_etsiinf_upm-node_cedint_upm	1	0.46053	23:32.363	23:38.566	6.20300	0
-ph9aj9pxp	measure	node_rectorado_upm-node_cedint_upm	1	0.98830	23:32.354	23:32.448	0.09400	0
 yejvcws34	swapped	node_etsiinf_upm-node_cedint_upm	1	0.91955	23:40.101	23:40.772	0.67100	0
 4pyd3r51y	swapped	node_rectorado_upm-node_cedint_upm	1	0.98769	23:40.095	23:40.194	0.09900	1
 4pyd3r51y_yejvcws34	swapper	node_cedint_upm-['node_rectorado_upm','node_etsiinf_upm']	""	""	""	""	""	""
