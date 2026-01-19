@@ -1,0 +1,20 @@
+{
+  "nodes": {
+    "node_rectorado_upm": {
+      "ip": "192.168.1.10",
+      "port": 5000
+    },
+    "node_cedint_upm": {
+      "ip": "192.168.1.11",
+      "port": 5002
+    },
+    "node_etsiinf_upm": {
+      "ip": "192.168.1.12",
+      "port": 5003
+    },
+    "node_cait_upm": {
+      "ip": "192.168.1.13",
+      "port": 5004
+    }
+  }
+}

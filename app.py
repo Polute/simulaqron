@@ -223,10 +223,32 @@ def app_open(ROL, PUERTO):
     @app.route("/actualizar_mapa")
     def actualizar_mapa():
         nodos = []
+        # ---------------------------------------------------------
+        # load real IPs from nodes_config.json
+        #
+        # with open("nodes_config.json") as f:
+        #     config_ips = json.load(f)["nodes"]
+        #
+        # Example usage:
+        # for node_id, info in config_ips.items():
+        #     ip = info["ip"]
+        #     port = info["port"]
+        #     requests.get(f"http://{ip}:{port}/info")
+        #
+        # ---------------------------------------------------------
+
+            
         for port in range(5000, 5011):
             if port == 5001:
                 continue
             try:
+                # Here, I could replace "localhost" with the real IP
+                # from nodes_config.json, for example:
+                #
+                # ip = config_ips[nodo_id]["ip"]
+                # res = requests.get(f"http://{ip}:{port}/info", timeout=1)
+                #
+                # For now, the code still uses localhost:
                 res = requests.get(f"http://localhost:{port}/info", timeout=1)
                 res.raise_for_status()
                 nodo = res.json()
@@ -260,6 +282,81 @@ def app_open(ROL, PUERTO):
             proc = subprocess.Popen(
                 ["simulaqron", "start", "--name", "default", "--force", "-n", ",".join(ids_actuales), "-t", "path"]
             )
+
+        # 1. Get SimulaQron network.json path
+        # ----------------------------------
+        # SimulaQron stores its active network configuration in a file.
+        # This command returns the absolute path to that file, usually:
+        # ~/.simulaqron/config/network.json
+        # We store that path in `net_path` so we can read and modify it.
+
+        #net_path = subprocess.check_output(
+        #   ["simulaqron", "get", "network-config-file"],
+        #    text=True
+        #).strip()
+
+
+        # 2. Load your real IP config
+        # ----------------------------------
+        # This loads *your own* JSON file (nodes_config.json), which contains
+        # the real IP addresses assigned to each logical node.
+        # Example:
+        # {
+        #   "nodes": {
+        #       "node_rectorado_upm": { "ip": "192.168.1.10", "port": 5000 },
+        #       ...
+        #   }
+        # }
+        # We extract only the "nodes" dictionary.
+
+        #with open("nodes_config.json") as f:
+        #    real_ips = json.load(f)["nodes"]
+
+
+        # 3. Load SimulaQron network.json
+        # ----------------------------------
+        # Now we open the actual SimulaQron network configuration file.
+        # This file contains entries like:
+        # "app_socket": ["localhost", 8018]
+        # "cqc_socket": ["localhost", 8019]
+        # "vnode_socket": ["localhost", 8021]
+        # We will replace "localhost" with the real IPs from your JSON.
+        #with open(net_path) as f:
+        #    net = json.load(f)
+
+
+        # 4. Replace localhost with real IPs
+        # ----------------------------------
+        # Iterate through every node defined in SimulaQron's network.json.
+        # If the node also exists in your nodes_config.json,
+        # replace the IP part of each socket entry with the real IP.
+        #
+        # Example transformation:
+        # Before:
+        #   "app_socket": ["localhost", 8018]
+        # After:
+        #   "app_socket": ["192.168.1.10", 8018]
+        #
+        # This ensures SimulaQron uses real network addresses instead of localhost.
+        
+        #for node_id, info in net["default"]["nodes"].items():
+        #    if node_id in real_ips:
+        #        ip = real_ips[node_id]["ip"]
+        #        info["app_socket"][0] = ip
+        #        info["cqc_socket"][0] = ip
+        #        info["vnode_socket"][0] = ip
+
+
+        # 5. Save updated network.json
+        # ----------------------------------
+        # After modifying the in‑memory structure, we write it back to disk.
+        # This overwrites the original SimulaQron network.json with the updated IPs.
+        # SimulaQron will use this file the next time it starts its backends.
+        
+        #with open(net_path, "w") as f:
+        #    json.dump(net, f, indent=4)
+
+
 
         # Construir diccionario de vecinos simétricos
         vecinos_dict = {n["id"]: set() for n in nodos}
