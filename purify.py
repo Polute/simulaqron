@@ -238,7 +238,7 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
         except Exception as e:
             print(f"[PURIFY] Error notificando endpoints: {e}")
 
-        print("[PURIFY] Nuevo EPR purificado creado:", json.dumps(new_epr, indent=2))
+        print("[PURIFY] Nuevo EPR purificado creado:", json.dumps(upgraded_epr, indent=2))
     else:
         reason="Ppur failed"
         print(f"[PURIFY] Ppur: {p_pur}")

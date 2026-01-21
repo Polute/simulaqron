@@ -1,0 +1,23 @@
+tlxfqx8gj	measure	node_rectorado_upm-None						0			
+9a7uj9lhn	swapped	node_etsiinf_upm-node_cedint_upm	1	0.90014	27:42.910	27:43.962	1.05200				
+zwqg6ybn5	swapped	node_rectorado_upm-node_cedint_upm	1	0.98926	27:42.896	27:43.004	0.10800				
+zwqg6ybn5_9a7uj9lhn	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+7gpzmo3p4	measure	node_rectorado_upm-None						1			
+7jap9pnk0	measure	node_rectorado_upm-node_etsiinf_upm	0.9892581106136534	0.89048	27:44.017	27:44.017	1.12100	1			
+t9na537ay	measure	node_rectorado_upm-None						0			
+j96jklkfe	swapped	node_etsiinf_upm-node_cedint_upm	1	0.90105	27:47.911	27:48.953	1.04200				
+3m8fnilue	swapped	node_rectorado_upm-node_cedint_upm	1	1.09461	27:47.905	27:47.001	-0.90400				
+3m8fnilue_j96jklkfe	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+y4umxa4w1	measure	node_rectorado_upm-node_etsiinf_upm	1.0946120409643072	0.98629	27:49.022	27:49.022	1.11700	0			
+d00ogwk2p	swapped	node_etsiinf_upm-node_cedint_upm	1	0.90041	27:52.904	27:53.953	1.04900				
+fd1mtjaz1	swapped	node_rectorado_upm-node_cedint_upm	1	0.99005	27:52.897	27:52.997	0.10000				
+fd1mtjaz1_d00ogwk2p	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+22qxplt3e	measure	node_rectorado_upm-node_etsiinf_upm	0.9900498337491546	0.89146	27:54.018	27:54.018	1.12100	1			
+enors233i	swapped	node_etsiinf_upm-node_cedint_upm	1	0.90095	27:57.911	27:58.954	1.04300				
+bape3f3ka	swapped	node_rectorado_upm-node_cedint_upm	1	0.98926	27:57.913	27:58.021	0.10800				
+enors233i_bape3f3ka	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+cx30i55kf	active	node_rectorado_upm-node_etsiinf_upm	0.9009549703830713	0.89128	27:59.022	27:59.022	1.11100				
+861zvpayg	swapped	node_etsiinf_upm-node_cedint_upm	1	0.89924	28:02.901	28:03.963	1.06200				
+4i36jlzbv	swapped	node_rectorado_upm-node_cedint_upm	1	0.99035	28:02.900	28:02.997	0.09700				
+4i36jlzbv_861zvpayg	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+pfuxo9uim	active	node_rectorado_upm-node_etsiinf_upm	0.9903468932559929	0.89056	28:04.037	28:04.037	1.13700				

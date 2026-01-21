@@ -1,0 +1,22 @@
+10uby5myu	swapped	node_etsiinf_upm-node_cedint_upm	1	0.90032	27:12.903	27:13.953	1.05000				
+jjlgvck6i	swapped	node_rectorado_upm-node_cedint_upm	1	0.99064	27:12.903	27:12.997	0.09400				
+jjlgvck6i_10uby5myu	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+9cyqb9er3	measure	node_rectorado_upm-node_etsiinf_upm	0.9906440418940298	0.89190	27:14.005	27:14.005	1.10200	0			
+s8ppsqlm5	swapped	node_etsiinf_upm-node_cedint_upm	1	0.90077	27:17.904	27:18.949	1.04500				
+qa4a6240y	swapped	node_rectorado_upm-node_cedint_upm	1	0.99074	27:17.904	27:17.997	0.09300				
+s8ppsqlm5_qa4a6240y	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+2qtv4za6c	active	node_rectorado_upm-node_etsiinf_upm	0.9007747974068766	0.89244	27:19.020	27:19.020	1.11600				
+fgnrrms1w	swapped	node_etsiinf_upm-node_cedint_upm	1	0.89987	27:22.901	27:23.956	1.05500				
+358bo8ute	swapped	node_rectorado_upm-node_cedint_upm	1	0.99045	27:22.891	27:22.987	0.09600				
+358bo8ute_fgnrrms1w	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+5c3lgz6pp	measure	node_rectorado_upm-node_etsiinf_upm	0.9904459328972156	0.89128	27:24.007	27:24.007	1.11600	1			
+kmb6t9wvy	swapped	node_etsiinf_upm-node_cedint_upm	1	0.90077	27:27.906	27:28.951	1.04500				
+hwyjecs6s	swapped	node_rectorado_upm-node_cedint_upm	1	1.09428	27:27.903	27:27.002	-0.90100				
+hwyjecs6s_kmb6t9wvy	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+tlxfqx8gj	active	node_rectorado_upm-node_etsiinf_upm	1.094283706604642	0.98570	27:29.017	27:29.017	1.11400				
+4h9a2cqzj	swapped	node_etsiinf_upm-node_cedint_upm	1	0.89960	27:32.910	27:33.968	1.05800				
+1uycxgi23	swapped	node_rectorado_upm-node_cedint_upm	1	0.98985	27:32.901	27:33.003	0.10200				
+1uycxgi23_4h9a2cqzj	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+7gpzmo3p4	active	node_rectorado_upm-node_etsiinf_upm	0.9898518435821085	0.89048	27:34.028	27:34.028	1.12700				
+euovvsreu	ok	node_etsiinf_upm-node_cedint_upm	1		27:37.902						
+t9na537ay	active	node_rectorado_upm-node_cedint_upm	1	0.99064	27:37.903	27:37.997	0.09400				

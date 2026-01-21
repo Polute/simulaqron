@@ -1,7 +1,7 @@
 import os
 import subprocess
 import time
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response
 import random
 import math
 import re
@@ -15,6 +15,8 @@ import json
 import importlib.resources
 import socket
 from flask_cors import CORS
+import queue
+event_queue = queue.Queue()
 
 import socket
 
@@ -268,7 +270,8 @@ def app_open(ROL, PUERTO):
         ids_actuales = [n["id"] for n in nodos]
         todos_pre = all(n["id"].endswith("pre") for n in nodos)
 
-        subprocess.Popen("simulaqron", "set", "max-qubits", "1000")
+        subprocess.Popen(["simulaqron", "set", "max-qubits", "1000"])
+
 
         # Arrancar nodos según cantidad
         if len(ids_actuales) < 4 and todos_pre:
@@ -471,6 +474,79 @@ def app_open(ROL, PUERTO):
     def master_parEPR_clear():
         MASTER_PAR_EPR.clear()
         return jsonify({"status": "cleared"})
+    
+    @app.route("/updates/stream")
+    def mandate_stream():
+        def event_stream():
+            msg = event_queue.get()
+            yield f"data: {msg}\n\n"
+        return Response(event_stream(), mimetype="text/event-stream")
+    
+    @app.route("/master/saving_history", methods=["POST"])
+    def saving_history():
+        # 1. Clear history in all nodes (5000–5010 except 5001)
+        for port in range(5000, 5011):
+            if port == 5001:
+                continue
+            try:
+                requests.post(
+                    f"http://localhost:{port}/history",
+                    json={"parEPR": []},
+                    timeout=2,
+                    headers={"Connection": "close"}
+                )
+            except Exception as e:
+                print(f"[MASTER] Could not reach node {port}: {e}")
+                break
+
+        # 2. Clear master history
+        MASTER_PAR_EPR.clear()
+        print("[MASTER] MASTER_PAR_EPR cleared")
+        # Send SSE event to the browser 
+        event_queue.put("history_cleared")
+
+        return jsonify({"status": "ok"}), 200
+
+    def ensure_header(filename):
+        header = "ID\tEstado\tlink\tw_gen\tw_out\tt_gen\tt_recv\tt_diff\tMedicion\n"
+
+        # Si el archivo no existe → crear con cabecera
+        if not os.path.exists(filename):
+            with open(filename, "w") as f:
+                f.write(header)
+            return
+
+        # Si existe pero está vacío → escribir cabecera
+        if os.path.getsize(filename) == 0:
+            with open(filename, "w") as f:
+                f.write(header)
+
+    @app.route("/master/save_txt", methods=["POST"])
+    def save_txt():
+        data = request.get_json()
+        content = data.get("content", "")
+
+        # Timestamp: HORA_DIA-MES (sin ceros delante)
+        t = time.localtime()
+        timestamp = f"{t.tm_hour}_{t.tm_mday}-{t.tm_mon}"
+
+        # Ensure folder exists
+        os.makedirs("histories", exist_ok=True)
+
+        # Filename with timestamp
+        filename = f"histories/history_{timestamp}.txt"
+
+        with open(filename, "a") as f:
+            f.write(content + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+
+
+        print(f"[MASTER] TXT saved as {filename}")
+
+        return jsonify({"status": "saved", "file": filename})
+
+
 
 
     @app.route("/crear_nodos_simulaqron")

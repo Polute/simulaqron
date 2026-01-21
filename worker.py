@@ -152,6 +152,10 @@ def recalculate_werner(epr_id, result_recv, conn,
 
     print(f"Hi, im monitorizing {epr_id} that enter with {w_in}")
     while True:
+        if epr_id in epr_store and epr_store[epr_id].get("protected"):
+            print(f"[MONITOR] EPR {epr_id} protected. Stopping monitor.")
+            break
+
         t_now = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
         tdif = calculate_tdiff(t_gen, t_now)
         w_out = w_in * math.exp(-tdif / tcoh)
@@ -203,11 +207,15 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
 
         # Only skip measurement if truly marked as 'swapped' OR 'consumed'
         if order not in ("swapped", "consumed", "no_kill"):
-            m = q.measure()
+            try:
+                m = q.measure()
+            except Exception as e:
+                print(f"[MEASURE] Could not measure {epr_id}: {e}")
+                m = None
         else:
             m = None
         for epr in node_info["parEPR"]:
-            if epr["id"] == epr_id:
+            if epr["id"] == epr_id and epr["state"] == "active":
                 epr["state"] = order
                 epr["medicion"] = m
 
@@ -316,6 +324,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
     # Notify endpoints
     try:
+        print("[RECEIVER] Success on receiving the EPR, sending update states to sender and master")
         if my_port:
             requests.post(f"http://localhost:{my_port}/parEPR/recv", json=resultado_recv, timeout=2)
         if emisor_port:
@@ -330,44 +339,79 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
     return resultado_recv
 
 
-def pick_pair_same_edge_swap(node_info, my_port, timeout=5.0, interval=0.01):
+def pick_pair_same_edge_swap(node_info, my_port, dest1, dest2, timeout=5.0, interval=0.01):
     """
     Pick two 'active' EPRs on this node that:
-      - have different neighbors
-      - have NOT been used already in a previous swap (swapper).
+      - have different neighbors and the repeater shares a EPR with both
+      - have NOT been used already in a previous swap (swapped).
     """
     start = time.time()
+    my_id = node_info["id"]
 
     while time.time() - start < timeout:
         par = node_info.get("parEPR", [])
-
-        # 1) Collect all EPR ids that have already been used in a swapper
+        # 1. EPRs already used in a swap
         used_ids = set()
         for e in par:
             if e.get("state") == "swapper":
-                parts = str(e.get("id", "")).split("_")
-                used_ids.update(parts)
-
-        # 2) Active EPRs that have not been used in any swapper
-        active = [
+                used_ids.update(str(e["id"]).split("_"))
+        # 2. EPRs whose qubit is still active
+        alive = [
             e for e in par
-            if e.get("state") == "active" and e.get("id") not in used_ids
+            if e["id"] in epr_store and e.get("state") == "active" and e["id"] not in used_ids
         ]
+        # 3. Find two EPRs with different endpoints AND valid for this repeater
+        for e1, e2 in combinations(alive, 2):
+            if e1["vecino"] in (dest1, dest2) and e2["vecino"] in (dest1, dest2):
+                if e1["vecino"] != e2["vecino"]:
+                    return e1, e2, "valid"
 
-        # 3) Look for a pair with different neighbors
-        for e1, e2 in combinations(active, 2):
-            if e1.get("vecino") != e2.get("vecino"):
-                return e1, e2, "valid"
 
-        # 4) Refresh node_info and retry
+        
+        
+        # 4. Refresh
         try:
             node_info = requests.get(f"http://localhost:{my_port}/info", timeout=2).json()
-        except Exception:
+        except:
             pass
 
         time.sleep(interval)
 
     return None, None, "none"
+
+def assign_old_ids(node_info, old_id1, old_id2, dest1, dest2):
+    """
+    Given node_info, two old_ids, and two destination neighbors,
+    determine which old_id belongs to which destination.
+
+    The function does NOT check state, activity, or existence in epr_store.
+    It ONLY compares IDs and neighbors using node_info['parEPR'].
+
+    Returns:
+        (old_id_for_dest1, old_id_for_dest2)
+    """
+
+    # Helper: find which old_id belongs to a given neighbor
+    def get_old_id_for_neighbor(neighbor):
+        for epr in node_info.get("parEPR", []):
+            if epr.get("vecino") == neighbor:
+                return epr.get("id")
+        return None
+
+    # The correct old_ids according to node_info
+    correct1 = get_old_id_for_neighbor(dest1)
+    correct2 = get_old_id_for_neighbor(dest2)
+
+    # If the provided old_ids already match the correct mapping
+    if old_id1 == correct1 and old_id2 == correct2:
+        return old_id1, old_id2
+
+    # If they are swapped
+    if old_id1 == correct2 and old_id2 == correct1:
+        return correct1, correct2
+
+    # If one or both are wrong, enforce the correct mapping
+    return correct1, correct2
 
 
 def sending_monitor(msg, listener_port):
@@ -412,12 +456,32 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
     q1.cnot(q2)
     q1.H()
 
-
     order = "swapped"
-
     # Consume original EPRs
     measure_epr(epr1["id"], node_info, conn, my_port, order)
     measure_epr(epr2["id"], node_info, conn, my_port, order)
+
+    old_id_A, old_id_B = assign_old_ids(
+        node_info,
+        epr1["id"],
+        epr2["id"],
+        destinatarios[0],
+        destinatarios[1]
+    )
+
+
+    # Tell both endpoints to stop monitoring the old EPRs
+    stop_msg_1 = {
+        "accion": "stop_monitor",
+        "id": old_id_A
+    }
+    stop_msg_2 = {
+        "accion": "stop_monitor",
+        "id": old_id_B
+    }
+    sending_monitor(stop_msg_1, str(ports_involved[0]))
+    sending_monitor(stop_msg_2, str(ports_involved[1]))
+
 
     # Derived fields
     t_gen_str = epr1.get("t_gen")
@@ -450,13 +514,6 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
         "state": "swapper",
     }
     try:
-        monitor_msg = {
-            "accion": "watch_over_and_kill",
-            "new_id": id_swap,
-            "old_id" : None,
-            "new_epr": swapped_epr.copy,
-            "order": None
-        }
 
         if destinatarios_ports and len(destinatarios_ports) == 2 and len(destinatarios) == 2:
             # Send swapped EPR metadata to each neighbor
@@ -478,13 +535,11 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
             requests.post(f"http://localhost:{my_port}/parEPR/swap", json=result_swap, timeout=2)
 
         # Updating their EPR and watch over it, making one of them measured it if it reaches the threshold
-
-
         monitor_msg_A = {
             "accion": "watch_over",
             "order": "kill_if_reached",
             "id": id_swap,
-            "old_id": epr1["id"],
+            "old_id": old_id_A,
             "EPR_pair": epr_msg1,
             "my_port": int(destinatarios_ports[0]),
             "other_port": int(destinatarios_ports[1])
@@ -493,15 +548,22 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
             "accion": "watch_over",
             "order": "no_kill",
             "id": id_swap,
-            "old_id": epr2["id"],
+            "old_id": old_id_B,
             "EPR_pair": epr_msg2,
             "my_port": int(destinatarios_ports[1]),
             "other_port": int(destinatarios_ports[0])
         }
 
         print(f"Mando el watch a estos puertos: {ports_involved}")
+
+        print("AAAAAAAAAAAAAAAAAAAAAAAAAA")
+        print(monitor_msg_A)
         sending_monitor(monitor_msg_A, str(ports_involved[0]))
+        print("AAAAAAAAAAAAAAAAAAAAAAAAAA")
+        print("BBBBBBBBBBBBBBBBBBBBBBBBBB")
+        print(monitor_msg_B)
         sending_monitor(monitor_msg_B, str(ports_involved[1]))
+        print("BBBBBBBBBBBBBBBBBBBBBBBBBB")
 
     except Exception as e:
         print(f"[SWAP] Error notifying endpoints: {e}")
@@ -513,7 +575,6 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
 # --------------------------------------------------
 # Socket handling (unified)
 # --------------------------------------------------
-
 def handle_client_unified(conn_sock,
                           node_info, conn,
                           my_port, emisor_port):
@@ -593,8 +654,17 @@ def handle_client_unified(conn_sock,
             other_port=payload.get("other_port")
             old_id=payload.get("old_id", None)
             print(f"Watching over {payload['id']}, that was {old_id} before")
-            
-            epr_store[payload["id"]] = {"q": epr_store[old_id]["q"], "other_port": other_port}
+            print("[DEBUG] epr_store full:", epr_store)
+
+            if old_id not in epr_store:
+                print(f"[WATCH_OVER] old_id {old_id} no existe en este nodo. Creando entrada vacía.")
+                epr_store[payload["id"]] = {"q": None, "other_port": other_port}
+            else:
+                epr_store[payload["id"]] = {
+                    "q": epr_store[old_id]["q"],
+                    "other_port": other_port
+                }
+
             start_monitor(
                 payload["id"],              # new swapped EPR id
                 payload.get("EPR_pair"),    # metadata of the new EPR
@@ -621,7 +691,7 @@ def handle_client_unified(conn_sock,
             ports_involved = payload.get("ports_involved", [])
             id_swap = str(payload.get("id", 0))
 
-            epr1, epr2, status = pick_pair_same_edge_swap(node_info_in, my_port_in)
+            epr1, epr2, status = pick_pair_same_edge_swap(node_info_in, my_port_in, destinatarios[0], destinatarios[1])
 
             if status != "valid":
                 conn_sock.send(json.dumps({"error": "No valid pair"}).encode())
@@ -640,6 +710,13 @@ def handle_client_unified(conn_sock,
                     ports_involved=ports_involved
                 )
                 conn_sock.send(json.dumps(result).encode())
+        elif accion == "stop_monitor":
+            epr_id = payload["id"]
+            print(f"[LISTENER] Stop monitor for {epr_id}")
+            if epr_id in epr_store:
+                epr_store[epr_id]["protected"] = True
+            conn_sock.send(json.dumps({"status": "stopped"}).encode())
+
 
         else:
             conn_sock.send(json.dumps({"error": f"Unknown action {accion}"}).encode())

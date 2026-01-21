@@ -1,12 +1,12 @@
-ID  Estado  link    w_gen   w_out   t_gen   t_recv  t_diff  Medicion    purificado_de   t_pur
-9w2i8nmx1   measure node_rectorado_upm-node_cedint_upm  1   0.9340518765042134  23:58.015   23:58.345   0.33000 1   ""  ""
-8aqwj34b8   measure node_rectorado_upm-node_cedint_upm  1   0.9793920078484588  23:58.592   23:58.685   0.09300 1   ""  ""
-4xcvyzplu   consumed    node_rectorado_upm-node_cedint_upm  1   0.9791961490333836  24:04.245   24:04.339   0.09400 1   ""  ""
-2jf5rul0b   consumed    node_rectorado_upm-node_cedint_upm  1   0.9874560396577702  24:05.683   24:05.725   0.04200 0   ""  ""
-xc0u2vki1   purified    node_rectorado_upm-node_rectorado_upm   1   0.9314589812899721  24:05.683   24:05.725   0.04200 0   4xcvyzplu,2jf5rul0b 24:06.023
-z0qk9ebj5   consumed    node_rectorado_upm-node_cedint_upm  1   0.9797838430133975  24:14.920   24:15.012   0.09200 0   ""  ""
-cpck6ioff   consumed    node_rectorado_upm-node_cedint_upm  1   0.9896308343420414  24:15.717   24:15.769   0.05200 0   ""  ""
-z52v9utqj   failed_p_pur    node_rectorado_upm-node_rectorado_upm   ""  0.95    ""  ""  ""  ""  z0qk9ebj5,cpck6ioff 24:16.904
-27ri4lwfg   consumed    node_rectorado_upm-node_cedint_upm  1   0.9799798193789342  24:19.827   24:19.918   0.09100 1   ""  ""
-dsamd4578   consumed    node_rectorado_upm-node_cedint_upm  1   0.9821381482728635  24:20.684   24:20.763   0.07900 1   ""  ""
-idlfuyn5u   purified    node_rectorado_upm-node_rectorado_upm   1   0.9176232319118169  24:20.684   24:20.763   0.07900 1   27ri4lwfg,dsamd4578 24:21.961
+ID	Estado	link	w_gen	w_out	t_gen	t_recv	t_diff	Medicion
+9w2i8nmx1	measure	node_rectorado_upm-node_cedint_upm	1	0.9340518765042134	23:58.015	23:58.345	0.33000	1
+8aqwj34b8	measure	node_rectorado_upm-node_cedint_upm	1	0.9793920078484588	23:58.592	23:58.685	0.09300	1
+4xcvyzplu	consumed	node_rectorado_upm-node_cedint_upm	1	0.9791961490333836	24:04.245	24:04.339	0.09400	1
+2jf5rul0b	consumed	node_rectorado_upm-node_cedint_upm	1	0.9874560396577702	24:05.683	24:05.725	0.04200	0
+xc0u2vki1	purified	node_rectorado_upm-node_rectorado_upm	1	0.9314589812899721	24:05.683	24:05.725	0.04200	0
+z0qk9ebj5	consumed	node_rectorado_upm-node_cedint_upm	1	0.9797838430133975	24:14.920	24:15.012	0.09200	0
+cpck6ioff	consumed	node_rectorado_upm-node_cedint_upm	1	0.9896308343420414	24:15.717	24:15.769	0.05200	0
+z52v9utqj	failed_p_pur	node_rectorado_upm-node_rectorado_upm	""	0.95	""	""	""	""
+27ri4lwfg	consumed	node_rectorado_upm-node_cedint_upm	1	0.9799798193789342	24:19.827	24:19.918	0.09100	1
+dsamd4578	consumed	node_rectorado_upm-node_cedint_upm	1	0.9821381482728635	24:20.684	24:20.763	0.07900	1
+idlfuyn5u	purified	node_rectorado_upm-node_rectorado_upm	1	0.9176232319118169	24:20.684	24:20.763	0.07900	1

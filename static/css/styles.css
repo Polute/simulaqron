@@ -250,8 +250,8 @@ h1, h2 { color: #333; }
 }
 
 /* Operation blocks: double = swapping/entanglement, simple = node */
-.op-double { background: #6fa8dc; color: white; }
-.op-simple { background: #93c47d; color: white; }
+.op-double { background: #6fa8dc; color: white; width: auto !important}
+.op-simple { background: #93c47d; color: white; width: auto !important}
 
 /* Headings inside operations */
 h4 { display: flex; align-items: center; gap: 10px; }
@@ -303,7 +303,7 @@ h4 { display: flex; align-items: center; gap: 10px; }
     overflow-x: hidden;
     transition: 0.3s;
     padding-top: 60px;
-    z-index: 1000;
+    z-index: 2000;
 }
 
 .sidebar a {

@@ -192,7 +192,31 @@
                     <div id="workspace" class="workspace">
                         <!-- Aquí se soltarán los bloques -->
                     </div>
-                    <button class="button" onclick="showOrders()">Export Orders</button>
+                    <label for="mode_select">Export mode:</label>
+                    <select id="mode_select" onchange="toggleMode()">
+                        <option value="normal">Normal</option>
+                        <option value="loop">Loop</option>
+                    </select>
+
+                    <br><br>
+
+                    <!-- Normal export button -->
+                    <div id="normal_mode">
+                        <button class="button" onclick="showOrders()">Export Orders</button>
+                    </div>
+
+                    <!-- Loop controls -->
+                    <div id="loop_mode" style="display:none;">
+                        <input type="number" id="time_loop" min="1" max="10" step="1" value="1">
+                        <label for="time_loop">Seconds between executions</label>
+
+                        <input type="number" id="loop_limit" min="1" max="100" step="1" value="5">
+                        <label for="loop_limit">Number of loops</label>
+
+                        <br><br>
+                        <button class="button" onclick="startLoop(true)">Export Orders (Loop)</button>
+                        <button class="button" onclick="startLoop(false)">STOP Loop</button>
+                    </div>
                     <pre id="ordersText"></pre>
                 </div>
             </div>
@@ -290,6 +314,7 @@
             const urls = buildUrls(num);
             await renderNodes(urls);
         }
+        
 
         // Render node cards
         async function renderNodes(urls) {
@@ -714,6 +739,58 @@
         function generarIdUnico() {
             return Math.random().toString(36).substr(2, 9); 
         }
+        function toggleMode() {
+            const mode = document.getElementById("mode_select").value;
+
+            const normalDiv = document.getElementById("normal_mode");
+            const loopDiv = document.getElementById("loop_mode");
+
+            if (mode === "normal") {
+                normalDiv.style.display = "block";
+                loopDiv.style.display = "none";
+            } else {
+                normalDiv.style.display = "none";
+                loopDiv.style.display = "block";
+            }
+        }
+        let loopInterval = null; // global reference
+
+        function startLoop(start) {
+            if (start) {
+                // START LOOP
+                const intervalSeconds = parseInt(document.getElementById("time_loop").value);
+                const loopLimit = parseInt(document.getElementById("loop_limit").value);
+
+                let count = 0;
+
+                // Prevent multiple loops running at the same time
+                if (loopInterval !== null) {
+                    clearInterval(loopInterval);
+                }
+
+                loopInterval = setInterval(() => {
+                    showOrders();
+                    count++;
+
+                    if (count >= loopLimit) {
+                        clearInterval(loopInterval);
+                        loopInterval = null;
+                        console.log("Loop finished");
+                    }
+                }, intervalSeconds * 1000);
+
+                console.log("Loop started");
+
+            } else {
+                // STOP LOOP
+                if (loopInterval !== null) {
+                    clearInterval(loopInterval);
+                    loopInterval = null;
+                    console.log("Loop stopped manually");
+                }
+            }
+        }
+
         // Exportar órdenes usando el mismo historial
         function showOrders() {
             const blocks = workspace.querySelectorAll(".block");
@@ -1737,6 +1814,46 @@
                     .catch(err => console.error("Error limpiando historial master:", err));
             })();
         }
+        function downloadHistoryAsTXT() {
+            let text = "";
+
+            const rows = document.querySelectorAll("#results-table  tbody tr");
+
+            rows.forEach(row => {
+                const cols = row.querySelectorAll("td");
+                let line = [];
+                cols.forEach(col => line.push(col.innerText.trim()));
+                text += line.join("\t") + "\n";
+            });
+
+            // Send the text to the backend
+            fetch("/master/save_txt", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content: text })
+            })
+            .then(r => r.json())
+            .then(data => console.log("TXT saved on server:", data))
+            .catch(err => console.error("Error saving TXT:", err));
+            // 2. Clear UI
+            actualizarTabla([]);
+            updateEPRTable([]);
+            eprMap.clear();
+            ultimoHistorialEPR = null;
+            console.log("Saving history");
+        }
+
+        const evtSource = new EventSource("/updates/stream");
+
+        evtSource.onmessage = function(event) {
+            if (event.data === "history_cleared") {
+                console.log("Master cleared history!");
+                // 1. Save the table as TXT
+                downloadHistoryAsTXT();
+            }
+        };
+
+
 
         document.getElementById("num_PairsEPR").addEventListener("change", () => {
             const nuevoModo = document.getElementById("num_PairsEPR").value;

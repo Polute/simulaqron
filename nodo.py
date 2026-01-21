@@ -321,7 +321,7 @@ def app_open(PUERTO, listener_port):
 
     @app.route("/info")
     def info():
-        return jsonify(nodo_info)
+        return jsonify(nodo_info), 200, {"Connection": "close"}
 
     @app.route("/parEPR/add", methods=["POST"])
     def parEPR_add():
@@ -355,7 +355,7 @@ def app_open(PUERTO, listener_port):
         nodo_info["parEPR"] = pares
         notificar_master_parEPR(nodo_info)
 
-        return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]})
+        return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]}), 200, {"Connection": "close"}
 
 
     @app.route("/parEPR/recv", methods=["POST"])
@@ -376,14 +376,14 @@ def app_open(PUERTO, listener_port):
         nodo_info["parEPR"] = pares
         print("Enviando a Emisor y a Master: ",nodo_info)
         notificar_master_parEPR(nodo_info)
-        return jsonify({"status": "updated", "parEPR": nodo_info["parEPR"]})
+        return jsonify({"status": "updated", "parEPR": nodo_info["parEPR"]}), 200, {"Connection": "close"}
     
     @app.route("/parEPR/failed_pur", methods=["POST"])
     def parEPR_failed_pur():
         data = request.get_json()
         nodo_info["parEPR"].append(data)
         notificar_master_parEPR(nodo_info)
-        return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]})
+        return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]}), 200, {"Connection": "close"}
 
     @app.route("/parEPR/swap", methods=["POST"])
     def parEPR_swap():
@@ -413,7 +413,7 @@ def app_open(PUERTO, listener_port):
         nodo_info["parEPR"] = pares
         notificar_master_parEPR(nodo_info)
 
-        return jsonify({"status": "swapped", "parEPR": nodo_info["parEPR"]})
+        return jsonify({"status": "swapped", "parEPR": nodo_info["parEPR"]}), 200, {"Connection": "close"}
 
 
 
@@ -462,7 +462,7 @@ def app_open(PUERTO, listener_port):
 
         nodo_info["lastUpdated"] = data.get("lastUpdated", time())
         event_queue.put("update")
-        return jsonify({"status": "ok", "nodo_info": nodo_info})
+        return jsonify({"status": "ok", "nodo_info": nodo_info}), 200, {"Connection": "close"}
     @app.route("/history", methods=["POST"])
     def update_history():
         data = request.get_json()
@@ -470,7 +470,7 @@ def app_open(PUERTO, listener_port):
         for key in ["parEPR"]:
             if key in data:
                 nodo_info[key] = data[key]
-        return jsonify({"status": "ok"})
+        return jsonify({"status": "ok"}), 200, {"Connection": "close"}
 
 
     @app.route("/mandate", methods=["POST"])
@@ -492,7 +492,7 @@ def app_open(PUERTO, listener_port):
         else:
             ORDERS.append(data)
         event_queue.put("mandate")
-        return jsonify({"status": "ok", "ORDERS": ORDERS})
+        return jsonify({"status": "ok", "ORDERS": ORDERS}), 200, {"Connection": "close"}
     
 
     @app.route("/updates/stream")
@@ -505,7 +505,7 @@ def app_open(PUERTO, listener_port):
     @app.route("/orders", methods=["GET"])
     def get_orders():
         global ORDERS
-        return jsonify(ORDERS)
+        return jsonify(ORDERS), 200, {"Connection": "close"}
 
     @app.route("/operations", methods=["POST"])
     def operations():
@@ -523,6 +523,16 @@ def app_open(PUERTO, listener_port):
             return jsonify({"status": "ok", "nodo_info": nodo_info})
         except Exception as e:
             print(">>> Excepción en aplicar_orden:", repr(e))
+            try:
+                res = requests.post(
+                    "http://localhost:8000/master/saving_history",  # puerto donde corre el master
+                    json={},
+                    timeout=2
+                )
+                print("[DEBUG] Saving history for a error:", res.status_code)
+                print("DEBUG] Deleting parEPR history")
+            except Exception as e:
+                print("[DEBUG] Error notificando al master:", e)
             print(f"Order: {data}")
             return jsonify({"error": str(e)}), 500
 

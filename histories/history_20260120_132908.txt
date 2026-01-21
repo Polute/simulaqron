@@ -1,0 +1,21 @@
+58l2ebmci	swapped	node_etsiinf_upm-node_cedint_upm	1	0.90041	28:42.904	28:43.953	1.04900				
+qip5o2dny	swapped	node_rectorado_upm-node_cedint_upm	1	0.98975	28:42.889	28:42.992	0.10300				
+qip5o2dny_58l2ebmci	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+5sinxohst	measure	node_rectorado_upm-node_etsiinf_upm	0.9897528633468244	0.89119	28:44.013	28:44.013	1.12400	1			
+rwdqcx2lj	swapped	node_etsiinf_upm-node_cedint_upm	1	0.90023	28:47.906	28:48.957	1.05100				
+7ewola5gb	swapped	node_rectorado_upm-node_cedint_upm	1	1.09439	28:47.903	28:47.001	-0.90200				
+u8y2xq71m	measure	node_rectorado_upm-None						1			
+7ewola5gb_rwdqcx2lj	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+2ngvith9e	measure	node_rectorado_upm-node_etsiinf_upm	1.0943931404469007	0.98521	28:49.021	28:49.021	1.11800	1			
+594y4c4yw	swapped	node_etsiinf_upm-node_cedint_upm	1	0.89889	28:52.901	28:53.967	1.06600				
+gcguazz0t	swapped	node_rectorado_upm-node_cedint_upm	1	0.99064	28:52.898	28:52.992	0.09400				
+gcguazz0t_594y4c4yw	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+e97s81gte	measure	node_rectorado_upm-node_etsiinf_upm	0.9906440418940298	0.89048	28:54.042	28:54.042	1.14400	0			
+il0efhu4k	swapped	node_etsiinf_upm-node_cedint_upm	1	0.90023	28:57.904	28:58.955	1.05100				
+gtjzef3el	swapped	node_rectorado_upm-node_cedint_upm	1	0.99074	28:57.902	28:57.995	0.09300				
+gtjzef3el_il0efhu4k	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+v119fsiv9	active	node_rectorado_upm-node_etsiinf_upm	0.9907431112516246	0.89190	28:59.021	28:59.021	1.11900				
+zo7nc9ey6	swapped	node_etsiinf_upm-node_cedint_upm	1	0.89978	29:02.894	29:03.950	1.05600				
+zdkmcf0i4	swapped	node_rectorado_upm-node_cedint_upm	1	0.99054	29:02.890	29:02.985	0.09500				
+zdkmcf0i4_zo7nc9ey6	swapper	node_cedint_upm-['node_rectorado_upm', 'node_etsiinf_upm']									
+qqvl0bj5z	active	node_rectorado_upm-node_etsiinf_upm	0.9905449824429203	0.89128	29:03.001	29:03.001	0.11100				
