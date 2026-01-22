@@ -177,14 +177,12 @@ def app_open(PUERTO, listener_port):
                 print("[INFO] Sender already running, sending order via socket")
                 print("Lo hace en: ")
                 print(listener_port)
-                
 
                 payload = {
                     "accion": "generate EPR",
                     "id": epr_id,
                     "source": source_id,
                     "target": target_id,
-                    "node_info": node_info,
                     "source_port": source_port,
                     "target_port": target_port,
                     "pgen": pgen_source,
@@ -249,7 +247,6 @@ def app_open(PUERTO, listener_port):
                     "id": epr_id,
                     "source": orden["source"],
                     "epr_obj": epr_obj,
-                    "node_info": node_info,
                     "my_port": my_port,
                     "emisor_port": emisor_port,
                     "listener_port": listener_port
@@ -287,7 +284,6 @@ def app_open(PUERTO, listener_port):
                 "accion": "do swapping",
                 "id": epr_id,
                 "source": node_info["id"],
-                "node_info": node_info,
                 "destinatarios": orden["con"],
                 "destinatarios_ports": [str(get_port_by_id(n)) for n in orden["con"]],
                 "pswap": str(node_info.get("pswap", 1)),

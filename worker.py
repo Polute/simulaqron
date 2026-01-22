@@ -50,7 +50,7 @@ def calculate_tdiff(ts1: str, ts2: str) -> float:
         except Exception:
             return 0.0
 
-    return parse_ts(ts2) - parse_ts(ts1)
+    return abs(parse_ts(ts2) - parse_ts(ts1))
 
 
 def starting_werner_recalculate_sender(epr_id, result_recv, listener_emiter_port):
@@ -308,6 +308,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             print(f"[RECEIVER] Error : {e}")
             resultado_recv["state"] = "error"
     else:
+        print("[RECEIVER] EPR not reveived")
         resultado_recv["state"] = "EPR not received"
 
     # Update local memory
@@ -366,7 +367,6 @@ def pick_pair_same_edge_swap(node_info, my_port, dest1, dest2, timeout=5.0, inte
                 if e1["vecino"] != e2["vecino"]:
                     return e1, e2, "valid"
 
-
         
         
         # 4. Refresh
@@ -381,37 +381,33 @@ def pick_pair_same_edge_swap(node_info, my_port, dest1, dest2, timeout=5.0, inte
 
 def assign_old_ids(node_info, old_id1, old_id2, dest1, dest2):
     """
-    Given node_info, two old_ids, and two destination neighbors,
-    determine which old_id belongs to which destination.
-
-    The function does NOT check state, activity, or existence in epr_store.
-    It ONLY compares IDs and neighbors using node_info['parEPR'].
-
-    Returns:
-        (old_id_for_dest1, old_id_for_dest2)
+    Given node_info, two old_ids (the ones used in THIS swap),
+    and two destination neighbors, determine which old_id belongs
+    to which destination, considering ONLY those two ids.
     """
 
-    # Helper: find which old_id belongs to a given neighbor
+    candidates = {old_id1, old_id2}
+
     def get_old_id_for_neighbor(neighbor):
         for epr in node_info.get("parEPR", []):
-            if epr.get("vecino") == neighbor:
+            if epr.get("vecino") == neighbor and epr.get("id") in candidates:
                 return epr.get("id")
         return None
 
-    # The correct old_ids according to node_info
     correct1 = get_old_id_for_neighbor(dest1)
     correct2 = get_old_id_for_neighbor(dest2)
 
-    # If the provided old_ids already match the correct mapping
+    # If already correct
     if old_id1 == correct1 and old_id2 == correct2:
         return old_id1, old_id2
 
-    # If they are swapped
+    # If swapped
     if old_id1 == correct2 and old_id2 == correct1:
         return correct1, correct2
 
-    # If one or both are wrong, enforce the correct mapping
+    # Fallback: enforce mapping from node_info
     return correct1, correct2
+
 
 
 def sending_monitor(msg, listener_port):
@@ -461,6 +457,12 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
     measure_epr(epr1["id"], node_info, conn, my_port, order)
     measure_epr(epr2["id"], node_info, conn, my_port, order)
 
+    # refresh node_info once after swap to catch latest parEPR 
+    try: 
+        node_info = requests.get(f"http://localhost:{my_port}/info", timeout=2).json() 
+    except: 
+        pass
+
     old_id_A, old_id_B = assign_old_ids(
         node_info,
         epr1["id"],
@@ -468,6 +470,9 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
         destinatarios[0],
         destinatarios[1]
     )
+    print("Sin ordenar",epr1["id"],epr2["id"])
+    print("Ordenados",old_id_A,old_id_B)
+    print(f"[SWAP] It has: {node_info}")
 
 
     # Tell both endpoints to stop monitoring the old EPRs
@@ -575,9 +580,7 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
 # --------------------------------------------------
 # Socket handling (unified)
 # --------------------------------------------------
-def handle_client_unified(conn_sock,
-                          node_info, conn,
-                          my_port, emisor_port):
+def handle_client_unified(conn_sock, conn, my_port, emisor_port):
     """Unified handler for ALL socket actions."""
     try:
         conn_sock.settimeout(5.0)
@@ -589,6 +592,10 @@ def handle_client_unified(conn_sock,
         accion = payload.get("accion")
 
         print(f"[LISTENER] Acción recibida: {accion}")
+        try: 
+            node_info = requests.get(f"http://localhost:{my_port}/info", timeout=2).json() 
+        except: 
+            pass
 
         # --------------------------------------------------
         # GENERATE EPR
@@ -602,7 +609,7 @@ def handle_client_unified(conn_sock,
                 int(payload["target_port"]),
                 float(payload.get("pgen", 1.0)),
                 payload["id"],
-                payload.get("node_info", node_info)
+                node_info
             )
             conn_sock.send(json.dumps({"status": "ok"}).encode())
 
@@ -612,7 +619,7 @@ def handle_client_unified(conn_sock,
         elif accion == "recibe EPR":
             resultado = recibir_epr(
                 payload.get("epr_obj"),
-                payload.get("node_info", node_info),
+                node_info,
                 conn,
                 payload.get("my_port", my_port),
                 payload.get("emisor_port", emisor_port),
@@ -664,7 +671,6 @@ def handle_client_unified(conn_sock,
                     "q": epr_store[old_id]["q"],
                     "other_port": other_port
                 }
-
             start_monitor(
                 payload["id"],              # new swapped EPR id
                 payload.get("EPR_pair"),    # metadata of the new EPR
@@ -682,7 +688,6 @@ def handle_client_unified(conn_sock,
         # DO SWAPPING
         # --------------------------------------------------
         elif accion == "do swapping":
-            node_info_in = payload.get("node_info", node_info)
             destinatarios = payload.get("destinatarios", [])
             destinatarios_ports = payload.get("destinatarios_ports", [])
             pswap = float(payload.get("pswap", 1.0))
@@ -691,7 +696,7 @@ def handle_client_unified(conn_sock,
             ports_involved = payload.get("ports_involved", [])
             id_swap = str(payload.get("id", 0))
 
-            epr1, epr2, status = pick_pair_same_edge_swap(node_info_in, my_port_in, destinatarios[0], destinatarios[1])
+            epr1, epr2, status = pick_pair_same_edge_swap(node_info, my_port_in, destinatarios[0], destinatarios[1])
 
             if status != "valid":
                 conn_sock.send(json.dumps({"error": "No valid pair"}).encode())
@@ -700,7 +705,7 @@ def handle_client_unified(conn_sock,
                     epr1=epr1,
                     epr2=epr2,
                     id_swap=id_swap,
-                    node_info=node_info_in,
+                    node_info=node_info,
                     conn=conn,
                     destinatarios=destinatarios,
                     destinatarios_ports=destinatarios_ports,
@@ -727,7 +732,7 @@ def handle_client_unified(conn_sock,
         conn_sock.close()
 
 
-def socket_listener(node_info, conn, port,
+def socket_listener(conn, port,
                     my_port=None, emisor_port=None):
     """Unified TCP listener for ALL EPR actions."""
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -742,7 +747,7 @@ def socket_listener(node_info, conn, port,
             conn_sock, addr = server.accept()
             threading.Thread(
                 target=handle_client_unified,
-                args=(conn_sock, node_info, conn, my_port, emisor_port),
+                args=(conn_sock, conn, my_port, emisor_port),
                 daemon=True
             ).start()
 
@@ -782,7 +787,6 @@ if __name__ == "__main__":
             )
 
             socket_listener(
-                node_info,
                 conn,
                 port=listener_port,
                 my_port=my_port,
@@ -803,9 +807,7 @@ if __name__ == "__main__":
         with CQCConnection(node_info["id"]) as conn:
             resultado = recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port)
             print(f"[RECEIVER] Initial synchronization result: {resultado}")
-
             socket_listener(
-                node_info,
                 conn,
                 port=listener_port,
                 my_port=my_port,

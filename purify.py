@@ -14,10 +14,10 @@ def ask_consumed(epr_id, listener_port, accion):
     resp = s.recv(4096).decode()
     s.close()
     return json.loads(resp)
-def monitor_werner(pur_epr, node_info, listener_port):
+def monitor_werner(pur_epr, listener_port):
     print(["PURIFY: Iniciating monitor werner to receiver"])
     print(listener_port)
-    msg = {"accion": "monitor_werner", "pur_epr": pur_epr, "node_info": node_info}
+    msg = {"accion": "monitor_werner", "pur_epr": pur_epr}
     try:
         with socket.create_connection(("localhost", listener_port), timeout=3) as s:
             s.send(json.dumps(msg).encode())
@@ -141,7 +141,7 @@ def calculate_tdiff(ts1: str, ts2: str) -> float:
         except Exception:
             return 0.0
 
-    return parse_ts(ts2) - parse_ts(ts1)
+    return abs(parse_ts(ts2) - parse_ts(ts1))
 
 def purify(node_info, pur_id, my_port=None, emitter_port=None):
     epr1, epr2, status = pick_pair_same_edge(node_info)
@@ -230,7 +230,7 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
             if my_port:
                 requests.post(f"http://localhost:{my_port}/parEPR/recv", json=operation_log, timeout=2)
                 requests.post(f"http://localhost:{my_port}/parEPR/recv", json=upgraded_epr, timeout=2)
-                monitor_werner(upgraded_epr, node_info, my_port+4000)
+                monitor_werner(upgraded_epr, my_port+4000)
             if emiter_port:
                 requests.post(f"http://localhost:{emiter_port}/parEPR/recv", json=operation_log, timeout=2)
                 requests.post(f"http://localhost:{my_port}/parEPR/recv", json=upgraded_epr, timeout=2)
