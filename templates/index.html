@@ -203,6 +203,7 @@
                     <!-- Normal export button -->
                     <div id="normal_mode">
                         <button class="button" onclick="showOrders()">Export Orders</button>
+                        <button class="button" onclick="downloadHistoryAsTXT()">Save History</button>
                     </div>
 
                     <!-- Loop controls -->
@@ -216,6 +217,7 @@
                         <br><br>
                         <button class="button" onclick="startLoop(true)">Export Orders (Loop)</button>
                         <button class="button" onclick="startLoop(false)">STOP Loop</button>
+                        <button class="button" onclick="downloadHistoryAsTXT()">Save History</button>
                     </div>
                     <pre id="ordersText"></pre>
                 </div>
@@ -612,12 +614,12 @@
                     for (let nodo in eprHistoryGlobal) {
                         const eprs = eprHistoryGlobal[nodo] || [];
                         
-                        // Solo EPR donde este nodo es el que los recibio (src)
-                        const creados = eprs.filter(e => e.dst === nodo);
+                        // Searching for nodes used in a EPR
+                        const creados = eprs.filter(e => e.src === nodo || e.dst === nodo );
 
                         const paresContados = {};
                         creados.forEach(e => {
-                            const key = [e.src, e.dst].sort().join("-");
+                            const key = [e.src, e.dst].sort().join("-"); 
                             paresContados[key] = (paresContados[key] || 0) + 1;
                         });
 
@@ -1749,7 +1751,7 @@
 
             historial.forEach(epr => {
                 const fila = document.createElement("tr");
-                if (epr.state === "purified") fila.classList.add("fila-purificada");
+                if (epr.purificado_de === "purified") fila.classList.add("fila-purificada");
                 
                 fila.innerHTML = `
                     <td>${epr.id}</td>
@@ -1763,7 +1765,7 @@
                     <td>${epr.medicion ?? ""}</td>
                     <td>${epr.state === "purified" ? (epr.purificado_de?.join(", ") ?? "") : ""}</td>
                     <td>${epr.state === "purified" ? (epr.t_pur ?? "") : ""}</td>
-                    <td>${epr.ts_print ? new Date(epr.ts_print).toLocaleTimeString() : ""}</td>
+
                 `;
                 tbody.appendChild(fila);
             });

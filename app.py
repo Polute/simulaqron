@@ -535,6 +535,8 @@ def app_open(ROL, PUERTO):
 
         # Filename with timestamp
         filename = f"histories/history_{timestamp}.txt"
+        
+        ensure_header(filename)
 
         with open(filename, "a") as f:
             f.write(content + "\n")

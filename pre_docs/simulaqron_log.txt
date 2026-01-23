@@ -1,0 +1,4 @@
+[SERVIDOR] Nodos existentes: ['node_rectorado_upm', 'node_cedint_upm']
+[SERVIDOR] Nodos creados en esta petición: []
+--------------------------------------------------
+[SERVIDOR] Nodos existentes tras operacion: ['node_rectorado_upm', 'node_cedint_upm']

@@ -434,3 +434,10 @@ body.night #ordersText {
     color: #eee;
     border-color: #666;
 }
+/* Purified row styling */
+body.night .fila-purificada {
+    background-color: inherit;
+    color: inherit;
+    border-color: #666;
+    border-left: 4px solid #00aaff;
+}
