@@ -143,7 +143,7 @@ def recalculate_werner(epr_id, result_recv, conn,
 
     w_in = float(result_recv.get("w_out", 1.0)) #Recalculates from the last updated Werner
     t_gen = result_recv.get("t_gen", "0")
-    tcoh = float(result_recv.get("tcoh", 10.0))
+    tcoh = float(result_recv.get("tcoh", 1.5))
     print(f"[MONITOR] Recalculating Werner from {epr_id}")
 
     if old_id != None:
@@ -274,7 +274,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             tdif = calculate_tdiff(t_gen_str, t_recv_str)
 
             dist_km = float(node_info.get("distkm", 0.0))
-            tcoh = float(node_info.get("tcoh", 10.0))
+            tcoh = float(node_info.get("tcoh", 1.5))
             tesp = dist_km / (2.0/3.0 * C)
 
             w_out = w_in * math.exp(-(tdif + tesp) / tcoh)

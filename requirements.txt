@@ -5,4 +5,4 @@ jinja2<3.0
 requests>=2.25
 flask_cors
 pandas
-maplotlib
+matplotlib
