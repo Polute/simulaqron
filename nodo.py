@@ -128,7 +128,7 @@ def app_open(PUERTO, listener_port):
 
     def aplicar_orden(orden, node_info):
         global worker_started
-        accion = orden["accion"]
+        comand = orden["comand"]
         source_id = node_info["id"]
         epr_id = orden.get("id")
 
@@ -143,7 +143,7 @@ def app_open(PUERTO, listener_port):
         # --------------------------------------------------
         # Generate EPR (this node is the sender)
         # --------------------------------------------------
-        if accion in ["genera EPR", "generar"]:
+        if comand in ["genera EPR", "generar"]:
             target_id = orden["target"]
             source_port = get_port_by_id(source_id)
             target_port = get_port_by_id(target_id)
@@ -179,7 +179,7 @@ def app_open(PUERTO, listener_port):
                 print(listener_port)
 
                 payload = {
-                    "accion": "generate EPR",
+                    "comand": "generate EPR",
                     "id": epr_id,
                     "source": source_id,
                     "target": target_id,
@@ -199,7 +199,7 @@ def app_open(PUERTO, listener_port):
         # --------------------------------------------------
         # Receive EPR (this node receives an EPR created by another node)
         # --------------------------------------------------
-        elif accion == "recibe EPR":
+        elif comand == "recibe EPR":
             epr_id = orden["id"]  # EPR id specified in the order
             timeout = 5.0         # max wait time in seconds
             interval = 0.1        # polling interval
@@ -243,7 +243,7 @@ def app_open(PUERTO, listener_port):
             else:
                 print("[INFO] Receiver already running, sending order via socket")
                 payload = {
-                    "accion": "recibe EPR",
+                    "comand": "recibe EPR",
                     "id": epr_id,
                     "source": orden["source"],
                     "epr_obj": epr_obj,
@@ -263,7 +263,7 @@ def app_open(PUERTO, listener_port):
         # --------------------------------------------------
         # Purification protocol
         # --------------------------------------------------
-        elif accion in ["purifica", "purificar"]:
+        elif comand in ["purifica", "purificar"]:
             print(f"[{source_id}] Running purification protocol...")
             my_port = get_port_by_id(node_info["id"])
             emisor_port = get_port_by_id(orden["con"])   # node with which we purify
@@ -278,10 +278,10 @@ def app_open(PUERTO, listener_port):
         # --------------------------------------------------
         # Swapping protocol
         # --------------------------------------------------
-        elif accion in ["swap", "swapping"]:
+        elif comand in ["swap", "swapping"]:
             print(f"[{source_id}] Running swapping protocol...")
             payload = {
-                "accion": "do swapping",
+                "comand": "do swapping",
                 "id": epr_id,
                 "source": node_info["id"],
                 "destinatarios": orden["con"],
@@ -300,11 +300,11 @@ def app_open(PUERTO, listener_port):
         # --------------------------------------------------
         # Swap received (just logs for now)
         # --------------------------------------------------
-        elif accion in ["swap recibido"]:
+        elif comand in ["swap recibido"]:
             print("Swap attempt between:", orden["con"])
 
         else:
-            raise ValueError(f"Unknown action: {accion}")
+            raise ValueError(f"Unknown action: {comand}")
 
 
     app = Flask(__name__)
@@ -436,7 +436,7 @@ def app_open(PUERTO, listener_port):
 
         source = data.get("source")
         target = data.get("target")
-        fields = ["distanceKm", "pgen", "lat", "lon"]
+        fields = ["distanceKm", "pgen", "lat", "lon", "pgenOverride"]
 
         if source and target:
             for node_id, neighbor_id in [(source, target), (target, source)]:
@@ -510,8 +510,8 @@ def app_open(PUERTO, listener_port):
 
         if not isinstance(data, dict):
             return jsonify({"error": "Formato inválido"}), 400
-        if "accion" not in data:
-            return jsonify({"error": "Falta 'accion'"}), 400
+        if "comand" not in data:
+            return jsonify({"error": "Falta 'comand'"}), 400
 
         try:
             aplicar_orden(data, nodo_info)

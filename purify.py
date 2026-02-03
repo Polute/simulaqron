@@ -3,8 +3,8 @@ import json, sys, random, time, socket, requests, math
 
 import time
 
-def ask_consumed(epr_id, listener_port, accion):
-    msg = {"accion": accion, "id": epr_id}
+def ask_consumed(epr_id, listener_port, comand):
+    msg = {"comand": comand, "id": epr_id}
     # Ensure listener_port is an int 
     listener_port = int(listener_port)
     
@@ -17,7 +17,7 @@ def ask_consumed(epr_id, listener_port, accion):
 def monitor_werner(pur_epr, listener_port):
     print(["PURIFY: Iniciating monitor werner to receiver"])
     print(listener_port)
-    msg = {"accion": "monitor_werner", "pur_epr": pur_epr}
+    msg = {"comand": "monitor_werner", "pur_epr": pur_epr}
     try:
         with socket.create_connection(("localhost", listener_port), timeout=3) as s:
             s.send(json.dumps(msg).encode())
@@ -29,7 +29,7 @@ def monitor_werner(pur_epr, listener_port):
 
 def starting_werner_recalculate_sender(epr_id, result_recv, listener_emiter_port):
     print(["PURIFY: Iniciating monitor werner to sender"])
-    msg = {"accion": "recalculate", "id": epr_id, "info": result_recv}
+    msg = {"comand": "recalculate", "id": epr_id, "info": result_recv}
     print("Sending recalculating from pur")
     print(listener_emiter_port)
     try:

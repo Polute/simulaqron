@@ -30,8 +30,10 @@
                 <h2>Quantum Map</h2>
 
                 <div class="controls">
-                    <button id="nodeMode" class="button">🖌️ Create Node</button>
-                    <button id="linkMode" class="button">🔗 Create Link</button>
+                    <div id="node_link_controls" class="controls">
+                        <button id="nodeMode" class="button">🖌️ Create Node</button>
+                        <button id="linkMode" class="button">🔗 Create Link</button>
+                    </div>
                     <button id="resetView" class="button">📍</button>
                     <button id="btnUpdateNodes">Update nodes</button>
                 </div>
@@ -44,7 +46,7 @@
 
                 <h3>Physics parameters</h3>
                 <div style="display: flex; align-items: flex-start; gap: 40px;">
-                    <div>
+                    <div id="physics_full_controls">
                         <label for="channel_type">Quantum channel definition type:</label>
                         <select id="channel_type" onchange="toggleCanalInput()">
                             <option value="number">Number (0-1)</option>
@@ -90,6 +92,11 @@
                             </table>
                         </div>
                     </div>
+                    <div id="tcoh_container" style="display:none; margin-top:10px;">
+                        <label for="tcoh_value">tcoh (s):</label>
+                        <input type="number" id="tcoh_value" min="0" max="1000" step="1" value="10">
+                    </div>
+
                 </div>
                 <br><br>
                 <h3>Nodes</h3>
@@ -832,10 +839,10 @@
                     const eprId = generarIdUnico();
 
                     if (!ordersPorNodo[srcId]) ordersPorNodo[srcId] = [];
-                    ordersPorNodo[srcId].push({ id: eprId, accion: "genera EPR", target: dstId });
+                    ordersPorNodo[srcId].push({ id: eprId, comand: "genera EPR", target: dstId });
 
                     if (!ordersPorNodo[dstId]) ordersPorNodo[dstId] = [];
-                    ordersPorNodo[dstId].push({ id: eprId, accion: "recibe EPR", source: srcId });
+                    ordersPorNodo[dstId].push({ id: eprId, comand: "recibe EPR", source: srcId });
 
                 }else if (op === "pur") {
                     const dstName = b.dataset.dst;
@@ -863,7 +870,7 @@
                         if (!ordersPorNodo[dstId]) ordersPorNodo[dstId] = [];
                         ordersPorNodo[dstId].push({
                             id: purId,
-                            accion: "purifica",
+                            comand: "purifica",
                             detalle: "dos EPR previos",
                             con: srcId
                         });
@@ -894,13 +901,13 @@
                         const swapId = generarIdUnico();
                         // Acción para el helper
                         if (!ordersPorNodo[helperId]) ordersPorNodo[helperId] = [];
-                        ordersPorNodo[helperId].push({ id: swapId, accion: "swap", con: [id1Id, id2Id] });
+                        ordersPorNodo[helperId].push({ id: swapId, comand: "swap", con: [id1Id, id2Id] });
 
                         // Notificar a id1 y id2 que reciben SWAP
                         if (!ordersPorNodo[id1Id]) ordersPorNodo[id1Id] = [];
                         ordersPorNodo[id1Id].push({ 
                             id: swapId, 
-                            accion: "swap recibido", 
+                            comand: "swap recibido", 
                             con: [id2Id],          // con quién se hace el swap
                             gracias_a: helperId    // gracias a quién se realizó
                         });
@@ -908,7 +915,7 @@
                         if (!ordersPorNodo[id2Id]) ordersPorNodo[id2Id] = [];
                         ordersPorNodo[id2Id].push({ 
                             id: swapId, 
-                            accion: "swap recibido", 
+                            comand: "swap recibido", 
                             con: [id1Id],          // con quién se hace el swap
                             gracias_a: helperId    // gracias a quién se realizó
                         });
@@ -984,22 +991,39 @@
                 const derecha = document.querySelector(".right-column");
                 const operaciones = document.querySelector(".operations-column");
 
+                const nodeLinkControls = document.getElementById("node_link_controls");
+                const physicsControls = document.getElementById("physics_full_controls");
+                const tcohContainer = document.getElementById("tcoh_container");
+
                 if (todosPre) {
-                    // mostrar cabecera normalmente
+                    // --- MODO NORMAL ---
                     if (header) header.style.display = "block";
                     if (derecha) derecha.style.flex = "1.5";
-                    // mostrar también las órdenes cuánticas
                     if (operaciones) operaciones.style.display = "none";
-                    f5 = true
+
+                    // show normal controls
+                    nodeLinkControls.style.display = "flex";
+                    physicsControls.style.display = "block";
+                    tcohContainer.style.display = "none";
+
+                    f5 = true;
+
                 } else {
-                    // ocultar cabecera de simulación
+                    // --- MODO ESPECIAL ---
                     if (header) header.style.display = "none";
                     if (derecha) derecha.style.flex = "2";
-                    // ocultar las órdenes cuánticas
                     if (operaciones) operaciones.style.display = "block";
+
+                    // hide node/link creation + channel definition
+                    nodeLinkControls.style.display = "none";
+                    physicsControls.style.display = "none";
+
+                    // show tcoh input
+                    tcohContainer.style.display = "block";
                 }
             }
         }
+
 
     </script>
               <!-- Leaflet JS -->
@@ -1034,7 +1058,8 @@
                                 distanciaKm: vecino.distanceKm,
                                 lat: vecino.lat,
                                 lon: vecino.lon,
-                                pgen: vecino.pgen
+                                pgen: vecino.pgen,
+                                pgenOverride: vecino.pgenOverride || false
                             };
                             links.push(link);
                         });
@@ -1090,6 +1115,11 @@
             };
             return mapa[id];
         }
+        function calculatePgen(distKm, Latt = 22, p0 = 0.5) {
+            console.log("Recalculating pgen from distance: ", distKm)
+            return p0 * Math.exp(-distKm / Latt);
+        }
+
         //-----------------------------------------MAP-----------------------------------------------------
         window.onload = function () {
             // -------------------- INITIAL SETUP --------------------
@@ -1145,6 +1175,10 @@
             L.control.scale().addTo(map);
 
             // -------------------- MODE TOGGLING --------------------
+            resetViewBtn.onclick = () => {
+                map.setView([40.4168, -3.7038], 11);
+            };
+
             nodeModeBtn.onclick = () => {
                 nodeMode = !nodeMode;
                 linkMode = false;
@@ -1224,6 +1258,7 @@
                                                 targetLon: vecino.lon,
                                                 distanciaKm: vecino.distanceKm,
                                                 pgen: vecino.pgen,
+                                                pgenOverride: vecino.pgenOverride || false,
                                                 lastUpdated: ts
                                             };
                                         }
@@ -1232,7 +1267,8 @@
                             });
                             Object.values(linksDict).forEach(l => {
                                 links.push({ source: l.source, target: l.target, targetLat: l.lat,
-                                                targetLon: l.lon, distanciaKm: l.distanciaKm, pgen: l.pgen });
+                                                targetLon: l.lon, distanciaKm: l.distanciaKm, pgen: l.pgen,
+                                                pgenOverride: l.pgenOverride });
                             });
 
                             crearBloquesDinamicos(nodes);
@@ -1298,6 +1334,7 @@
                             const otroVecino = other.neighbors.find(v => v.id === node.id);
                             const distanciaKm = (esteVecino && esteVecino.distanceKm) || (otroVecino && otroVecino.distanceKm);
                             const pgen = (esteVecino && esteVecino.pgen) || (otroVecino && otroVecino.pgen);
+                            const pgenOverride = (esteVecino && esteVecino.pgenOverride) || (otroVecino && otroVecino.pgenOverride) || false;
                             // default: target coords
                             let lat = other.lat;
                             let lon = other.lon;
@@ -1307,7 +1344,12 @@
                                 lat = node.lat;
                                 lon = node.lon;
                             }
-                            if (distanciaKm !== undefined) vecinosSimetricos.push({ id: other.id, distanceKm: distanciaKm, lat, lon, pgen });
+                            if (distanciaKm !== undefined){
+                                vecinosSimetricos.push({ id: other.id, distanceKm: distanciaKm, 
+                                    lat, lon, pgen, 
+                                    pgenOverride: (esteVecino && esteVecino.pgenOverride) || 
+                                    (otroVecino && otroVecino.pgenOverride) || false });
+                            }
                         }
                     });
                     console.log(vecinosSimetricos);
@@ -1520,33 +1562,66 @@
                     vistos.add(key);
 
                     const fila = document.createElement("tr");
+
+                    // source & target
                     ["source", "target"].forEach(prop => {
                         const td = document.createElement("td");
                         td.textContent = link[prop];
                         fila.appendChild(td);
                     });
 
-                    // Distance
+                    // ---------------- DISTANCE ----------------
                     const distCell = document.createElement("td");
                     const distInput = document.createElement("input");
                     distInput.type = "number";
                     distInput.value = link.distanciaKm;
+
                     distInput.onchange = () => {
                         const val = parseFloat(distInput.value);
-                        links.forEach(l => { if ([l.source, l.target].sort().join("-") === key) l.distanciaKm = val; });
-                        nodes.forEach(n => {
-                            if (n.id === link.source) {
-                                const vecino = n.neighbors.find(v => v.id === link.target); if (vecino) vecino.distanceKm = val;
-                            }
-                            if (n.id === link.target) {
-                                const vecino = n.neighbors.find(v => v.id === link.source); if (vecino) vecino.distanceKm = val;
+
+                        links.forEach(l => {
+                            if ([l.source, l.target].sort().join("-") === key) {
+                                l.distanciaKm = val;
+
+                                // --- NEW: auto-update pgen only if override is OFF ---
+                                if (!l.pgenOverride) {
+                                    l.pgen = calculatePgen(val);
+                                }
                             }
                         });
+
+                        nodes.forEach(n => {
+                            if (n.id === link.source) {
+                                const vecino = n.neighbors.find(v => v.id === link.target);
+                                if (vecino) {
+                                    vecino.distanceKm = val;
+
+                                    // --- NEW: auto-update pgen only if override is OFF ---
+                                    if (!vecino.pgenOverride) {
+                                        vecino.pgen = calculatePgen(val);
+                                    }
+                                }
+                            }
+                            if (n.id === link.target) {
+                                const vecino = n.neighbors.find(v => v.id === link.source);
+                                if (vecino) {
+                                    vecino.distanceKm = val;
+
+                                    // --- NEW: auto-update pgen only if override is OFF ---
+                                    if (!vecino.pgenOverride) {
+                                        vecino.pgen = calculatePgen(val);
+                                    }
+                                }
+                            }
+                        });
+
+                        actualizarTablaAristas(); // refresh table
                     };
+
                     distCell.appendChild(distInput);
                     fila.appendChild(distCell);
 
-                    // pgen
+                    // ---------------- PGEN ----------------
                     const pgenCell = document.createElement("td");
                     const pgenInput = document.createElement("input");
                     pgenInput.type = "number";
@@ -1554,20 +1629,50 @@
                     pgenInput.min = "0";
                     pgenInput.max = "1";
                     pgenInput.value = link.pgen !== undefined ? link.pgen : "";
+
                     pgenInput.onchange = () => {
                         const val = parseFloat(pgenInput.value);
-                        links.forEach(l => { if ([l.source, l.target].sort().join("-") === key) l.pgen = val; });
-                        nodes.forEach(n => {
-                            if (n.id === link.source) { const vecino = n.neighbors.find(v => v.id === link.target); if (vecino) vecino.pgen = val; }
-                            if (n.id === link.target) { const vecino = n.neighbors.find(v => v.id === link.source); if (vecino) vecino.pgen = val; }
+
+                        links.forEach(l => {
+                            if ([l.source, l.target].sort().join("-") === key) {
+                                l.pgen = val;
+
+                                // --- NEW: manual edit activates override ---
+                                l.pgenOverride = true;
+                            }
                         });
+
+                        nodes.forEach(n => {
+                            if (n.id === link.source) {
+                                const vecino = n.neighbors.find(v => v.id === link.target);
+                                if (vecino) {
+                                    vecino.pgen = val;
+
+                                    // --- NEW: manual edit activates override ---
+                                    vecino.pgenOverride = true;
+                                }
+                            }
+                            if (n.id === link.target) {
+                                const vecino = n.neighbors.find(v => v.id === link.source);
+                                if (vecino) {
+                                    vecino.pgen = val;
+
+                                    // --- NEW: manual edit activates override ---
+                                    vecino.pgenOverride = true;
+                                }
+                            }
+                        });
+
+                        actualizarTablaAristas(); // refresh table
                     };
+
                     pgenCell.appendChild(pgenInput);
                     fila.appendChild(pgenCell);
 
                     tbody.appendChild(fila);
                 });
             }
+
 
             draw();
         };

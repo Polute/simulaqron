@@ -58,7 +58,7 @@ def starting_werner_recalculate_sender(epr_id, result_recv, listener_emiter_port
     Ask the emitter-side listener to start a Werner recalculation
     for a given EPR id and its receive metadata.
     """
-    msg = {"accion": "recalculate", "id": epr_id, "info": result_recv}
+    msg = {"comand": "recalculate", "id": epr_id, "info": result_recv}
     print("Sending recalculating")
     print(listener_emiter_port)
     try:
@@ -143,7 +143,7 @@ def recalculate_werner(epr_id, result_recv, conn,
 
     w_in = float(result_recv.get("w_out", 1.0)) #Recalculates from the last updated Werner
     t_gen = result_recv.get("t_gen", "0")
-    tcoh = float(result_recv.get("tcoh", 1.5))
+    tcoh = float(result_recv.get("tcoh", 10.0))
     print(f"[MONITOR] Recalculating Werner from {epr_id}")
 
     if old_id != None:
@@ -274,7 +274,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             tdif = calculate_tdiff(t_gen_str, t_recv_str)
 
             dist_km = float(node_info.get("distkm", 0.0))
-            tcoh = float(node_info.get("tcoh", 1.5))
+            tcoh = float(node_info.get("tcoh", 10.0))
             tesp = dist_km / (2.0/3.0 * C)
 
             w_out = w_in * math.exp(-(tdif + tesp) / tcoh)
@@ -477,11 +477,11 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
 
     # Tell both endpoints to stop monitoring the old EPRs
     stop_msg_1 = {
-        "accion": "stop_monitor",
+        "comand": "stop_monitor",
         "id": old_id_A
     }
     stop_msg_2 = {
-        "accion": "stop_monitor",
+        "comand": "stop_monitor",
         "id": old_id_B
     }
     sending_monitor(stop_msg_1, str(ports_involved[0]))
@@ -541,7 +541,7 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
 
         # Updating their EPR and watch over it, making one of them measured it if it reaches the threshold
         monitor_msg_A = {
-            "accion": "watch_over",
+            "comand": "watch_over",
             "order": "kill_if_reached",
             "id": id_swap,
             "old_id": old_id_A,
@@ -550,7 +550,7 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
             "other_port": int(destinatarios_ports[1])
         }
         monitor_msg_B = {
-            "accion": "watch_over",
+            "comand": "watch_over",
             "order": "no_kill",
             "id": id_swap,
             "old_id": old_id_B,
@@ -589,9 +589,9 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
             return
 
         payload = json.loads(data.decode())
-        accion = payload.get("accion")
+        comand = payload.get("comand")
 
-        print(f"[LISTENER] Acción recibida: {accion}")
+        print(f"[LISTENER] Acción recibida: {comand}")
         try: 
             node_info = requests.get(f"http://localhost:{my_port}/info", timeout=2).json() 
         except: 
@@ -600,7 +600,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
         # --------------------------------------------------
         # GENERATE EPR
         # --------------------------------------------------
-        if accion == "generate EPR":
+        if comand == "generate EPR":
             generar_epr(
                 payload["source"],
                 payload["target"],
@@ -616,7 +616,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
         # --------------------------------------------------
         # RECIBE EPR
         # --------------------------------------------------
-        elif accion == "recibe EPR":
+        elif comand == "recibe EPR":
             resultado = recibir_epr(
                 payload.get("epr_obj"),
                 node_info,
@@ -630,7 +630,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
         # --------------------------------------------------
         # MEASURE (purified)
         # --------------------------------------------------
-        elif accion == "purified":
+        elif comand == "purified":
             epr_id = payload.get("id")
             result = measure_epr(epr_id, node_info, conn, my_port, "Consumed")
             conn_sock.send(json.dumps(result or {"error": "EPR not found"}).encode())
@@ -638,7 +638,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
         # --------------------------------------------------
         # RECALCULATE (sender-side monitor start)
         # --------------------------------------------------
-        elif accion == "recalculate":
+        elif comand == "recalculate":
             if payload["info"] != "active":
                  print("[LISTENER] Ignoring recalculate because EPR is not active") 
                  conn_sock.send(json.dumps({"status": "monitor ignored"}).encode())
@@ -657,7 +657,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
         # --------------------------------------------------
         # WATCH OVER (swapped EPR monitor)
         # --------------------------------------------------
-        elif accion == "watch_over":
+        elif comand == "watch_over":
             other_port=payload.get("other_port")
             old_id=payload.get("old_id", None)
             print(f"Watching over {payload['id']}, that was {old_id} before")
@@ -687,7 +687,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
         # --------------------------------------------------
         # DO SWAPPING
         # --------------------------------------------------
-        elif accion == "do swapping":
+        elif comand == "do swapping":
             destinatarios = payload.get("destinatarios", [])
             destinatarios_ports = payload.get("destinatarios_ports", [])
             pswap = float(payload.get("pswap", 1.0))
@@ -715,7 +715,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
                     ports_involved=ports_involved
                 )
                 conn_sock.send(json.dumps(result).encode())
-        elif accion == "stop_monitor":
+        elif comand == "stop_monitor":
             epr_id = payload["id"]
             print(f"[LISTENER] Stop monitor for {epr_id}")
             if epr_id in epr_store:
@@ -724,7 +724,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
 
 
         else:
-            conn_sock.send(json.dumps({"error": f"Unknown action {accion}"}).encode())
+            conn_sock.send(json.dumps({"error": f"Unknown action {comand}"}).encode())
 
     except Exception as e:
         print(f"[LISTENER ERROR] {e}")

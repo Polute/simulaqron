@@ -413,7 +413,7 @@ def app_open(ROL, PUERTO):
     # Endpoint para enviar órdenes a los nodos
     @app.route("/mandate", methods=["POST"])
     def send_mandates():
-        data = request.get_json()  # formato esperado: { nodo_id: [ {accion:..., ...}, ... ], ... }
+        data = request.get_json()  # formato esperado: { nodo_id: [ {comand:..., ...}, ... ], ... }
         if not isinstance(data, dict):
             return jsonify({"error": "Formato inválido"}), 400
 
