@@ -21,7 +21,7 @@ C = 3e5
 
 # Local EPR memory
 epr_store = {}
-nodo_info = {"parEPR": []}
+nodo_info = {"pairEPR": []}
 
 
 # --------------------------------------------------
@@ -84,17 +84,17 @@ def generar_epr(emisor, receptor, conn, emisor_port, receptor_port,
     if receptor not in neighbors:
         print(f"[SENDER] {receptor} is not a neighbor of {emisor}")
         send_info(
-            f"http://localhost:{emisor_port}/parEPR/add",
-            {"id": epr_id, "vecino": receptor, "t_gen": "0", "w_gen": "0"}
+            f"http://localhost:{emisor_port}/pairEPR/add",
+            {"id": epr_id, "neighbor": receptor, "t_gen": "0", "w_gen": "0"}
         )
         return
 
     if random.random() > pgen:
         print("[SENDER] Probabilistic failure, no EPR created")
-        for port, vecino in [(emisor_port, receptor), (receptor_port, emisor)]:
+        for port, neighbor in [(emisor_port, receptor), (receptor_port, emisor)]:
             send_info(
-                f"http://localhost:{port}/parEPR/add",
-                {"id": epr_id, "vecino": vecino, "t_gen": "0", "w_gen": "0"}
+                f"http://localhost:{port}/pairEPR/add",
+                {"id": epr_id, "neighbor": neighbor, "t_gen": "0", "w_gen": "0"}
             )
         return
 
@@ -110,10 +110,10 @@ def generar_epr(emisor, receptor, conn, emisor_port, receptor_port,
         epr_store[epr_id] = {"q": q, "w_out": 1.0, "other_port": receptor_port}
     except CQCNoQubitError:
         print("[SENDER] No quantum memory available")
-        for port, vecino in [(emisor_port, receptor), (receptor_port, emisor)]:
+        for port, neighbor in [(emisor_port, receptor), (receptor_port, emisor)]:
             send_info(
-                f"http://localhost:{port}/parEPR/add",
-                {"id": epr_id, "vecino": vecino, "t_gen": "0", "w_gen": "0"}
+                f"http://localhost:{port}/pairEPR/add",
+                {"id": epr_id, "neighbor": neighbor, "t_gen": "0", "w_gen": "0"}
             )
         return
     except Exception as e:
@@ -121,10 +121,10 @@ def generar_epr(emisor, receptor, conn, emisor_port, receptor_port,
         return
 
     t_gen = time.strftime("%M:%S.") + f"{int((time.time() % 1)*1000):03d}"
-    for port, vecino in [(emisor_port, receptor), (receptor_port, emisor)]:
+    for port, neighbor in [(emisor_port, receptor), (receptor_port, emisor)]:
         send_info(
-            f"http://localhost:{port}/parEPR/add",
-            {"id": epr_id, "vecino": vecino, "t_gen": t_gen, "w_gen": 1.0}
+            f"http://localhost:{port}/pairEPR/add",
+            {"id": epr_id, "neighbor": neighbor, "t_gen": t_gen, "w_gen": 1.0}
         )
 
 
@@ -214,7 +214,7 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
                 m = None
         else:
             m = None
-        for epr in node_info["parEPR"]:
+        for epr in node_info["pairEPR"]:
             if epr["id"] == epr_id and epr["state"] == "active":
                 epr["state"] = order
                 epr["medicion"] = m
@@ -224,9 +224,9 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
 
         try:
             if my_port:
-                requests.post(f"http://localhost:{my_port}/parEPR/recv", json=result_measure, timeout=2)
+                requests.post(f"http://localhost:{my_port}/pairEPR/recv", json=result_measure, timeout=2)
             if other_port:
-                requests.post(f"http://localhost:{other_port}/parEPR/recv", json=result_measure, timeout=2)
+                requests.post(f"http://localhost:{other_port}/pairEPR/recv", json=result_measure, timeout=2)
         except Exception as e:
             print(f"[ORDER] Error notifying endpoints of a measure with ports: {my_port}, {other_port} with this msg: {result_measure} and error: {e}")
 
@@ -244,7 +244,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
     state = payload.get("state", "fallo")
     resultado_recv = {
         "id": epr_id,
-        "vecino": payload.get("vecino"),
+        "neighbor": payload.get("neighbor"),
         "t_gen": payload.get("t_gen"),
         "t_recv": None,
         "t_diff": None,
@@ -283,10 +283,10 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             resultado_recv["t_recv"] = t_recv_str
             resultado_recv["t_diff"] = tdif
             resultado_recv["state"] = "active"
-            vecino = payload["vecino"]
+            neighbor = payload["neighbor"]
 
             resultado_recv["distancia_nodos"] = next(
-                v["distanceKm"] for v in node_info["neighbors"] if v["id"] == vecino
+                v["distanceKm"] for v in node_info["neighbors"] if v["id"] == neighbor
             )
 
             resultado_recv["listener_port"] = listener_port
@@ -312,7 +312,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
         resultado_recv["state"] = "EPR not received"
 
     # Update local memory
-    pares = node_info.get("parEPR", [])
+    pares = node_info.get("pairEPR", [])
     updated = False
     for i, epr in enumerate(pares):
         if epr.get("id") == epr_id:
@@ -321,16 +321,16 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             break
     if not updated:
         pares.append(resultado_recv)
-    node_info["parEPR"] = pares
+    node_info["pairEPR"] = pares
 
     # Notify endpoints
     try:
         print("[RECEIVER] Success on receiving the EPR, sending update states to sender and master")
         if my_port:
-            requests.post(f"http://localhost:{my_port}/parEPR/recv", json=resultado_recv, timeout=2)
+            requests.post(f"http://localhost:{my_port}/pairEPR/recv", json=resultado_recv, timeout=2)
         if emisor_port:
-            resultado_recv["vecino"] = node_info["id"]
-            requests.post(f"http://localhost:{emisor_port}/parEPR/recv", json=resultado_recv, timeout=2)
+            resultado_recv["neighbor"] = node_info["id"]
+            requests.post(f"http://localhost:{emisor_port}/pairEPR/recv", json=resultado_recv, timeout=2)
             listener_emiter_port = emisor_port + 4000
             starting_werner_recalculate_sender(epr_id, resultado_recv, listener_emiter_port)
 
@@ -350,7 +350,7 @@ def pick_pair_same_edge_swap(node_info, my_port, dest1, dest2, timeout=5.0, inte
     my_id = node_info["id"]
 
     while time.time() - start < timeout:
-        par = node_info.get("parEPR", [])
+        par = node_info.get("pairEPR", [])
         # 1. EPRs already used in a swap
         used_ids = set()
         for e in par:
@@ -363,8 +363,8 @@ def pick_pair_same_edge_swap(node_info, my_port, dest1, dest2, timeout=5.0, inte
         ]
         # 3. Find two EPRs with different endpoints AND valid for this repeater
         for e1, e2 in combinations(alive, 2):
-            if e1["vecino"] in (dest1, dest2) and e2["vecino"] in (dest1, dest2):
-                if e1["vecino"] != e2["vecino"]:
+            if e1["neighbor"] in (dest1, dest2) and e2["neighbor"] in (dest1, dest2):
+                if e1["neighbor"] != e2["neighbor"]:
                     return e1, e2, "valid"
 
         
@@ -389,8 +389,8 @@ def assign_old_ids(node_info, old_id1, old_id2, dest1, dest2):
     candidates = {old_id1, old_id2}
 
     def get_old_id_for_neighbor(neighbor):
-        for epr in node_info.get("parEPR", []):
-            if epr.get("vecino") == neighbor and epr.get("id") in candidates:
+        for epr in node_info.get("pairEPR", []):
+            if epr.get("neighbor") == neighbor and epr.get("id") in candidates:
                 return epr.get("id")
         return None
 
@@ -457,7 +457,7 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
     measure_epr(epr1["id"], node_info, conn, my_port, order)
     measure_epr(epr2["id"], node_info, conn, my_port, order)
 
-    # refresh node_info once after swap to catch latest parEPR 
+    # refresh node_info once after swap to catch latest pairEPR 
     try: 
         node_info = requests.get(f"http://localhost:{my_port}/info", timeout=2).json() 
     except: 
@@ -499,10 +499,10 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
     # New swapped EPR (metadata)
     swapped_epr = {
         "id": id_swap,
-        "vecino": destinatarios,
+        "neighbor": destinatarios,
         "state": "active",
         "medicion": None,
-        "t_gen": t_recv_str,
+        "t_gen": t_gen_str,
         "t_recv": t_recv_str,
         "t_diff": tdif,
         "w_gen": w_gen_tuple,
@@ -510,12 +510,12 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
         "distancia_nodos": distancia_total,
         "listener_port": None
     }
-    node_info["parEPR"].append(swapped_epr)
+    node_info["pairEPR"].append(swapped_epr)
 
     # Notify endpoints
     result_swap = {
         "id": f"{str(epr1['id'])}_{str(epr2['id'])}",
-        "vecino": swapped_epr["vecino"],
+        "neighbor": swapped_epr["neighbor"],
         "state": "swapper",
     }
     try:
@@ -523,21 +523,21 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
         if destinatarios_ports and len(destinatarios_ports) == 2 and len(destinatarios) == 2:
             # Send swapped EPR metadata to each neighbor
             epr_msg1 = swapped_epr.copy()
-            epr_msg1["vecino"] = destinatarios[1]
+            epr_msg1["neighbor"] = destinatarios[1]
             epr_msg1["w_gen"] = w_gen_tuple[0]
             epr_msg1["listener_port"] = ports_involved[0]
             print("Notifying", destinatarios[0], "on port", destinatarios_ports[0])
-            requests.post(f"http://localhost:{destinatarios_ports[0]}/parEPR/recv", json=epr_msg1, timeout=2)
+            requests.post(f"http://localhost:{destinatarios_ports[0]}/pairEPR/recv", json=epr_msg1, timeout=2)
 
             epr_msg2 = swapped_epr.copy()
-            epr_msg2["vecino"] = destinatarios[0]
+            epr_msg2["neighbor"] = destinatarios[0]
             epr_msg2["w_gen"] = w_gen_tuple[1]
             epr_msg2["listener_port"] = ports_involved[1]
             print("Notifying", destinatarios[1], "on port", destinatarios_ports[1])
-            requests.post(f"http://localhost:{destinatarios_ports[1]}/parEPR/recv", json=epr_msg2, timeout=2)
+            requests.post(f"http://localhost:{destinatarios_ports[1]}/pairEPR/recv", json=epr_msg2, timeout=2)
 
         if my_port:
-            requests.post(f"http://localhost:{my_port}/parEPR/swap", json=result_swap, timeout=2)
+            requests.post(f"http://localhost:{my_port}/pairEPR/swap", json=result_swap, timeout=2)
 
         # Updating their EPR and watch over it, making one of them measured it if it reaches the threshold
         monitor_msg_A = {
@@ -616,7 +616,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
         # --------------------------------------------------
         # RECIBE EPR
         # --------------------------------------------------
-        elif comand == "recibe EPR":
+        elif comand == "receive EPR":
             resultado = recibir_epr(
                 payload.get("epr_obj"),
                 node_info,

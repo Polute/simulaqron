@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Nodo {{ nodo_info.name }}</title>
+    <title>Node {{ node_info.name }}</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
@@ -58,13 +58,6 @@
             stroke-width: 2px;
         }
 
-        .pgen-input,
-        .name-input {
-            position: absolute;
-            display: none;
-            z-index: 10;
-        }
-
         .label {
             font-size: 12px;
             text-anchor: middle;
@@ -78,22 +71,32 @@
         .node {
             cursor: pointer;
         }
+        /* Estilo general del checkbox */
+        /* Reset completo solo para el checkbox */
+        #tabla-node .roleChk {
+            all: unset;          /* borra TODO el estilo heredado */
+            appearance: auto;    /* vuelve a ser un checkbox normal */
+            cursor: pointer;
+        }
 
-        #tabla-nodos, #tabla-aristas {
+
+
+
+        #tabla-node, #tabla-aristas {
             width: 100%;
             border-collapse: collapse;
             margin-top: 1em;
             font-size: 0.9em;
         }
 
-        #tabla-nodos th, #tabla-nodos td,
+        #tabla-node th, #tabla-node td,
         #tabla-aristas th, #tabla-aristas td {
             border: 1px solid #ccc;
             padding: 0.4em;
             text-align: center;
         }
 
-        #tabla-nodos input, #tabla-aristas input {
+        #tabla-node input, #tabla-aristas input {
             width: 90%;
             padding: 0.2em;
             font-size: 0.9em;
@@ -114,14 +117,99 @@
             overflow-y: auto;
             white-space: pre-wrap;
         }
+        /* === Night mode for this section === */
+        /* Fondo general */
+        body.night {
+            background-color: #1e1e1e;
+            color: #eee;
+        }
+
+        /* Columna principal */
+        body.night .columna {
+            background-color: #2a2a2a;
+            color: #eee;
+            box-shadow: 0 0 10px rgba(255,255,255,0.05);
+        }
+
+        /* Títulos */
+        body.night h1,
+        body.night h2,
+        body.night h3 {
+            color: #ddd;
+        }
+
+        /* Tablas */
+        body.night table th {
+            background-color: #333;
+            color: #eee;
+        }
+        body.night table td {
+            background-color: #2a2a2a;
+            color: #eee;
+            border-color: #555;
+        }
+
+        /* Etiquetas */
+        body.night .label {
+            color: #ccc;
+        }
+
+        /* Tabla nodes y aristas */
+        body.night #tabla-node th,
+        body.night #tabla-aristas th {
+            background-color: #333;
+            color: #eee;
+        }
+        body.night #tabla-node td,
+        body.night #tabla-aristas td {
+            background-color: #2a2a2a;
+            color: #eee;
+            border-color: #555;
+        }
+
+        /* Inputs de tabla */
+        body.night #tabla-node input,
+        body.night #tabla-aristas input {
+            background-color: #444;
+            color: #eee;
+            border: 1px solid #666;
+        }
+        body.night #tabla-node .roleChk {
+            accent-color: #bb86fc; /* morado suave estilo Material Night */
+            filter: brightness(0.8);
+        }
+
+
+        /* Matrices */
+        body.night .matrix-input {
+            background-color: #444;
+            color: #eee;
+            border: 1px solid #666;
+        }
+
+        /* Panel de órdenes */
+        body.night #ordenesNodo {
+            background-color: #2a2a2a;
+            border-color: #555;
+            color: #eee;
+        }
+        /* Buttons in night mode */
+        body.night .button {
+            background-color: #555;
+            color: #eee;
+        }
+
     </style>
 </head>
 <body>
 <div class="container-flex">
     <div class="columna">
         <h2>
-            Mapa del Nodo {{ nodo_info.name }}
-            <button onclick="window.open('/info', '_blank')">Ver JSON del Nodo</button>
+            Node map {{ node_info.name }}
+            <button class="button"o nclick="window.open('/info', '_blank')">Watch JSON of the node</button>
+            <button id="resetView" class="button">📍</button>
+            <!-- Interactive icon for day/night -->
+            <span id="toggleIcon">🌞</span>
         </h2>
         <div id="map-wrapper">
             <div id="map"></div>
@@ -133,7 +221,7 @@
         <script src="https://d3js.org/d3.v7.min.js"></script>
 
         <h3>Nodo Info</h3>
-        <table id="tabla-nodo">
+        <table id="tabla-node">
             <thead>
                 <tr>
                     <th>ID</th>
@@ -144,16 +232,16 @@
             </thead>
             <tbody>
                 <tr>
-                    <td>{{ nodo_info.id }}</td>
-                    <td><input type="text" id="nameInput" value="{{ nodo_info.name }}"></td>
+                    <td>{{ node_info.id }}</td>
+                    <td><input type="text" id="nameInput" value="{{ node_info.name }}"></td>
                     <td>
                         {% for role in ["emisor","receptor","repeater"] %}
                             <label>
-                                <input type="checkbox" class="roleChk" value="{{ role }}" {% if role in nodo_info.roles %}checked{% endif %}>{{ role }}
+                                <input type="checkbox" class="roleChk" value="{{ role }}" {% if role in node_info.roles %}checked{% endif %}>{{ role }}
                             </label>
                         {% endfor %}
                     </td>
-                    <td><input type="number" id="pswapInput" min="0" max="1" step="0.01" value="{{ nodo_info.get('pswap',0.0) }}"></td>
+                    <td><input type="number" id="pswapInput" min="0" max="1" step="0.01" value="{{ node_info.get('pswap',0.0) }}"></td>
                 </tr>
             </tbody>
         </table>
@@ -164,10 +252,10 @@
                 <tr><th>Source</th><th>Target</th><th>Distance (km)</th><th>Pgen</th></tr>
             </thead>
             <tbody>
-                {% for vecino in nodo_info.get("neighbors", []) %}
+                {% for vecino in node_info.get("neighbors", []) %}
                     {% if vecino %}
                     <tr data-id="{{ vecino.id }}">
-                        <td>{{ nodo_info.id }}</td>
+                        <td>{{ node_info.id }}</td>
                         <td>{{ vecino.id }}</td>
                         <td><input type="number" class="distInput" step="0.1" value="{{ vecino.distanceKm }}"></td>
                         <td><input type="number" class="pgenInput" min="0" max="1" step="0.01" value="{{ vecino.pgen }}"></td>
@@ -183,12 +271,21 @@
 </div>
 
 <script>
+    // Day/Night toggle
+    const icon = document.getElementById("toggleIcon");
+    const body = document.body;
+    icon.addEventListener("click", () => {
+        body.classList.toggle("day");
+        body.classList.toggle("night");
+        icon.textContent = body.classList.contains("day") ? "🌞" : "🌙";
+    });
     window.onload = function () {
-        // Parse nodo_info from backend
-        const nodo = JSON.parse('{{ nodo_info|tojson|safe }}');
+        // Parse node_info from backend
+        const node = JSON.parse('{{ node_info|tojson|safe }}');
+        const resetViewBtn = document.getElementById("resetView");
 
         // Inicializar mapa Leaflet
-        const map = L.map('map').setView([nodo.lat, nodo.lon], 13);
+        const map = L.map('map').setView([node.lat, node.lon], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
@@ -197,26 +294,30 @@
         const svgLayer = L.svg().addTo(map);
         const svg = d3.select("#map").select("svg");
 
-        // Arrays globales de nodos y enlaces
-        let nodes = [nodo];
+        resetViewBtn.onclick = () => {
+                map.setView([node.lat, node.lon], 13);
+            };
+
+        // Arrays globales de nodes y enlaces
+        let nodes = [node];
         let links = [];
 
-        // Si el nodo tiene vecinos, añadirlos como nodos y enlaces
-        nodo.neighbors.forEach((vecino, i) => {
+        // Si el node tiene vecinos, añadirlos como nodes y enlaces
+        node.neighbors.forEach((vecino, i) => {
             // Si no tiene lat/lon, asignar aleatorio alrededor
             if (!vecino.lat || !vecino.lon) {
                 const radius = 0.01; // ~1 km
                 let angle;
-                if (nodo.neighbors.length === 2) {
+                if (node.neighbors.length === 2) {
                     angle = i === 0 ? 0 : Math.PI;
                 } else {
                     angle = Math.random() * 2 * Math.PI;
                 }
-                vecino.lat = nodo.lat + radius * Math.cos(angle);
-                vecino.lon = nodo.lon + radius * Math.sin(angle);
+                vecino.lat = node.lat + radius * Math.cos(angle);
+                vecino.lon = node.lon + radius * Math.sin(angle);
             }
             nodes.push(vecino);
-            links.push({ source: nodo.id, target: vecino.id });
+            links.push({ source: node.id, target: vecino.id });
         });
 
         let draggingNode = null;
@@ -245,7 +346,7 @@
                     .attr("opacity", 0.9);
             });
 
-            // Dibujar nodos
+            // Dibujar nodes
             nodes.forEach(node => {
                 const point = map.latLngToLayerPoint([node.lat, node.lon]);
 
@@ -296,9 +397,9 @@
                     const info = JSON.stringify(data);
                     const otherInfo = JSON.stringify(lastInfo);
                     if(info != otherInfo){
-                        Object.assign(nodo, data);
+                        Object.assign(node, data);
                         // Update nodes and links for the map overlay
-                        nodes = [nodo]; // main node
+                        nodes = [node]; // main node
                         links = [];
 
                         data.neighbors.forEach(vecino => {
@@ -306,19 +407,19 @@
                             if (!vecino.lat || !vecino.lon) {
                                 const radius = 0.01;
                                 const angle = Math.random() * 2 * Math.PI;
-                                vecino.lat = nodo.lat + radius * Math.cos(angle);
-                                vecino.lon = nodo.lon + radius * Math.sin(angle);
+                                vecino.lat = node.lat + radius * Math.cos(angle);
+                                vecino.lon = node.lon + radius * Math.sin(angle);
                             }
 
                             nodes.push(vecino);
-                            links.push({ source: nodo.id, target: vecino.id });
+                            links.push({ source: node.id, target: vecino.id });
                         });
 
 
                         // preserve client-side coordinates
                         if (draggingNode) {
-                            nodo.lat = draggingNode.lat;
-                            nodo.lon = draggingNode.lon;
+                            node.lat = draggingNode.lat;
+                            node.lon = draggingNode.lon;
                         }
 
                         // Node inputs
@@ -407,7 +508,7 @@
 
             if (type === "neighbor") {
                 console.log("Cambiando distancia2");
-                payload.source = nodo.id;
+                payload.source = node.id;
                 payload.target = neighborId;
                 payload[field] = value;
                 console.log("Payload",payload);
@@ -491,17 +592,17 @@
         actualizarNodo();
 
         // Guardar los IDs de los intervalos
-        let nodoInterval = setInterval(actualizarNodo, 2000);
+        let nodeInterval = setInterval(actualizarNodo, 2000);
 
         // Funciones para pausar y reanudar
         function pausarActualizaciones() {
-            clearInterval(nodoInterval);
+            clearInterval(nodeInterval);
         // clearInterval(ordenesInterval);
             console.log("Actualizaciones pausadas");
         }
 
         function reanudarActualizaciones() {
-            nodoInterval = setInterval(actualizarNodo, 2000);
+            nodeInterval = setInterval(actualizarNodo, 2000);
         // ordenesInterval = setInterval(actualizarOrdenes, 2000);
             console.log("Actualizaciones reanudadas");
         }

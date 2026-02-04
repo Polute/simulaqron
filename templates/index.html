@@ -53,7 +53,7 @@
                             <option value="matrix">Matrix 4x4</option>
                         </select>
 
-                        <!-- Input numérico -->
+                        <!-- Numeric input -->
                         <div id="number_channel">
                             <label for="quantum_channel">Value:</label>
                             <input type="number" id="quantum_channel" name="quantum_channel" min="0" max="1" step="0.01" value="1.0">
@@ -123,7 +123,7 @@
             </div>
 
 
-            <!-- Columna central: simulación -->
+            <!-- Central column: simulation -->
             <div class="center-column">
                 <div id="simulation-header">
                     <h1>Quantum Simulation</h1>
@@ -177,27 +177,27 @@
                     <button class="button" onclick="initSimulation()">Start Simulation</button>
                 </div>    
                  
-                <!-- Sección de operaciones más pequeña -->
+                <!-- Operations column -->
                 <div class="operations-column">
                     <h3>Quantum orders</h3>
-                        <!-- Paleta de bloques disponibles -->
+                        <!-- Blocks pallette -->
                         <div id="pallette" class="pallette">
-                            <!-- Bloques fijos -->
+                            <!-- Fixed blocks -->
                             <div class="block op-double" draggable="true" data-op="epr">⚛️ Entanglement</div>
                             <div class="block op-double" draggable="true" data-op="swap">🔗 Swapping</div>
                             <div class="block op-simple" draggable="true" data-op="pur">🧪 Purification</div>
                         </div>
 
-                    <!-- Workspace horizontal -->
+                    <!-- Horizontal Workspace  -->
                     <h4>Order secuence
                         <button id="clean-workspace" class="button">Clean Workspace</button>
-                        <!-- Zona de eliminación de bloques -->
+                        <!-- Block removal zone -->
                         <div id="trash-frame" class="trash-frame">
                             🗑️
                         </div>
                     </h4>
                     <div id="workspace" class="workspace">
-                        <!-- Aquí se soltarán los bloques -->
+                        <!-- Blocks will be dropped here -->
                     </div>
                     <label for="mode_select">Export mode:</label>
                     <select id="mode_select" onchange="toggleMode()">
@@ -230,7 +230,7 @@
                 </div>
             </div>
             <div class="right-column">
-                <h2>Historial</h2>
+                <h2>History</h2>
                 <div id="results-table-wrapper">
                     <table id="results-table">
                         <thead></thead>
@@ -356,10 +356,10 @@
                         </tr>
                         </thead>
                         <tbody>
-                        ${data.parEPR.map(p => `
+                        ${data.pairEPR.map(p => `
                             <tr>
                             <td>${p.id}</td>
-                            <td>${p.vecino}</td>
+                            <td>${p.neighbor}</td>
                             <td>${p.distancia_nodos}</td>
                             <td class="state ${p.state}">${p.state}</td>
                             <td>${p.t_gen}</td>
@@ -396,19 +396,19 @@
         const workspace = document.getElementById("workspace");
         const limpiarBtn = document.getElementById("clean-workspace");
 
-        // Historial global de EPR: mantiene todos los pares aunque los nodos se oculten
+        // Global EPR history: keeps all pairs even if nodes are hidden
         let eprHistoryGlobal = [];
 
         limpiarBtn.addEventListener("click", () => {
             eprHistoryGlobal = [];
-            workspace.innerHTML = ""; // Borra todo
+            workspace.innerHTML = ""; // Clear history
         });
 
-        // --- Drag interno del workspace ---
+        // --- Internal workspace dragging ---
         workspace.addEventListener("dragstart", e => {
             if (e.target.classList.contains("block")) {
                 e.target.classList.add("dragging");
-                e.dataTransfer.setData("text/plain", null); // para Firefox
+                e.dataTransfer.setData("text/plain", null); // for Firefox
             }
         });
 
@@ -442,7 +442,7 @@
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
 
-        // --- Drop desde pallette ---
+        // --- Drop from pallette ---
         workspace.addEventListener("drop", e => {
             e.preventDefault();
 
@@ -462,18 +462,18 @@
 
             workspace.appendChild(newBlock);
 
-            actualizarBloques();
+            updatingBlocks();
         });
-        const marcoPapelera = document.getElementById("trash-frame");
+        const trashFrame = document.getElementById("trash-frame");
 
-        // Permitir drop
-        marcoPapelera.addEventListener("dragover", e => {
+        // Allow drop
+        trashFrame.addEventListener("dragover", e => {
             e.preventDefault();
-            marcoPapelera.classList.add("dragover");
+            trashFrame.classList.add("dragover");
         });
 
-        // Borrar bloque al soltar sobre la papelera
-        marcoPapelera.addEventListener("drop", e => {
+        // Delete block when dropped onto the trash bin
+        trashFrame.addEventListener("drop", e => {
             e.preventDefault();
             const dragging = workspace.querySelector(".dragging");
 
@@ -484,27 +484,27 @@
                     const dst = dragging.dataset.dst;
 
                     if (src && dst) {
-                        eliminarUnaEpr(src, dst);
-                        console.log("EPR eliminado:", { src, dst });
+                        deletingOneEpr(src, dst);
+                        console.log("EPR removed:", { src, dst });
                     }
 
                 }else if (op === "pur") {
-                    if (dragging.dataset.paresUsados) {
-                        const usados = JSON.parse(dragging.dataset.paresUsados);
+                    if (dragging.dataset.usedPairs) {
+                        const used = JSON.parse(dragging.dataset.usedPairs);
+                        
+                        // Restore ONLY the first consumed EPR (the one PUR actually removes)
+                        const e1 = used[0];
 
-                        // Restaurar SOLO el primer EPR consumido (el que PUR realmente elimina)
-                        const e1 = usados[0];
-
-                        // Asegurar existencia de listas
+                        // Securing the existence of the list
                         if (!eprHistoryGlobal[e1.src]) eprHistoryGlobal[e1.src] = [];
                         if (!eprHistoryGlobal[e1.dst]) eprHistoryGlobal[e1.dst] = [];
 
-                        // Restaurar 1 copia en cada nodo
+                        // Restoring one copy in each node
                         eprHistoryGlobal[e1.src].push(e1);
                         eprHistoryGlobal[e1.dst].push(e1);
 
-                        console.log("PUR eliminada → restaurado 1 EPR:", e1);
-                        console.log("Historial global tras restaurar PUR:", eprHistoryGlobal);
+                        console.log("PUR removed → restored 1 EPR:", e1);
+                        console.log("Global history after restoring PUR:", eprHistoryGlobal);
                     }
                 } else if (op === "swap") {
                     const id1 = dragging.dataset.src;
@@ -512,25 +512,25 @@
                     const helper = dragging.dataset.helper;
 
                     if (helper && id1) {
-                        eliminarUnaEpr(helper, id1);
-                        console.log("SWAP eliminó EPR helper-node1:", helper, id1);
+                        deletingOneEpr(helper, id1);
+                        console.log("SWAP removed EPR helper-node1:", helper, id1);
                     }
                     if (helper && id2) {
-                        eliminarUnaEpr(helper, id2);
-                        console.log("SWAP eliminó EPR helper-node2:", helper, id2);
+                        deletingOneEpr(helper, id2);
+                        console.log("SWAP removed EPR helper-node2:", helper, id2);
                     }
 
                 }
 
                 dragging.remove();
-                actualizarBloques();
+                updatingBlocks();
 
-                console.log("Historial global tras borrar bloque:", eprHistoryGlobal);
+                console.log("Global history after deleting block:", eprHistoryGlobal);
             }
 
-            marcoPapelera.classList.remove("dragover");
+            trashFrame.classList.remove("dragover");
         });
-        function eliminarUnaEpr(src, dst) {
+        function deletingOneEpr(src, dst) {
             if (eprHistoryGlobal[src]) {
                 const i = eprHistoryGlobal[src].findIndex(
                     e => e.src === src && e.dst === dst
@@ -547,9 +547,9 @@
         }
 
 
-        // Quitar efecto visual al salir
-        marcoPapelera.addEventListener("dragleave", e => {
-            marcoPapelera.classList.remove("dragover");
+        // Clear visual effect on exit
+        trashFrame.addEventListener("dragleave", e => {
+            trashFrame.classList.remove("dragover");
         });
 
         function hasEprWith(node, target) {
@@ -573,11 +573,11 @@
 
 
 
-        function actualizarBloques() {
+        function updatingBlocks() {
             const blocks = Array.from(workspace.querySelectorAll(".block"));
             const actualizarInfoBtn = 
 
-            // Inicializar historial para cada nodo
+            // Inicialize history on each node
             blocks.forEach(b => {
                 if (b.dataset.op === "node") {
                     if (!eprHistoryGlobal[b.dataset.src]) eprHistoryGlobal[b.dataset.src] = [];
@@ -588,7 +588,7 @@
                 if (b.dataset.finalizado) return;
 
                 if (b.dataset.op === "epr") {
-                    // Buscar nodos alrededor, sin importar si están visibles
+                    // Searching nodes, even if they aren't visible
                     const prevNode = blocks.slice(0, idx).reverse().find(bb => bb.dataset.op === "node");
                     const nextNode = blocks.slice(idx + 1).find(bb => bb.dataset.op === "node");
 
@@ -598,17 +598,17 @@
                         b.textContent = `${prevNode.dataset.src} → ${nextNode.dataset.src}`;
                         b.dataset.finalizado = true;
 
-                        // Guardar EPR en historial global
-                        const nuevoEpr = { src: prevNode.dataset.src, dst: nextNode.dataset.src };
+                        // Saving EPR in the global history
+                        const newEpr = { src: prevNode.dataset.src, dst: nextNode.dataset.src };
 
-                        eprHistoryGlobal[prevNode.dataset.src].push(nuevoEpr);
-                        eprHistoryGlobal[nextNode.dataset.src].push(nuevoEpr);
+                        eprHistoryGlobal[prevNode.dataset.src].push(newEpr);
+                        eprHistoryGlobal[nextNode.dataset.src].push(newEpr);
 
-                        console.log("EPR agregado:", nuevoEpr);
-                        console.log("Historial global:", eprHistoryGlobal);
+                        console.log("EPR added:", newEpr);
+                        console.log("Global history:", eprHistoryGlobal);
 
 
-                        // Ocultar nodos visualmente, pero mantener historial
+                        // Hiding nodes, but keeping the history
                         prevNode.style.display = "none";
                         nextNode.style.display = "none";
                     } else {
@@ -618,11 +618,11 @@
                 }else if (b.dataset.op === "pur") {
                     let posiblesCandidatos = [];
 
-                    for (let nodo in eprHistoryGlobal) {
-                        const eprs = eprHistoryGlobal[nodo] || [];
+                    for (let node in eprHistoryGlobal) {
+                        const eprs = eprHistoryGlobal[node] || [];
                         
                         // Searching for nodes used in a EPR
-                        const creados = eprs.filter(e => e.src === nodo || e.dst === nodo );
+                        const creados = eprs.filter(e => e.src === node || e.dst === node );
 
                         const paresContados = {};
                         creados.forEach(e => {
@@ -633,7 +633,7 @@
                         for (let k in paresContados) {
                             if (paresContados[k] >= 2) {
                                 const paresUsar = creados.filter(e => [e.src, e.dst].sort().join("-") === k).slice(0, 2);
-                                posiblesCandidatos.push({ nodo, paresUsar });
+                                posiblesCandidatos.push({ node, paresUsar });
                                 break;
                             }
                         }
@@ -642,7 +642,7 @@
                     if (posiblesCandidatos.length === 0) {
                         b.textContent = "🧪 Purification 🚫";
                     } else {
-                        // Crear selector desplegable con estilo similar a bloques
+                        // Create a dropdown selector with a block‑style appearance
                         const select = document.createElement("select");
                         select.style.fontSize = "0.85em";
                         select.style.padding = "3px 6px";
@@ -660,8 +660,8 @@
 
                         posiblesCandidatos.forEach(candidato => {
                             const option = document.createElement("option");
-                            option.value = candidato.nodo;
-                            option.textContent = candidato.nodo;
+                            option.value = candidato.node;
+                            option.textContent = candidato.node;
                             select.appendChild(option);
                         });
 
@@ -669,24 +669,24 @@
                         b.appendChild(select);
 
                         select.addEventListener("change", () => {
-                            const nodoSeleccionado = select.value;
-                            const elegido = posiblesCandidatos.find(c => c.nodo === nodoSeleccionado);
-                            const { nodo, paresUsar } = elegido;
+                            const nodeSeleccionado = select.value;
+                            const elegido = posiblesCandidatos.find(c => c.node === nodeSeleccionado);
+                            const { node, paresUsar } = elegido;
 
-                            // Asignar datos al bloque
-                            b.dataset.dst = nodo;
+                            // Asign data to the block
+                            b.dataset.dst = node;
                             b.dataset.finalizado = true;
-                            b.dataset.paresUsados = JSON.stringify(paresUsar);
-                            b.textContent = `🧪 ${nodo}`;
+                            b.dataset.usedPairs = JSON.stringify(paresUsar);
+                            b.textContent = `🧪 ${node}`;
 
-                            // Eliminar 1 EPR consumido en ambos nodos
+                            // Deleting 1 EPR consumed in both nodes
                             const e1 = paresUsar[0];
-                            eliminarUnaEpr(e1.src, e1.dst);
+                            deletingOneEpr(e1.src, e1.dst);
 
-                            console.log("🧪 PUR aplicada:", elegido);
-                            console.log("Historial global tras PUR:", eprHistoryGlobal);
+                            console.log("🧪 PUR applied:", elegido);
+                            console.log("Global history after PUR:", eprHistoryGlobal);
 
-                            // Quitar selector tras seleccionar
+                            // Removing selector after selecting
                             select.remove();
                         });
                     }
@@ -705,14 +705,14 @@
                         console.log("=== SWAP DEBUG ===");
                         console.log("Helper node:", helperNode.dataset.src);
                         console.log("Target nodes:", n1.dataset.src, n2.dataset.src);
-                        console.log("Historial global del helper:", eprHistoryGlobal[helperNode.dataset.src]);
+                        console.log("Global history after SWAP:", eprHistoryGlobal[helperNode.dataset.src]);
 
                         // Validate that helper has EPRs with both target nodes
                         const valid1 = hasEprWith(helperNode.dataset.src, n1.dataset.src);
                         const valid2 = hasEprWith(helperNode.dataset.src, n2.dataset.src);
 
 
-                        console.log("Resultados validación swap:", valid1, valid2);
+                        console.log("SWAP validation results:", valid1, valid2);
                         console.log("==================");
 
                         if (valid1 && valid2) {
@@ -721,16 +721,16 @@
                             b.textContent = `${n1.dataset.src}<=>${n2.dataset.src}(${helperNode.dataset.src})`;
 
                             // Record new swapped EPR in global history
-                            const nuevoSwap = {
+                            const newSwap = {
                                 src: n1.dataset.src,
                                 dst: n2.dataset.src,
                                 helper: helperNode.dataset.src
                             };
-                            eprHistoryGlobal[n1.dataset.src].push(nuevoSwap);
-                            eprHistoryGlobal[n2.dataset.src].push(nuevoSwap);
+                            eprHistoryGlobal[n1.dataset.src].push(newSwap);
+                            eprHistoryGlobal[n2.dataset.src].push(newSwap);
 
-                            console.log("SWAP agregado:", nuevoSwap);
-                            console.log("Historial global tras SWAP:", eprHistoryGlobal);
+                            console.log("SWAP added:", newSwap);
+                            console.log("Global history after SWAP:", eprHistoryGlobal);
 
                             // Hide nodes visually
                             helperNode.style.display = "none";
@@ -745,7 +745,7 @@
                 }
             });
         }
-        function generarIdUnico() {
+        function generateUniqueId() {
             return Math.random().toString(36).substr(2, 9); 
         }
         function toggleMode() {
@@ -800,22 +800,22 @@
             }
         }
 
-        // Exportar órdenes usando el mismo historial
+        // Export orders using the same history
         function showOrders() {
             const blocks = workspace.querySelectorAll(".block");
             const orders = [];
             const eprHistory = [];
-            const ordersPorNodo = {}; // objeto donde agrupamos órdenes por nodo
+            const ordersPerNode = {}; // Object that gather every order of each node
 
 
-            // Construir un mapeo name -> id
+            // Build a name‑to‑id mapping
             const nameToId = {};
             nodes.forEach(n => { 
                 nameToId[n.name] = n.id;
             });
 
             blocks.forEach((b, i) => {
-                if (b.style.display === "none") return; // ignorar nodos ocultos
+                if (b.style.display === "none") return; // ignoring hidden nodes
 
                 const op = b.dataset.op;
 
@@ -824,55 +824,55 @@
                     const dstName = b.dataset.dst || "???";
 
                     if (!srcName || !dstName) {
-                        orders.push(`ERROR: Bloque EPR en posición ${i} sin src o dst`);
+                        orders.push(`ERROR: EPR block in position ${i} without src or dst`);
                         return;
                     }
 
-                    orders.push(`ENTANGLEMENT: ${srcName} crea EPR con ${dstName} [pos ${i}]`);
+                    orders.push(`ENTANGLEMENT: ${srcName} creates EPR with ${dstName} [pos ${i}]`);
                     eprHistory.push({ src: srcName, dst: dstName });
 
-                    // IDs para enviar al backend
+                    // IDs to send to the backend
                     const srcId = nameToId[srcName];
                     const dstId = nameToId[dstName];
 
-                    // generar un único id para ambos
-                    const eprId = generarIdUnico();
+                    // generate a single id for both
+                    const eprId = generateUniqueId();
 
-                    if (!ordersPorNodo[srcId]) ordersPorNodo[srcId] = [];
-                    ordersPorNodo[srcId].push({ id: eprId, comand: "genera EPR", target: dstId });
+                    if (!ordersPerNode[srcId]) ordersPerNode[srcId] = [];
+                    ordersPerNode[srcId].push({ id: eprId, comand: "generate EPR", target: dstId });
 
-                    if (!ordersPorNodo[dstId]) ordersPorNodo[dstId] = [];
-                    ordersPorNodo[dstId].push({ id: eprId, comand: "recibe EPR", source: srcId });
+                    if (!ordersPerNode[dstId]) ordersPerNode[dstId] = [];
+                    ordersPerNode[dstId].push({ id: eprId, comand: "receive EPR", source: srcId });
 
                 }else if (op === "pur") {
                     const dstName = b.dataset.dst;
 
-                    // Recuperar el último EPR del historial para saber con quién se purifica
+                    // Retrieve the last EPR from the history to know with whom it is purified
                     const lastEpr = eprHistory[eprHistory.length - 1];
                     const srcName = lastEpr ? lastEpr.src : null;
 
-                    console.log("Quien hace el pur:", dstName, "| y con quien lo comparte:", srcName);
+                    console.log("Who makes the pur:", dstName, "| and with who shares it:", srcName);
 
                     if (!dstName || !srcName) {
-                        orders.push(`ERROR: Bloque PUR en posición ${i} sin nodo asignado o sin EPR previo`);
+                        orders.push(`ERROR: PUR block in position ${i} without an assigned node or without a prior EPR`);
                         return;
                     }
 
-                    // Contar EPR donde este nodo es receptor
+                    // Count EPRs where this node is the receiver
                     const eprCount = eprHistory.filter(e => e.dst === dstName || e.src === dstName).length;
                     if (eprCount < 2) {
-                        orders.push(`ERROR: ${dstName} no tiene suficientes EPR previos para purificar [pos ${i}]`);
+                        orders.push(`ERROR: ${dstName} does not have enough prior EPRs to purify [pos ${i}]`);
                     } else {
-                        orders.push(`PURIFICACIÓN: ${dstName} purifica dos EPR previos [pos ${i}]`);
+                        orders.push(`PURIFICATION: ${dstName} purifies two prior EPRs [pos ${i}]`);
                         const srcId = nameToId[srcName];
                         const dstId = nameToId[dstName];
-                        const purId = generarIdUnico();
-                        if (!ordersPorNodo[dstId]) ordersPorNodo[dstId] = [];
-                        ordersPorNodo[dstId].push({
+                        const purId = generateUniqueId();
+                        if (!ordersPerNode[dstId]) ordersPerNode[dstId] = [];
+                        ordersPerNode[dstId].push({
                             id: purId,
-                            comand: "purifica",
-                            detalle: "dos EPR previos",
-                            con: srcId
+                            comand: "purify",
+                            detail: "two previous EPRs",
+                            with: srcId
                         });
                     }
                 } else if (op === "swap") {
@@ -881,7 +881,7 @@
                     const helperName = b.dataset.helper;
 
                     if (!id1Name || !id2Name || !helperName) {
-                        orders.push(`ERROR: Bloque SWAP en posición ${i} incompleto (falta src, dst o helper)`);
+                        orders.push(`ERROR: Incomplete SWAP block at position ${i} (missing src, dst, or helper)`);
                         return;
                     }
 
@@ -891,33 +891,33 @@
                     console.log("HISTORY: ",eprHistory);
                     if (!valid1 || !valid2) {
                         console.log("HISTORY2: ",eprHistory);
-                        orders.push(`ERROR: ${helperName} no tiene EPR previos con ${id1Name} y ${id2Name} para SWAP [pos ${i}]`);
+                        orders.push(`ERROR: ${helperName} has no prior EPRs with ${id1Name} and ${id2Name} for SWAP [pos ${i}]`);
                     } else {
-                        orders.push(`SWAP: ${helperName} hace entanglement swapping entre ${id1Name} y ${id2Name} [pos ${i}]`);
+                        orders.push(`SWAP: ${helperName} executes entanglement swapping between ${id1Name} and ${id2Name} [pos ${i}]`);
 
                         const helperId = nameToId[helperName];
                         const id1Id = nameToId[id1Name];
                         const id2Id = nameToId[id2Name];
-                        const swapId = generarIdUnico();
-                        // Acción para el helper
-                        if (!ordersPorNodo[helperId]) ordersPorNodo[helperId] = [];
-                        ordersPorNodo[helperId].push({ id: swapId, comand: "swap", con: [id1Id, id2Id] });
+                        const swapId = generateUniqueId();
+                        // Action for the helper
+                        if (!ordersPerNode[helperId]) ordersPerNode[helperId] = [];
+                        ordersPerNode[helperId].push({ id: swapId, comand: "swap", with: [id1Id, id2Id] });
 
-                        // Notificar a id1 y id2 que reciben SWAP
-                        if (!ordersPorNodo[id1Id]) ordersPorNodo[id1Id] = [];
-                        ordersPorNodo[id1Id].push({ 
+                        // Notify id1 and id2 that they receive a SWAP
+                        if (!ordersPerNode[id1Id]) ordersPerNode[id1Id] = [];
+                        ordersPerNode[id1Id].push({ 
                             id: swapId, 
-                            comand: "swap recibido", 
-                            con: [id2Id],          // con quién se hace el swap
-                            gracias_a: helperId    // gracias a quién se realizó
+                            comand: "received swap", 
+                            with: [id2Id],          // with whom the swap is performed
+                            thanks_to: helperId    // thanks to whom it was carried out
                         });
 
-                        if (!ordersPorNodo[id2Id]) ordersPorNodo[id2Id] = [];
-                        ordersPorNodo[id2Id].push({ 
+                        if (!ordersPerNode[id2Id]) ordersPerNode[id2Id] = [];
+                        ordersPerNode[id2Id].push({ 
                             id: swapId, 
-                            comand: "swap recibido", 
-                            con: [id1Id],          // con quién se hace el swap
-                            gracias_a: helperId    // gracias a quién se realizó
+                            comand: "received swap", 
+                            with: [id1Id],          // with whom the swap is performed
+                            thanks_to: helperId    // thanks to whom it was carried out
                         });
                     }
 
@@ -925,48 +925,48 @@
                 } else if (op === "node") {
                     orders.push(`NODE: ${b.dataset.src} [pos ${i}]`);
                 } else {
-                    orders.push(`ERROR: Operación desconocida "${op}" [pos ${i}]`);
+                    orders.push(`ERROR: Unknown operation "${op}" [pos ${i}]`);
                 }
             });
 
-            // Mostrar en pantalla usando nombres
+            // Display on screen using names
             document.getElementById("ordersText").textContent = orders.join("\n");
 
-            // Enviar automáticamente al endpoint /mandate usando IDs
+            // Automatically send to the /mandate endpoint using IDs
             fetch("/mandate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(ordersPorNodo)
+                body: JSON.stringify(ordersPerNode)
             })
             .then(response => response.json())
-            .then(data => console.log("Instrucciones enviadas al servidor:", data))
-            .catch(error => console.error("Error enviando instrucciones:", error));
+            .then(data => console.log("Instructions sent to the server:", data))
+            .catch(error => console.error("Error sending instructions:", error));
         }
 
 
-        function crearBloquesDinamicos(nodos) {
+        function createDynamicBlocks(nodes) {
             const pallette = document.getElementById("pallette");
 
-            nodos.forEach(nodo => {
+            nodes.forEach(node => {
                 // Evitar bloques duplicados fijos (EPR y Pur)
-                if (nodo.name.includes("epr") || nodo.name.includes("Pur") ||nodo.name.includes("swap")) return;
-                // 🔍 Si ya existe un bloque con este ID, no crearlo de nuevo
-                const yaExiste = pallette.querySelector(`[data-id="${nodo.id}"]`);
+                if (node.name.includes("epr") || node.name.includes("Pur") ||node.name.includes("swap")) return;
+                // 🔍 Si ya existe un bloque con este ID, no crearlo again
+                const yaExiste = pallette.querySelector(`[data-id="${node.id}"]`);
                 if (yaExiste) return;
 
                 const block = document.createElement("div");
                 block.className = "block op-simple";
                 block.draggable = true;
 
-                // Guardamos info del nodo en dataset para análisis posterior
+                // Guardamos info del node en dataset para análisis posterior
                 block.dataset.op = "node";
-                block.dataset.src = nodo.name;    // nombre del nodo
-                block.dataset.id = nodo.id;       // id del nodo
-                block.dataset.neighbors = JSON.stringify(nodo.neighbors); // vecinos en JSON
-                block.dataset.parEPR = JSON.stringify(nodo.parEPR);
+                block.dataset.src = node.name;    // nombre del node
+                block.dataset.id = node.id;       // id del node
+                block.dataset.neighbors = JSON.stringify(node.neighbors); // neighbors en JSON
+                block.dataset.pairEPR = JSON.stringify(node.pairEPR);
 
-                // Texto del bloque = nombre del nodo
-                block.textContent = nodo.name;
+                // Texto del bloque = nombre del node
+                block.textContent = node.name;
 
                 // Drag & Drop
                 block.addEventListener("dragstart", e => {
@@ -975,7 +975,7 @@
                     e.dataTransfer.setData("src", block.dataset.src);
                     e.dataTransfer.setData("id", block.dataset.id);
                     e.dataTransfer.setData("neighbors", block.dataset.neighbors);
-                    e.dataTransfer.setData("parEPR", block.dataset.parEPR);
+                    e.dataTransfer.setData("pairEPR", block.dataset.pairEPR);
                     e.dataTransfer.setData("class", block.className);
                     e.dataTransfer.setData("width", block.offsetWidth);
                 });
@@ -983,9 +983,9 @@
                 pallette.appendChild(block);
             });
         }
-        function ajustarColumnasSegunNodos(nodo_info) {
-            if (Array.isArray(nodo_info.nodes) && nodo_info.nodes.length > 0) {
-                const todosPre = nodo_info.nodes.every(n => n.id.endsWith("pre"));
+        function ajustarColumnasSegunNodos(node_info) {
+            if (Array.isArray(node_info.nodes) && node_info.nodes.length > 0) {
+                const todosPre = node_info.nodes.every(n => n.id.endsWith("pre"));
 
                 const header = document.getElementById("simulation-header");
                 const derecha = document.querySelector(".right-column");
@@ -1038,28 +1038,28 @@
         let links = [];
         let f5 = false;
         if (rol === "master") {
-            const nodo_info = JSON.parse('{{ nodo_info|tojson|safe }}');
-            console.log("Objeto nodo_info recibido:", nodo_info);
-            if (nodo_info.nodes && nodo_info.nodes.length > 0) {
-                // Inicializar nodos desde el backend (ya incluye predefinidos si hace falta)
-                nodes = nodo_info.nodes;
-                console.log("Nodos inicializados:", nodes);
+            const node_info = JSON.parse('{{ node_info|tojson|safe }}');
+            console.log("Received node_info object:", node_info);
+            if (node_info.nodes && node_info.nodes.length > 0) {
+                // Inicializar nodes desde el backend (ya incluye predefinidos si hace falta)
+                nodes = node_info.nodes;
+                console.log("Nodes initialized:", nodes);
 
                 // aplicar ajuste de columnas
-                ajustarColumnasSegunNodos(nodo_info);
+                ajustarColumnasSegunNodos(node_info);
 
-                nodes.forEach(nodo => {
-                    if (Array.isArray(nodo.neighbors)) {
-                        nodo.neighbors.forEach(vecino => {
-                            if (!vecino) return; // skip null/undefined neighbors
+                nodes.forEach(node => {
+                    if (Array.isArray(node.neighbors)) {
+                        node.neighbors.forEach(neighbor => {
+                            if (!neighbor) return; // skip null/undefined neighbors
                             const link = {
-                                source: nodo.id,
-                                target: vecino.id,
-                                distanciaKm: vecino.distanceKm,
-                                lat: vecino.lat,
-                                lon: vecino.lon,
-                                pgen: vecino.pgen,
-                                pgenOverride: vecino.pgenOverride || false
+                                source: node.id,
+                                target: neighbor.id,
+                                distanciaKm: neighbor.distanceKm,
+                                lat: neighbor.lat,
+                                lon: neighbor.lon,
+                                pgen: neighbor.pgen,
+                                pgenOverride: neighbor.pgenOverride || false
                             };
                             links.push(link);
                         });
@@ -1068,14 +1068,15 @@
             }
         }
 
-        console.log("Rol actual:", rol);
-        console.log("Lista final de Nodes:", nodes);
-        console.log("Lista final de Links:", links);
+        console.log("Current role:", rol);
+        console.log("Final list of Nodes:", nodes);
+        console.log("Final list of Links:", links);
 
 
-        // Crear bloques para los nodos detectados
+
+        // Crear bloques para los nodes detectados
         document.addEventListener("DOMContentLoaded", () => {
-            crearBloquesDinamicos(nodes);
+            createDynamicBlocks(nodes);
         });
 
 
@@ -1085,8 +1086,8 @@
                 .then(res => res.json())
                 .then(data => {
                     let texto = "";
-                    for (const nodo in data) {
-                        texto += `Nodo ${nodo} conectado con: {${data[nodo].join(", ")}}\n`;
+                    for (const node in data) {
+                        texto += `Node ${node} connected with: {${data[node].join(", ")}}\n`;
                     }
                     document.getElementById("topologyText").textContent = texto;
                 });
@@ -1243,22 +1244,22 @@
                             // Recalculate links
                             links.length = 0;
                             const linksDict = {};
-                            nodes.forEach(nodo => {
-                                const ts = nodo.lastUpdated || 0;
-                                if (Array.isArray(nodo.neighbors)) {
-                                    nodo.neighbors.forEach(vecino => {
-                                        const nodoKey = nodo.id || nodo.name;
-                                        const vecinoKey = vecino.id || vecino.name;
-                                        const par = [nodoKey, vecinoKey].sort().join("-");
+                            nodes.forEach(node => {
+                                const ts = node.lastUpdated || 0;
+                                if (Array.isArray(node.neighbors)) {
+                                    node.neighbors.forEach(neighbor => {
+                                        const nodeKey = node.id || node.name;
+                                        const neighborKey = neighbor.id || neighbor.name;
+                                        const par = [nodeKey, neighborKey].sort().join("-");
                                         if (!linksDict[par] || ts > linksDict[par].lastUpdated) {
                                             linksDict[par] = {
-                                                source: nodoKey,
-                                                target: vecinoKey,
-                                                targetLat: vecino.lat,
-                                                targetLon: vecino.lon,
-                                                distanciaKm: vecino.distanceKm,
-                                                pgen: vecino.pgen,
-                                                pgenOverride: vecino.pgenOverride || false,
+                                                source: nodeKey,
+                                                target: neighborKey,
+                                                targetLat: neighbor.lat,
+                                                targetLon: neighbor.lon,
+                                                distanciaKm: neighbor.distanceKm,
+                                                pgen: neighbor.pgen,
+                                                pgenOverride: neighbor.pgenOverride || false,
                                                 lastUpdated: ts
                                             };
                                         }
@@ -1271,7 +1272,7 @@
                                                 pgenOverride: l.pgenOverride });
                             });
 
-                            crearBloquesDinamicos(nodes);
+                            createDynamicBlocks(nodes);
                             draw();
                             actualizarTablaNodos();
                             actualizarTablaAristas();
@@ -1327,7 +1328,7 @@
                     const puerto = obtenerPuertoDesdeId(node.id);
                     console.log(puerto);
                     if (!puerto) return;
-                    const vecinosSimetricos = [];
+                    const neighborsSimetricos = [];
                     nodes.forEach(other => {
                         if (other.id !== node.id) {
                             const esteVecino = node.neighbors.find(v => v.id === other.id);
@@ -1345,14 +1346,14 @@
                                 lon = node.lon;
                             }
                             if (distanciaKm !== undefined){
-                                vecinosSimetricos.push({ id: other.id, distanceKm: distanciaKm, 
+                                neighborsSimetricos.push({ id: other.id, distanceKm: distanciaKm, 
                                     lat, lon, pgen, 
                                     pgenOverride: (esteVecino && esteVecino.pgenOverride) || 
                                     (otroVecino && otroVecino.pgenOverride) || false });
                             }
                         }
                     });
-                    console.log(vecinosSimetricos);
+                    console.log(neighborsSimetricos);
                     fetch(`http://127.0.0.1:${puerto}/update`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -1361,8 +1362,8 @@
                             name: node.name,
                             pswap: node.pswap,
                             roles: node.roles,
-                            neighbors: vecinosSimetricos,
-                            parEPR: node.parEPR,
+                            neighbors: neighborsSimetricos,
+                            pairEPR: node.pairEPR,
                             lastUpdated: Date.now()
                         })
                     }).catch(err => console.error(`Error updating node ${node.id}:`, err));
@@ -1592,24 +1593,24 @@
 
                         nodes.forEach(n => {
                             if (n.id === link.source) {
-                                const vecino = n.neighbors.find(v => v.id === link.target);
-                                if (vecino) {
-                                    vecino.distanceKm = val;
+                                const neighbor = n.neighbors.find(v => v.id === link.target);
+                                if (neighbor) {
+                                    neighbor.distanceKm = val;
 
                                     // --- NEW: auto-update pgen only if override is OFF ---
-                                    if (!vecino.pgenOverride) {
-                                        vecino.pgen = calculatePgen(val);
+                                    if (!neighbor.pgenOverride) {
+                                        neighbor.pgen = calculatePgen(val);
                                     }
                                 }
                             }
                             if (n.id === link.target) {
-                                const vecino = n.neighbors.find(v => v.id === link.source);
-                                if (vecino) {
-                                    vecino.distanceKm = val;
+                                const neighbor = n.neighbors.find(v => v.id === link.source);
+                                if (neighbor) {
+                                    neighbor.distanceKm = val;
 
                                     // --- NEW: auto-update pgen only if override is OFF ---
-                                    if (!vecino.pgenOverride) {
-                                        vecino.pgen = calculatePgen(val);
+                                    if (!neighbor.pgenOverride) {
+                                        neighbor.pgen = calculatePgen(val);
                                     }
                                 }
                             }
@@ -1644,21 +1645,21 @@
 
                         nodes.forEach(n => {
                             if (n.id === link.source) {
-                                const vecino = n.neighbors.find(v => v.id === link.target);
-                                if (vecino) {
-                                    vecino.pgen = val;
+                                const neighbor = n.neighbors.find(v => v.id === link.target);
+                                if (neighbor) {
+                                    neighbor.pgen = val;
 
                                     // --- NEW: manual edit activates override ---
-                                    vecino.pgenOverride = true;
+                                    neighbor.pgenOverride = true;
                                 }
                             }
                             if (n.id === link.target) {
-                                const vecino = n.neighbors.find(v => v.id === link.source);
-                                if (vecino) {
-                                    vecino.pgen = val;
+                                const neighbor = n.neighbors.find(v => v.id === link.source);
+                                if (neighbor) {
+                                    neighbor.pgen = val;
 
                                     // --- NEW: manual edit activates override ---
-                                    vecino.pgenOverride = true;
+                                    neighbor.pgenOverride = true;
                                 }
                             }
                         });
@@ -1766,7 +1767,7 @@
                 thead.innerHTML = `
                     <tr>
                         <th>ID</th>
-                        <th>Estado</th>
+                        <th>State</th>
                         <th>link</th>
                         <th>w_gen</th>
                         <th>w_out</th>
@@ -1781,7 +1782,7 @@
                 
 
                 const loadEPR = () => {
-                    fetch("/master/parEPR")
+                    fetch("/master/pairEPR")
                         .then(res => res.json())
                         .then(data => {
                             for (const [key, list] of Object.entries(data.MASTER_PAR_EPR || {})) {
@@ -1846,9 +1847,9 @@
                 return
             }
 
-            const nuevoJSON = JSON.stringify(historial);
-            if (ultimoHistorialEPR === nuevoJSON) return;
-            ultimoHistorialEPR = nuevoJSON;
+            const newJSON = JSON.stringify(historial);
+            if (ultimoHistorialEPR === newJSON) return;
+            ultimoHistorialEPR = newJSON;
 
             const tbody = document.querySelector("#results-table tbody");
             tbody.innerHTML = "";
@@ -1862,7 +1863,7 @@
                     <td>${epr.id}</td>
                     <td>${epr.state}</td>
                     <td>${epr.link}</td>
-                    <td>${epr.w_gen ?? ""}</td>
+                    <td>${formatNumber(epr.w_gen) ?? ""}</td>
                     <td>${formatNumber(epr.w_out)}</td>
                     <td>${epr.t_gen ?? ""}</td>
                     <td>${epr.t_recv ?? ""}</td>
@@ -1890,15 +1891,15 @@
                         const res = await fetch(`http://localhost:${puerto}/history`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ parEPR: [] })
+                            body: JSON.stringify({ pairEPR: [] })
                         });
 
                         if (!res.ok) {
-                            console.warn(`Nodo en puerto ${puerto} no respondió correctamente`);
+                            console.warn(`Node in port ${puerto} did not respond correctly `);
                             break; // parar el bucle si no responde bien
                         }
                     } catch (err) {
-                        console.warn(`No se pudo conectar al nodo en puerto ${puerto}:`, err);
+                        console.warn(`Could not connect to the node on port ${puerto}:`, err);
                         break; // parar el bucle si no conecta
                     }
                 }
@@ -1963,8 +1964,8 @@
 
 
         document.getElementById("num_PairsEPR").addEventListener("change", () => {
-            const nuevoModo = document.getElementById("num_PairsEPR").value;
-            if (nuevoModo !== modoAnterior) {
+            const newModo = document.getElementById("num_PairsEPR").value;
+            if (newModo !== modoAnterior) {
                 fetch("/limpieza_docs")
                     .then(response => response.json())
                     .then(data => {
@@ -1977,7 +1978,7 @@
                                 "<strong>Estado:</strong> Error al limpiar qubits.";
                             console.warn("Error al limpiar qubits.");
                         }
-                        modoAnterior = nuevoModo;
+                        modoAnterior = newModo;
                     });
             }
         });

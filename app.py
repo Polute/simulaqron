@@ -90,15 +90,15 @@ def mostrar_topologia():
             pseudo_topology[nodo] = [n for n in node_ids if n != nodo]
         return pseudo_topology
 
-    # Normalizar topología: solo vecinos válidos y distintos del propio nodo
+    # Normalizar topología: solo neighbors válidos y distintos del propio nodo
     result = {}
-    for nodo, vecinos in topology.items():
-        vecinos_filtrados = [
-            v for v in vecinos
+    for nodo, neighbors in topology.items():
+        neighbors_filtrados = [
+            v for v in neighbors
             if v in node_ids and v != nodo
         ]
-        result[nodo] = vecinos_filtrados
-        print(f"Nodo {nodo} conectado con: {{{', '.join(vecinos_filtrados)}}}")
+        result[nodo] = neighbors_filtrados
+        print(f"Nodo {nodo} conectado con: {{{', '.join(neighbors_filtrados)}}}")
 
     return result
 
@@ -118,8 +118,8 @@ PREDEFINED_NODES = [
         "lon": -3.8349,
         "pswap": 0.9,
         "roles": ["emisor", "receptor"],
-        "neighbors": [],   # Alice no tiene vecinos iniciales
-        "parEPR": []
+        "neighbors": [],   # Alice no tiene neighbors iniciales
+        "pairEPR": []
     },
     {
         "id": "node_bob_pre",
@@ -131,7 +131,7 @@ PREDEFINED_NODES = [
         "neighbors": [
             {"id": "node_alice_pre", "distanceKm": 50, "pgen": 0.8}
         ],
-        "parEPR": []
+        "pairEPR": []
     },
     {
         "id": "node_charlie_pre",
@@ -144,7 +144,7 @@ PREDEFINED_NODES = [
             {"id": "node_alice_pre", "distanceKm": 70, "pgen": 0.6},
             {"id": "node_bob_pre", "distanceKm": 40, "pgen": 0.9}
         ],
-        "parEPR": []
+        "pairEPR": []
     }
 ]
 
@@ -161,7 +161,7 @@ def app_open(ROL, PUERTO):
     # Diccionario que mapea puertos a nodos completos
     PORT_NODE_MAP = {}
 
-    nodo_info = PORT_NODE_MAP.get(PUERTO, {"id": "node_unknown", "name": "Desconocido", "neighbors": []})
+    node_info = PORT_NODE_MAP.get(PUERTO, {"id": "node_unknown", "name": "Desconocido", "neighbors": []})
     app = Flask(__name__)
     @app.route("/")
     def index():
@@ -184,7 +184,7 @@ def app_open(ROL, PUERTO):
                 counter=len(historial),
                 historial=historial,
                 rol=ROL,
-                nodo_info=nodo_info,
+                node_info=node_info,
             )
         elif ROL == "master":
             nodos = []
@@ -201,7 +201,7 @@ def app_open(ROL, PUERTO):
                 nodos = PREDEFINED_NODES
 
             # Enviar solo los nodos, sin links
-            nodo_info_master = {
+            node_info_master = {
                 "nodes": nodos
             }
 
@@ -211,14 +211,14 @@ def app_open(ROL, PUERTO):
                 counter=len(historial),
                 historial=historial,
                 rol=ROL,
-                nodo_info=nodo_info_master, 
+                node_info=node_info_master, 
                 time=int(time.time())
             )
 
     # Endpoint JSON del state del nodo
     @app.route("/info")
     def info():
-        return jsonify(nodo_info)
+        return jsonify(node_info)
     
     NODOS_PUERTOS = {}  # nodo_name -> puerto
 
@@ -361,18 +361,18 @@ def app_open(ROL, PUERTO):
 
 
 
-        # Construir diccionario de vecinos simétricos
-        vecinos_dict = {n["id"]: set() for n in nodos}
+        # Construir diccionario de neighbors simétricos
+        neighbors_dict = {n["id"]: set() for n in nodos}
         for nodo in nodos:
             nodo_id = nodo["id"]
-            for vecino in nodo.get("neighbors", []):
-                vecino_id = vecino.get("id")
-                if vecino_id and vecino_id != nodo_id:
-                    if vecino_id in vecinos_dict:
-                        vecinos_dict[nodo_id].add(vecino_id)
-                        vecinos_dict[vecino_id].add(nodo_id)
+            for neighbor in nodo.get("neighbors", []):
+                neighbor_id = neighbor.get("id")
+                if neighbor_id and neighbor_id != nodo_id:
+                    if neighbor_id in neighbors_dict:
+                        neighbors_dict[nodo_id].add(neighbor_id)
+                        neighbors_dict[neighbor_id].add(nodo_id)
                     else:
-                        print(f"Vecino {vecino_id} ignorado: no está en nodos actuales")
+                        print(f"Vecino {neighbor_id} ignorado: no está en nodos actuales")
 
 
         # Consolidate links keyed by sorted node pairs (no sourceLat/sourceLon)
@@ -440,8 +440,8 @@ def app_open(ROL, PUERTO):
     
     MASTER_PAR_EPR = {}
 
-    @app.route("/master/parEPR", methods=["GET", "POST"])
-    def master_parEPR():
+    @app.route("/master/pairEPR", methods=["GET", "POST"])
+    def master_pairEPR():
         if request.method == "POST":
             data = request.get_json()
             if not isinstance(data, dict):
@@ -451,8 +451,11 @@ def app_open(ROL, PUERTO):
                 for epr in historial:
                     # Build key using node id and neighbor
                     # Normalize neighbor: use "None" string if missing
-                    vecino = epr.get("vecino") if epr.get("vecino") is not None else "None"
-                    clave = f"{nodo_id}-{vecino}"
+                    
+                    neighbor = epr.get("neighbor") if epr.get("neighbor") is not None else "None"
+                    print(epr)
+                    print(f"VECINO {neighbor}")
+                    clave = f"{nodo_id}-{neighbor}"
                     if clave not in MASTER_PAR_EPR:
                         MASTER_PAR_EPR[clave] = {}
 
@@ -470,8 +473,8 @@ def app_open(ROL, PUERTO):
 
 
     
-    @app.route("/master/parEPR/clear", methods=["POST"])
-    def master_parEPR_clear():
+    @app.route("/master/pairEPR/clear", methods=["POST"])
+    def master_pairEPR_clear():
         MASTER_PAR_EPR.clear()
         return jsonify({"status": "cleared"})
     
@@ -491,7 +494,7 @@ def app_open(ROL, PUERTO):
             try:
                 requests.post(
                     f"http://localhost:{port}/history",
-                    json={"parEPR": []},
+                    json={"pairEPR": []},
                     timeout=2,
                     headers={"Connection": "close"}
                 )
@@ -598,45 +601,45 @@ def app_open(ROL, PUERTO):
             destino = link["target"]
 
             topologia = mostrar_topologia()
-            vecinos_actuales = topologia.get(origen, [])
+            neighbors_actuales = topologia.get(origen, [])
 
             todos_nodos = list(topologia.keys())
             # Lista de todos menos el propio origen
             todos_menos_origen = [n for n in todos_nodos if n != origen]
 
-            if set(vecinos_actuales) == set(todos_menos_origen):
-                # Caso 1: el origen todavía tiene a TODOS como vecinos
+            if set(neighbors_actuales) == set(todos_menos_origen):
+                # Caso 1: el origen todavía tiene a TODOS como neighbors
                 # → lo reducimos a solo el destino
-                nuevos_vecinos = [destino]
+                nuevos_neighbors = [destino]
             else:
                 # Caso 2: ya no tiene a todos, solo algunos
                 # → añadimos el destino a los que ya tiene
-                nuevos_vecinos = list(vecinos_actuales)
-                if destino not in nuevos_vecinos:
-                    nuevos_vecinos.append(destino)
+                nuevos_neighbors = list(neighbors_actuales)
+                if destino not in nuevos_neighbors:
+                    nuevos_neighbors.append(destino)
 
             # Actualizar origen con la lista corregida
             subprocess.run(
-                ["simulaqron", "nodes", "add", origen, "--force", "--neighbors", ",".join(nuevos_vecinos)],
+                ["simulaqron", "nodes", "add", origen, "--force", "--neighbors", ",".join(nuevos_neighbors)],
                 capture_output=True, text=True
             )
 
             
             topologia = mostrar_topologia()
-            for nodo, vecinos in topologia.items():
+            for nodo, neighbors in topologia.items():
                 if nodo != origen:
-                    if nodo in nuevos_vecinos:
-                        # Este nodo debe tener al origen como vecino
-                        if origen not in vecinos:
-                            vecinos.append(origen)
+                    if nodo in nuevos_neighbors:
+                        # Este nodo debe tener al origen como neighbor
+                        if origen not in neighbors:
+                            neighbors.append(origen)
                     else:
-                        # Este nodo NO debe tener al origen como vecino
-                        if origen in vecinos:
-                            vecinos.remove(origen)
+                        # Este nodo NO debe tener al origen como neighbor
+                        if origen in neighbors:
+                            neighbors.remove(origen)
 
                     # Actualizar SimulaQron con la lista corregida
                     subprocess.run(
-                        ["simulaqron", "nodes", "add", nodo, "--force", "--neighbors", ",".join(vecinos)],
+                        ["simulaqron", "nodes", "add", nodo, "--force", "--neighbors", ",".join(neighbors)],
                         capture_output=True, text=True
                     )
 
@@ -657,15 +660,15 @@ def app_open(ROL, PUERTO):
         if antiguo not in topologia:
             return jsonify({"error": "Nodo no encontrado en topología"}), 404
 
-        vecinos = topologia[antiguo]
+        neighbors = topologia[antiguo]
 
         # Eliminar nodo antiguo
         subprocess.run(["simulaqron", "nodes", "remove", antiguo], capture_output=True)
 
-        # Crear nodo nuevo con mismos vecinos
-        subprocess.run(["simulaqron", "nodes", "add", nuevo, "--force", "--neighbors", ",".join(vecinos)], capture_output=True)
+        # Crear nodo nuevo con mismos neighbors
+        subprocess.run(["simulaqron", "nodes", "add", nuevo, "--force", "--neighbors", ",".join(neighbors)], capture_output=True)
 
-        # Actualizar vecinos que tenían al antiguo como vecino
+        # Actualizar neighbors que tenían al antiguo como neighbor
         for nodo, lista in topologia.items():
             if nodo == antiguo:
                 continue

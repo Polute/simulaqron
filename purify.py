@@ -56,8 +56,8 @@ def pick_pair_same_edge(node_info, timeout=7.0, interval=0.2):
         pairs = node_info.get("parEPR", [])
         groups = {}
         for e in pairs:
-            v = e.get("vecino") or "None"
-            # Saltar si vecino es una lista (caso swapped)
+            v = e.get("neighbor") or "None"
+            # Saltar si neighbor es una lista (caso swapped)
             if isinstance(v, list):
                 continue
             key = "-".join(sorted([local_id, v]))
@@ -97,10 +97,10 @@ def pick_pair_same_edge(node_info, timeout=7.0, interval=0.2):
 
 def send_epr_pu_failed(node_info, pur_id, my_port, emitter_port, reason, epr1=None, epr2=None):
     neighbor = None
-    if epr2 and "vecino" in epr2:
-        neighbor = epr2["vecino"]
-    elif epr1 and "vecino" in epr1:
-        neighbor = epr1["vecino"]
+    if epr2 and "neighbor" in epr2:
+        neighbor = epr2["neighbor"]
+    elif epr1 and "neighbor" in epr1:
+        neighbor = epr1["neighbor"]
 
     link = "-".join(sorted([node_info["id"], neighbor])) if neighbor else None
     purified_from = []
@@ -112,7 +112,7 @@ def send_epr_pu_failed(node_info, pur_id, my_port, emitter_port, reason, epr1=No
     new_epr = {
         "id": pur_id,
         "state": "failed pur" if reason == "No 2 active EPR" else "failed p_pur",
-        "vecino": neighbor,
+        "neighbor": neighbor,
         "enlace": link,
         "purificado_de": purified_from,
         "t_pur": time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
@@ -197,7 +197,7 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
         w_final = mejora
         operation_log = { 
             "id": pur_id, 
-            "vecino": epr2["vecino"], 
+            "neighbor": epr2["neighbor"], 
             "state": "purified",
             "medicion": epr2.get("medicion"),
             "distancia_nodos": epr2.get("distancia_nodos"),
@@ -211,7 +211,7 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
             }
         upgraded_epr = {
             "id": id_upgrade_epr,
-            "vecino": epr2["vecino"],
+            "neighbor": epr2["neighbor"],
             "state": "active",
             "medicion": "",
             "distancia_nodos": epr2.get("distancia_nodos"),

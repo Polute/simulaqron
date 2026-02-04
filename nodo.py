@@ -54,7 +54,7 @@ def app_open(PUERTO, listener_port):
             "pswap": 0.85,
             "roles": ["emisor", "receptor", "repeater"],
             "neighbors": [],
-            "parEPR": []
+            "pairEPR": []
         },
 
         5002: {
@@ -73,7 +73,7 @@ def app_open(PUERTO, listener_port):
                 "pgen": 0.85 
             }
             ],
-            "parEPR": []
+            "pairEPR": []
         },
 
         5003: {
@@ -92,7 +92,7 @@ def app_open(PUERTO, listener_port):
                 "pgen": 0.9 
             }
             ],
-            "parEPR": []
+            "pairEPR": []
         },
 
         5004: {
@@ -111,12 +111,12 @@ def app_open(PUERTO, listener_port):
                 "pgen": 0.9 
             }
             ],
-            "parEPR": []
+            "pairEPR": []
         }
     }
 
-    nodo_info = PORT_NODE_MAP.get(PUERTO, {"id": "node_unknown", "name": "Desconocido", "neighbors": []})
-    print(nodo_info)
+    node_info = PORT_NODE_MAP.get(PUERTO, {"id": "node_unknown", "name": "Desconocido", "neighbors": []})
+    print(node_info)
 
     # --- Auxiliar: obtener puerto a partir del id ---
     def get_port_by_id(node_id: str) -> int:
@@ -133,8 +133,8 @@ def app_open(PUERTO, listener_port):
         epr_id = orden.get("id")
 
         print("APPLYING ORDER!!!")
-        print("\n===== DEBUG: FULL parEPR DUMP =====")
-        for e in node_info.get("parEPR", []):
+        print("\n===== DEBUG: FULL pairEPR DUMP =====")
+        for e in node_info.get("pairEPR", []):
             print(f"ID: {e.get('id')}")
             for k, v in e.items():
                 print(f"   {k}: {v}")
@@ -143,7 +143,7 @@ def app_open(PUERTO, listener_port):
         # --------------------------------------------------
         # Generate EPR (this node is the sender)
         # --------------------------------------------------
-        if comand in ["genera EPR", "generar"]:
+        if comand in ["generate EPR", "generar"]:
             target_id = orden["target"]
             source_port = get_port_by_id(source_id)
             target_port = get_port_by_id(target_id)
@@ -175,8 +175,7 @@ def app_open(PUERTO, listener_port):
                 worker_started = True
             else:
                 print("[INFO] Sender already running, sending order via socket")
-                print("Lo hace en: ")
-                print(listener_port)
+                print(f"Using this listener_port {listener_port}")
 
                 payload = {
                     "comand": "generate EPR",
@@ -199,17 +198,17 @@ def app_open(PUERTO, listener_port):
         # --------------------------------------------------
         # Receive EPR (this node receives an EPR created by another node)
         # --------------------------------------------------
-        elif comand == "recibe EPR":
+        elif comand == "receive EPR":
             epr_id = orden["id"]  # EPR id specified in the order
             timeout = 5.0         # max wait time in seconds
             interval = 0.1        # polling interval
             start = time()
             epr_obj = None
 
-            print("Searching for EPR in node_info['parEPR']...")
+            print("Searching for EPR in node_info['pairEPR']...")
             while time() - start < timeout:
                 epr_obj = next(
-                    (e for e in node_info.get("parEPR", []) if str(e["id"]) == str(epr_id)),
+                    (e for e in node_info.get("pairEPR", []) if str(e["id"]) == str(epr_id)),
                     None
                 )
                 print("...\n")
@@ -243,7 +242,7 @@ def app_open(PUERTO, listener_port):
             else:
                 print("[INFO] Receiver already running, sending order via socket")
                 payload = {
-                    "comand": "recibe EPR",
+                    "comand": "receive EPR",
                     "id": epr_id,
                     "source": orden["source"],
                     "epr_obj": epr_obj,
@@ -263,10 +262,10 @@ def app_open(PUERTO, listener_port):
         # --------------------------------------------------
         # Purification protocol
         # --------------------------------------------------
-        elif comand in ["purifica", "purificar"]:
+        elif comand in ["purify", "purificar"]:
             print(f"[{source_id}] Running purification protocol...")
             my_port = get_port_by_id(node_info["id"])
-            emisor_port = get_port_by_id(orden["con"])   # node with which we purify
+            emisor_port = get_port_by_id(orden["with"])   # node with which we purify
             subprocess.run([
                 "python", "purify.py",
                 json.dumps(node_info),
@@ -284,11 +283,11 @@ def app_open(PUERTO, listener_port):
                 "comand": "do swapping",
                 "id": epr_id,
                 "source": node_info["id"],
-                "destinatarios": orden["con"],
-                "destinatarios_ports": [str(get_port_by_id(n)) for n in orden["con"]],
+                "destinatarios": orden["with"],
+                "destinatarios_ports": [str(get_port_by_id(n)) for n in orden["with"]],
                 "pswap": str(node_info.get("pswap", 1)),
                 "listener_port": listener_port,
-                "ports_involved": [str(get_port_by_id(n) + 4000) for n in orden["con"]]
+                "ports_involved": [str(get_port_by_id(n) + 4000) for n in orden["with"]]
             }
             if wait_for_listener(listener_port):
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -300,8 +299,8 @@ def app_open(PUERTO, listener_port):
         # --------------------------------------------------
         # Swap received (just logs for now)
         # --------------------------------------------------
-        elif comand in ["swap recibido"]:
-            print("Swap attempt between:", orden["con"])
+        elif comand in ["received swap"]:
+            print("Swap attempt between:", orden["with"])
 
         else:
             raise ValueError(f"Unknown action: {comand}")
@@ -312,17 +311,17 @@ def app_open(PUERTO, listener_port):
 
     @app.route("/")
     def index():
-        print(nodo_info)
-        return render_template("nodo.html", nodo_info=nodo_info)
+        print(node_info)
+        return render_template("nodo.html", node_info=node_info)
 
     @app.route("/info")
     def info():
-        return jsonify(nodo_info), 200, {"Connection": "close"}
+        return jsonify(node_info), 200, {"Connection": "close"}
 
-    @app.route("/parEPR/add", methods=["POST"])
-    def parEPR_add():
+    @app.route("/pairEPR/add", methods=["POST"])
+    def pairEPR_add():
         data = request.get_json()
-        pares = nodo_info.setdefault("parEPR", [])
+        pares = node_info.setdefault("pairEPR", [])
         epr_id = data.get("id") or (max((p["id"] for p in pares), default=0) + 1)
 
         print(f"ESTO MANDO SENDER: {data}")
@@ -332,7 +331,7 @@ def app_open(PUERTO, listener_port):
 
         nuevo_epr = {
             "id": epr_id,
-            "vecino": data["vecino"],
+            "neighbor": data["neighbor"],
             "t_gen": data["t_gen"],
             "w_gen": data["w_gen"],
             "state": state
@@ -348,16 +347,16 @@ def app_open(PUERTO, listener_port):
         if not updated:
             pares.append(nuevo_epr)
 
-        nodo_info["parEPR"] = pares
-        notificar_master_parEPR(nodo_info)
+        node_info["pairEPR"] = pares
+        notificar_master_pairEPR(node_info)
 
-        return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]}), 200, {"Connection": "close"}
+        return jsonify({"status": "added", "pairEPR": node_info["pairEPR"]}), 200, {"Connection": "close"}
 
 
-    @app.route("/parEPR/recv", methods=["POST"])
-    def parEPR_recv():
+    @app.route("/pairEPR/recv", methods=["POST"])
+    def pairEPR_recv():
         data = request.get_json()
-        pares = nodo_info.setdefault("parEPR", [])
+        pares = node_info.setdefault("pairEPR", [])
         updated = False
         print("DATA: ", data)
         for i, epr in enumerate(pares):
@@ -369,28 +368,28 @@ def app_open(PUERTO, listener_port):
         if not updated:
             pares.append(data)
 
-        nodo_info["parEPR"] = pares
-        print("Enviando a Emisor y a Master: ",nodo_info)
-        notificar_master_parEPR(nodo_info)
-        return jsonify({"status": "updated", "parEPR": nodo_info["parEPR"]}), 200, {"Connection": "close"}
+        node_info["pairEPR"] = pares
+        print("Sending to the emiter and the master: ",node_info)
+        notificar_master_pairEPR(node_info)
+        return jsonify({"status": "updated", "pairEPR": node_info["pairEPR"]}), 200, {"Connection": "close"}
     
-    @app.route("/parEPR/failed_pur", methods=["POST"])
-    def parEPR_failed_pur():
+    @app.route("/pairEPR/failed_pur", methods=["POST"])
+    def pairEPR_failed_pur():
         data = request.get_json()
-        nodo_info["parEPR"].append(data)
-        notificar_master_parEPR(nodo_info)
-        return jsonify({"status": "added", "parEPR": nodo_info["parEPR"]}), 200, {"Connection": "close"}
+        node_info["pairEPR"].append(data)
+        notificar_master_pairEPR(node_info)
+        return jsonify({"status": "added", "pairEPR": node_info["pairEPR"]}), 200, {"Connection": "close"}
 
-    @app.route("/parEPR/swap", methods=["POST"])
-    def parEPR_swap():
+    @app.route("/pairEPR/swap", methods=["POST"])
+    def pairEPR_swap():
         data = request.get_json()
-        pares = nodo_info.setdefault("parEPR", [])
+        pares = node_info.setdefault("pairEPR", [])
         # Usa el id recibido o genera uno nuevo
         epr_id = data.get("id") or (max((p["id"] for p in pares), default=0) + 1)
         # Construye el nuevo EPR de swapping
         nuevo_epr = {
             "id": epr_id,
-            "vecino": data.get("vecino"),          # normalmente lista de destinatarios
+            "neighbor": data.get("neighbor"),          # normalmente lista de destinatarios
             "state": data.get("state", "swapped"),
             "medicion": data.get("medicion")
         }
@@ -406,23 +405,23 @@ def app_open(PUERTO, listener_port):
         if not updated:
             pares.append(nuevo_epr)
 
-        nodo_info["parEPR"] = pares
-        notificar_master_parEPR(nodo_info)
+        node_info["pairEPR"] = pares
+        notificar_master_pairEPR(node_info)
 
-        return jsonify({"status": "swapped", "parEPR": nodo_info["parEPR"]}), 200, {"Connection": "close"}
+        return jsonify({"status": "swapped", "pairEPR": node_info["pairEPR"]}), 200, {"Connection": "close"}
 
 
 
-    def notificar_master_parEPR(nodo_info):
+    def notificar_master_pairEPR(node_info):
         try:
             res = requests.post(
-                "http://localhost:8000/master/parEPR",  # puerto donde corre el master
-                json={nodo_info["id"]: nodo_info.get("parEPR", [])},
+                "http://localhost:8000/master/pairEPR",  # puerto donde corre el master
+                json={node_info["id"]: node_info.get("pairEPR", [])},
                 timeout=2
 
             )
-            print("[DEBUG] Historial parEPR enviado al master:", res.status_code)
-            print("[DEBUG] Master recibio esto:", nodo_info)
+            print("[DEBUG] Historial pairEPR enviado al master:", res.status_code)
+            print("[DEBUG] Master recibio esto:", node_info)
         except Exception as e:
             print("[DEBUG] Error notificando al master:", e)
 
@@ -432,7 +431,7 @@ def app_open(PUERTO, listener_port):
         print(data)
         for key in ["id", "name", "pswap", "roles", "neighbors"]:
             if key in data:
-                nodo_info[key] = data[key]
+                node_info[key] = data[key]
 
         source = data.get("source")
         target = data.get("target")
@@ -440,8 +439,8 @@ def app_open(PUERTO, listener_port):
 
         if source and target:
             for node_id, neighbor_id in [(source, target), (target, source)]:
-                if nodo_info.get("id") == node_id:
-                    for v in nodo_info.get("neighbors", []):
+                if node_info.get("id") == node_id:
+                    for v in node_info.get("neighbors", []):
                         if v.get("id") == neighbor_id:
                             for f in fields:
                                 if f in data:
@@ -449,23 +448,23 @@ def app_open(PUERTO, listener_port):
 
 
 
-            vecino_id = target if nodo_info["id"] == source else source
-            vecino_port = get_port_by_id(vecino_id)
+            neighbor_id = target if node_info["id"] == source else source
+            neighbor_port = get_port_by_id(neighbor_id)
             try:
-                requests.post(f"http://localhost:{vecino_port}/update", json=data)
+                requests.post(f"http://localhost:{neighbor_port}/update", json=data)
             except Exception as e:
-                print(f"Error propagando actualización a {vecino_id}: {e}")
+                print(f"Error propagando actualización a {neighbor_id}: {e}")
 
-        nodo_info["lastUpdated"] = data.get("lastUpdated", time())
+        node_info["lastUpdated"] = data.get("lastUpdated", time())
         event_queue.put("update")
-        return jsonify({"status": "ok", "nodo_info": nodo_info}), 200, {"Connection": "close"}
+        return jsonify({"status": "ok", "node_info": node_info}), 200, {"Connection": "close"}
     @app.route("/history", methods=["POST"])
     def update_history():
         data = request.get_json()
         print(data)
-        for key in ["parEPR"]:
+        for key in ["pairEPR"]:
             if key in data:
-                nodo_info[key] = data[key]
+                node_info[key] = data[key]
         return jsonify({"status": "ok"}), 200, {"Connection": "close"}
 
 
@@ -514,9 +513,9 @@ def app_open(PUERTO, listener_port):
             return jsonify({"error": "Falta 'comand'"}), 400
 
         try:
-            aplicar_orden(data, nodo_info)
+            aplicar_orden(data, node_info)
             print(">>> Orden aplicada correctamente")
-            return jsonify({"status": "ok", "nodo_info": nodo_info})
+            return jsonify({"status": "ok", "node_info": node_info})
         except Exception as e:
             print(">>> Excepción en aplicar_orden:", repr(e))
             try:
@@ -526,7 +525,7 @@ def app_open(PUERTO, listener_port):
                     timeout=2
                 )
                 print("[DEBUG] Saving history for a error:", res.status_code)
-                print("DEBUG] Deleting parEPR history")
+                print("DEBUG] Deleting pairEPR history")
             except Exception as e:
                 print("[DEBUG] Error notificando al master:", e)
             print(f"Order: {data}")
