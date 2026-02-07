@@ -29,11 +29,9 @@ This caused:
 
 To fix the calculation, `w_A` and `w_B` must be updated to the real swap time:
 
-    delta_A = t_swap - t_gen_A
-    delta_B = t_swap - t_gen_B
+    delta_B = t_swap - t_gen_B (Usually, t_recv_B = t_swap)
 
-    w_A = exp(-2 * delta_A / t_coh)
-    w_B = exp(-2 * delta_B / t_coh)
+    w_A * w_B = exp(-2 * delta_B / t_coh)
 
     w_out_new = w_A * w_B
 
