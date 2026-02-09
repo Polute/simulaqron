@@ -1,7 +1,7 @@
 import os
 import subprocess
 import time
-from flask import Flask, render_template, jsonify, request, Response
+from flask import Flask, render_template, jsonify, request, Response, send_from_directory, abort
 import random
 import math
 import re
@@ -163,6 +163,29 @@ def app_open(ROL, PUERTO):
 
     node_info = PORT_NODE_MAP.get(PUERTO, {"id": "node_unknown", "name": "Desconocido", "neighbors": []})
     app = Flask(__name__)
+
+    @app.route('/tiles/<int:z>/<int:x>/<int:y>.png')
+    def serve_tile(z, x, y):
+        # Ruta absoluta a la carpeta donde están los tiles
+        base_path = os.path.join(app.root_path, "templates", "tiles", str(z), str(x))
+        filename = f"{y}.png"
+
+        # Debug prints
+        print("---- TILE REQUEST ----")
+        print("Requested:", f"/tiles/{z}/{x}/{y}.png")
+        print("Looking in:", base_path)
+        print("Full path:", os.path.join(base_path, filename))
+        print("Exists:", os.path.exists(os.path.join(base_path, filename)))
+        print("----------------------")
+
+        if not os.path.exists(os.path.join(base_path, filename)):
+            return abort(404)
+
+        return send_from_directory(base_path, filename)
+
+
+
+
     @app.route("/")
     def index():
         try:

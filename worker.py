@@ -428,7 +428,7 @@ def sending_monitor(msg, listener_port):
     return json.loads(resp)
 
 
-def do_swapping(epr1, epr2, id_swap, node_info, conn,
+def do_swapping(epr1, epr2, id_swap, node_info, t_gen_swap, conn,
                 destinatarios=None, destinatarios_ports=None,
                 pswap=1.0, listener_port=None,
                 my_port=None, ports_involved=None):
@@ -489,10 +489,18 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
 
 
     # Derived fields
-    t_gen_str = epr1.get("t_gen")
+    tcoh = float(node_info.get("tcoh", 10.0))
     t_recv_str = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
-    tdif = calculate_tdiff(t_gen_str, t_recv_str)
-    w_gen_tuple = (epr1.get("w_out"), epr2.get("w_out"))
+    tdiff1 = calculate_tdiff(epr1.get("t_gen"), t_recv_str)
+    tdiff2 = calculate_tdiff(epr2.get("t_gen"), t_recv_str)
+    tdif = calculate_tdiff(t_gen_swap, t_recv_str)
+    w1 = math.exp(-tdiff1 / tcoh)
+    w2 = math.exp(-tdiff2 / tcoh)
+
+    print("w1 at t_swap: ",w1)
+    print("w2 at t_swap: ",w2)
+
+    w_gen_tuple = (w1, w2)
     w_out_new = (w_gen_tuple[0] * w_gen_tuple[1]) if all(w_gen_tuple) else None
     distancia_total = (epr1.get("distancia_nodos") or 0) + (epr2.get("distancia_nodos") or 0)
 
@@ -502,7 +510,7 @@ def do_swapping(epr1, epr2, id_swap, node_info, conn,
         "neighbor": destinatarios,
         "state": "active",
         "medicion": None,
-        "t_gen": t_gen_str,
+        "t_gen": t_gen_swap,
         "t_recv": t_recv_str,
         "t_diff": tdif,
         "w_gen": w_gen_tuple,
@@ -640,7 +648,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
         # --------------------------------------------------
         elif comand == "recalculate":
             if payload["info"] != "active":
-                 print("[LISTENER] Ignoring recalculate because EPR is not active") 
+                 print(f"[LISTENER] Ignoring recalculate because EPR with id: {payload['id']} is not active") 
                  conn_sock.send(json.dumps({"status": "monitor ignored"}).encode())
             else:
                 start_monitor(
@@ -688,6 +696,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
         # DO SWAPPING
         # --------------------------------------------------
         elif comand == "do swapping":
+            t_gen_swap = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
             destinatarios = payload.get("destinatarios", [])
             destinatarios_ports = payload.get("destinatarios_ports", [])
             pswap = float(payload.get("pswap", 1.0))
@@ -706,6 +715,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
                     epr2=epr2,
                     id_swap=id_swap,
                     node_info=node_info,
+                    t_gen_swap=t_gen_swap,
                     conn=conn,
                     destinatarios=destinatarios,
                     destinatarios_ports=destinatarios_ports,

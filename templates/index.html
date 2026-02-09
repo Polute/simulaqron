@@ -575,7 +575,6 @@
 
         function updatingBlocks() {
             const blocks = Array.from(workspace.querySelectorAll(".block"));
-            const actualizarInfoBtn = 
 
             // Inicialize history on each node
             blocks.forEach(b => {
@@ -585,7 +584,7 @@
             });
 
             blocks.forEach((b, idx) => {
-                if (b.dataset.finalizado) return;
+                if (b.dataset.finished) return;
 
                 if (b.dataset.op === "epr") {
                     // Searching nodes, even if they aren't visible
@@ -596,7 +595,7 @@
                         b.dataset.src = prevNode.dataset.src;
                         b.dataset.dst = nextNode.dataset.src;
                         b.textContent = `${prevNode.dataset.src} → ${nextNode.dataset.src}`;
-                        b.dataset.finalizado = true;
+                        b.dataset.finished = true;
 
                         // Saving EPR in the global history
                         const newEpr = { src: prevNode.dataset.src, dst: nextNode.dataset.src };
@@ -616,30 +615,30 @@
                     }
 
                 }else if (b.dataset.op === "pur") {
-                    let posiblesCandidatos = [];
+                    let potentialCandidates = [];
 
                     for (let node in eprHistoryGlobal) {
                         const eprs = eprHistoryGlobal[node] || [];
                         
                         // Searching for nodes used in a EPR
-                        const creados = eprs.filter(e => e.src === node || e.dst === node );
+                        const createdNodes = eprs.filter(e => e.src === node || e.dst === node );
 
-                        const paresContados = {};
-                        creados.forEach(e => {
+                        const countedPairs = {};
+                        createdNodes.forEach(e => {
                             const key = [e.src, e.dst].sort().join("-"); 
-                            paresContados[key] = (paresContados[key] || 0) + 1;
+                            countedPairs[key] = (countedPairs[key] || 0) + 1;
                         });
 
-                        for (let k in paresContados) {
-                            if (paresContados[k] >= 2) {
-                                const paresUsar = creados.filter(e => [e.src, e.dst].sort().join("-") === k).slice(0, 2);
-                                posiblesCandidatos.push({ node, paresUsar });
+                        for (let k in countedPairs) {
+                            if (countedPairs[k] >= 2) {
+                                const pairsToUse = createdNodes.filter(e => [e.src, e.dst].sort().join("-") === k).slice(0, 2);
+                                potentialCandidates.push({ node, pairsToUse });
                                 break;
                             }
                         }
                     }
 
-                    if (posiblesCandidatos.length === 0) {
+                    if (potentialCandidates.length === 0) {
                         b.textContent = "🧪 Purification 🚫";
                     } else {
                         // Create a dropdown selector with a block‑style appearance
@@ -658,32 +657,32 @@
                         defaultOption.selected = true;
                         select.appendChild(defaultOption);
 
-                        posiblesCandidatos.forEach(candidato => {
+                        potentialCandidates.forEach(candidato => {
                             const option = document.createElement("option");
                             option.value = candidato.node;
                             option.textContent = candidato.node;
                             select.appendChild(option);
                         });
 
-                        b.textContent = "🧪 Purificar: ";
+                        b.textContent = "🧪 Purify: ";
                         b.appendChild(select);
 
                         select.addEventListener("change", () => {
                             const nodeSeleccionado = select.value;
-                            const elegido = posiblesCandidatos.find(c => c.node === nodeSeleccionado);
-                            const { node, paresUsar } = elegido;
+                            const selected = potentialCandidates.find(c => c.node === nodeSeleccionado);
+                            const { node, pairsToUse } = selected;
 
                             // Asign data to the block
                             b.dataset.dst = node;
-                            b.dataset.finalizado = true;
-                            b.dataset.usedPairs = JSON.stringify(paresUsar);
+                            b.dataset.finished = true;
+                            b.dataset.usedPairs = JSON.stringify(pairsToUse);
                             b.textContent = `🧪 ${node}`;
 
                             // Deleting 1 EPR consumed in both nodes
-                            const e1 = paresUsar[0];
+                            const e1 = pairsToUse[0];
                             deletingOneEpr(e1.src, e1.dst);
 
-                            console.log("🧪 PUR applied:", elegido);
+                            console.log("🧪 PUR applied:", selected);
                             console.log("Global history after PUR:", eprHistoryGlobal);
 
                             // Removing selector after selecting
@@ -717,7 +716,7 @@
 
                         if (valid1 && valid2) {
                             // Mark block as finalized
-                            b.dataset.finalizado = true;
+                            b.dataset.finished = true;
                             b.textContent = `${n1.dataset.src}<=>${n2.dataset.src}(${helperNode.dataset.src})`;
 
                             // Record new swapped EPR in global history
@@ -899,6 +898,7 @@
                         const id1Id = nameToId[id1Name];
                         const id2Id = nameToId[id2Name];
                         const swapId = generateUniqueId();
+
                         // Action for the helper
                         if (!ordersPerNode[helperId]) ordersPerNode[helperId] = [];
                         ordersPerNode[helperId].push({ id: swapId, comand: "swap", with: [id1Id, id2Id] });
@@ -948,24 +948,25 @@
             const pallette = document.getElementById("pallette");
 
             nodes.forEach(node => {
-                // Evitar bloques duplicados fijos (EPR y Pur)
+                // Avoiding duplicated fixed blocks (EPR & Pur)
                 if (node.name.includes("epr") || node.name.includes("Pur") ||node.name.includes("swap")) return;
-                // 🔍 Si ya existe un bloque con este ID, no crearlo again
-                const yaExiste = pallette.querySelector(`[data-id="${node.id}"]`);
-                if (yaExiste) return;
+                
+                // If a block with this ID already exists, do not create it again
+                const alreadyExists = pallette.querySelector(`[data-id="${node.id}"]`);
+                if (alreadyExists) return;
 
                 const block = document.createElement("div");
                 block.className = "block op-simple";
                 block.draggable = true;
 
-                // Guardamos info del node en dataset para análisis posterior
+                // We store the node info in the dataset for later analysis
                 block.dataset.op = "node";
-                block.dataset.src = node.name;    // nombre del node
-                block.dataset.id = node.id;       // id del node
-                block.dataset.neighbors = JSON.stringify(node.neighbors); // neighbors en JSON
+                block.dataset.src = node.name;    // name of the node
+                block.dataset.id = node.id;       // id of the node
+                block.dataset.neighbors = JSON.stringify(node.neighbors); // neighbors in JSON
                 block.dataset.pairEPR = JSON.stringify(node.pairEPR);
 
-                // Texto del bloque = nombre del node
+                // Block text = Node name
                 block.textContent = node.name;
 
                 // Drag & Drop
@@ -985,7 +986,7 @@
         }
         function ajustarColumnasSegunNodos(node_info) {
             if (Array.isArray(node_info.nodes) && node_info.nodes.length > 0) {
-                const todosPre = node_info.nodes.every(n => n.id.endsWith("pre"));
+                const allPre = node_info.nodes.every(n => n.id.startsWith("pre"));
 
                 const header = document.getElementById("simulation-header");
                 const derecha = document.querySelector(".right-column");
@@ -995,13 +996,13 @@
                 const physicsControls = document.getElementById("physics_full_controls");
                 const tcohContainer = document.getElementById("tcoh_container");
 
-                if (todosPre) {
-                    // --- MODO NORMAL ---
+                if (allPre) {
+                    // --- LOCAL MODE ---
                     if (header) header.style.display = "block";
                     if (derecha) derecha.style.flex = "1.5";
                     if (operaciones) operaciones.style.display = "none";
 
-                    // show normal controls
+                    // show local controls
                     nodeLinkControls.style.display = "flex";
                     physicsControls.style.display = "block";
                     tcohContainer.style.display = "none";
@@ -1009,7 +1010,7 @@
                     f5 = true;
 
                 } else {
-                    // --- MODO ESPECIAL ---
+                    // --- ONLINE MODE ---
                     if (header) header.style.display = "none";
                     if (derecha) derecha.style.flex = "2";
                     if (operaciones) operaciones.style.display = "block";
@@ -1120,6 +1121,53 @@
             console.log("Recalculating pgen from distance: ", distKm)
             return p0 * Math.exp(-distKm / Latt);
         }
+        async function checkOnline() {
+            try {
+                const res = await fetch("https://tile.openstreetmap.org/11/1007/772.png", {
+                    method: "HEAD",
+                    cache: "no-store"
+                });
+                return res.ok;
+            } catch {
+                return false;
+            }
+        }
+
+        async function loadTiles(map) {
+            const online = await checkOnline();
+            let tileLayer;
+
+            if (online) {
+                console.log("ONLINE MODE: using tiles of OSM");
+                tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                });
+            } else {
+                console.log("OFFLINE MODE: using local tiles");
+                tileLayer = L.tileLayer('tiles/{z}/{x}/{y}.png', {
+                    attribution: 'Map data © OpenTopoMap'
+                });
+            }
+
+            // Ahora sí: añadir al mapa
+            tileLayer.addTo(map);
+
+            // Y ahora sí: los eventos funcionan
+            tileLayer.on('tileloadstart', e => {
+                console.log("Tile load started:", e.tile.src);
+            });
+
+            tileLayer.on('tileload', e => {
+                console.log("Tile loaded:", e.tile.src);
+            });
+
+            tileLayer.on('tileerror', e => {
+                console.error("Tile load error:", e.tile.src);
+            });
+
+            return tileLayer;
+        }
+
 
         //-----------------------------------------MAP-----------------------------------------------------
         window.onload = function () {
@@ -1130,7 +1178,6 @@
             const linkModeBtn = document.getElementById("linkMode");
             const resetViewBtn = document.getElementById("resetView");
             const updateNodesBtn = document.getElementById("btnUpdateNodes");
-            const receiveInfoBtn = document.getElementById("btnreceiveInfo");
 
             let nodeMode = false;
             let linkMode = false;
@@ -1145,21 +1192,7 @@
             console.log("Map object created:", map);
 
             // Add OpenStreetMap tiles
-            const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(map);
-            
-            tileLayer.on('tileloadstart', function(e) {
-                console.log("Tile load started:", e.tile.src);
-            });
-
-            tileLayer.on('tileload', function(e) {
-                console.log("Tile loaded:", e.tile.src);
-            });
-
-            tileLayer.on('tileerror', function(e) {
-                console.error("Tile load error:", e.tile.src);
-            });
+            tileLayer = loadTiles(map);
 
             // Tell Leaflet to recalc map size
             map.invalidateSize();
@@ -1214,7 +1247,7 @@
 
                 // Acción al hacer clic
                 L.DomEvent.on(btn, 'click', () => {
-                    // Aquí va el código de receiveInfoBtn
+                    // Aquí va el código de updateBtn
                     if (f5) {
                         location.reload();
                         f5 = false;
