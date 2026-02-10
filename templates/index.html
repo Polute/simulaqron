@@ -986,7 +986,7 @@
         }
         function ajustarColumnasSegunNodos(node_info) {
             if (Array.isArray(node_info.nodes) && node_info.nodes.length > 0) {
-                const allPre = node_info.nodes.every(n => n.id.startsWith("pre"));
+                const allPre = node_info.nodes.every(n => n.id.endsWith("pre"));
 
                 const header = document.getElementById("simulation-header");
                 const derecha = document.querySelector(".right-column");
@@ -995,7 +995,6 @@
                 const nodeLinkControls = document.getElementById("node_link_controls");
                 const physicsControls = document.getElementById("physics_full_controls");
                 const tcohContainer = document.getElementById("tcoh_container");
-
                 if (allPre) {
                     // --- LOCAL MODE ---
                     if (header) header.style.display = "block";

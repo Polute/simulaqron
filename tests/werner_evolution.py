@@ -167,8 +167,9 @@ def process_blocks(rows):
 
     return results
 
+def print_table(results, outfile="results.txt"):
+    lines = []
 
-def print_table(results):
     header = (
         f"{'A_ID':<12} {'B_ID':<12} "
         f"{'ΔA':>8} {'ΔB':>8} "
@@ -176,9 +177,13 @@ def print_table(results):
         f"{'w_direct':>12} {'w_theor':>12} "
         f"{'w_real':>10} {'error':>10}"
     )
-    print(header)
-    print("-" * len(header))
+    separator = "-" * len(header)
 
+    # Add header to lines
+    lines.append(header)
+    lines.append(separator)
+
+    # Build each row
     for r in results:
         delta_A = f"{r['delta_A']:.3f}" if r["delta_A"] is not None else "---"
         delta_B = f"{r['delta_B']:.3f}" if r["delta_B"] is not None else "---"
@@ -189,19 +194,31 @@ def print_table(results):
         w_real = f"{r['w_real']:.5f}" if r["w_real"] is not None else "---"
         error = f"{r['error']:.5f}" if r["error"] is not None else "---"
 
-        print(
+        line = (
             f"{r['A_id']:<12} {r['B_id']:<12} "
             f"{delta_A:>8} {delta_B:>8} "
             f"{w_A:>10} {w_B:>10} "
             f"{w_direct:>12} {w_theor:>12} "
             f"{w_real:>10} {error:>10}"
         )
+        lines.append(line)
+
+    # Print to console
+    for line in lines:
+        print(line)
+
+    # Write to file
+    with open(outfile, "w") as f:
+        for line in lines:
+            f.write(line + "\n")
+
+    print(f"\nResults written to {outfile}")
 
 def main():
     filename = "werner_logs.txt"
     rows = load_log(filename)
     results = process_blocks(rows)
-    print_table(results)
+    print_table(results, "results.txt")
 
 if __name__ == "__main__":
     main()
