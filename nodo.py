@@ -11,6 +11,51 @@ import queue
 event_queue = queue.Queue()
 import os
 
+import zmq
+import msgpack
+import threading
+# --------------------------------------------------
+# HIGH PRECISION TIMESTAMPS
+# --------------------------------------------------
+
+import time as _t  # módulo real
+
+def timestamp_precise():
+    """
+    Returns a timestamp in the same style as t_gen/t_recv (MM:SS.xxxxxx)
+    but with microsecond precision.
+    """
+    now = time()
+    mmss = _t.strftime("%M:%S.", _t.localtime(now))
+    usec = int((now % 1) * 1_000_000)
+    return f"{mmss}{usec:06d}"
+
+
+def timestamp_to_seconds(ts):
+    """
+    Convert 'MM:SS.xxxxxx' into float seconds.
+    """
+    mm, rest = ts.split(":")
+    ss, us = rest.split(".")
+    return int(mm)*60 + int(ss) + int(us)/1_000_000
+
+
+def diff_precise(t1, t2):
+    """
+    Compute difference between two precise timestamps.
+    """
+    return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
+
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_2.txt"
+
+def log_timestamp(event_type, epr_id, **fields):
+    line = f"[{event_type}]  ID={epr_id}"
+    for k, v in fields.items():
+        line += f"  {k}={v}"
+    line += "\n"
+    with open(TIMESTAMP_LOG, "a") as f:
+        f.write(line)
+
 def port_available(port: int) -> bool:
     """Returns True if the port is free on localhost."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -201,7 +246,7 @@ def app_open(PUERTO, listener_port):
         elif comand == "receive EPR":
             epr_id = orden["id"]  # EPR id specified in the order
             timeout = 5.0         # max wait time in seconds
-            interval = 0.1        # polling interval
+            interval = 0.001        # polling interval
             start = time()
             epr_obj = None
 
@@ -211,7 +256,6 @@ def app_open(PUERTO, listener_port):
                     (e for e in node_info.get("pairEPR", []) if str(e["id"]) == str(epr_id)),
                     None
                 )
-                print("...\n")
                 if epr_obj:
                     print(f"[RECEIVER] EPR {epr_id} found")
                     break
@@ -226,9 +270,11 @@ def app_open(PUERTO, listener_port):
 
             print(f"[RECEIVER] Processing EPR {epr_id} between {node_info['id']}:{my_port} "
                 f"and {orden['source']}:{emisor_port}")
+            
 
+            log_timestamp("ORDER_RECV_EXECUTING",epr_id, t_start = timestamp_precise())
             if not worker_started:
-                print("[INFO] Starting worker.py in receiver_init mode for the first time")
+                print("[INFO] Starting worker.py in receiver_init mode for the first time at ",timestamp_precise())
                 subprocess.Popen([
                     "python", "worker.py",
                     "receiver_init",
@@ -240,7 +286,7 @@ def app_open(PUERTO, listener_port):
                 ])
                 worker_started = True
             else:
-                print("[INFO] Receiver already running, sending order via socket")
+                print("[INFO] Receiver already running, sending order via socket at ",timestamp_precise())
                 payload = {
                     "comand": "receive EPR",
                     "id": epr_id,
@@ -318,16 +364,14 @@ def app_open(PUERTO, listener_port):
     def info():
         return jsonify(node_info), 200, {"Connection": "close"}
 
-    @app.route("/pairEPR/add", methods=["POST"])
-    def pairEPR_add():
-        data = request.get_json()
+
+    
+
+    def pairEPR_add(data):
         pares = node_info.setdefault("pairEPR", [])
         epr_id = data.get("id") or (max((p["id"] for p in pares), default=0) + 1)
 
-        print(f"ESTO MANDO SENDER: {data}")
-
         state = "fallo" if float(data["w_gen"]) == 0.0 else "ok"
-
 
         nuevo_epr = {
             "id": epr_id,
@@ -337,24 +381,67 @@ def app_open(PUERTO, listener_port):
             "state": state
         }
 
-        updated = False
+        # actualizar si existe
         for i, epr in enumerate(pares):
-            if str(epr.get("id")) == str(epr_id):
-                epr.update(nuevo_epr)
-                pares[i] = epr
-                updated = True
+            if str(epr["id"]) == str(epr_id):
+                pares[i].update(nuevo_epr)
                 break
-        if not updated:
+        else:
             pares.append(nuevo_epr)
 
         node_info["pairEPR"] = pares
-        notificar_master_pairEPR(node_info)
+        notificar_master_pairEPR_zmq(node_info, epr_id)
 
-        return jsonify({"status": "added", "pairEPR": node_info["pairEPR"]}), 200, {"Connection": "close"}
+        print("[ZeroMQ] pairEPR updated:", nuevo_epr)
+
+    def pairEPR_recv(data):
+        pares = node_info.setdefault("pairEPR", [])
+        epr_id = data.get("id")
+
+        updated = False
+        for i, epr in enumerate(pares):
+            if str(epr.get("id")) == str(epr_id):
+                pares[i].update(data)
+                updated = True
+                break
+
+        if not updated:
+            pares.append(data)
+
+        node_info["pairEPR"] = pares
+        notificar_master_pairEPR_zmq(node_info, epr_id)
+
+        print("[ZeroMQ] pairEPR received & updated:", data)
+
+    zmq_port = PUERTO + 1000 # Puerto exclusivo para ZeroMQ
+    ROUTES = {
+        "pairEPR/add": pairEPR_add,
+        "pairEPR/recv": pairEPR_recv
+    }
+
+    def zmq_listener():
+        context = zmq.Context()
+        sock = context.socket(zmq.PULL)
+        sock.bind(f"tcp://*:{zmq_port}")
+
+        print(f"[ZeroMQ] Listening on tcp://*:{zmq_port}")
+
+        while True:
+            msg = sock.recv()
+            data = msgpack.unpackb(msg, raw=False)
+
+            route = data.get("route")
+            payload = data.get("payload")
+
+            if route in ROUTES:
+                ROUTES[route](payload)
+            else:
+                print(f"[ZeroMQ] Unknown route: {route}")
+
 
 
     @app.route("/pairEPR/recv", methods=["POST"])
-    def pairEPR_recv():
+    def pairEPR_recv_request():
         data = request.get_json()
         pares = node_info.setdefault("pairEPR", [])
         updated = False
@@ -409,21 +496,72 @@ def app_open(PUERTO, listener_port):
         notificar_master_pairEPR(node_info)
 
         return jsonify({"status": "swapped", "pairEPR": node_info["pairEPR"]}), 200, {"Connection": "close"}
+    
+    import zmq
+    import msgpack
 
+    # Global ZeroMQ context shared by all sockets
+    context = zmq.Context()
 
+    # Cache of PUSH sockets (one per destination)
+    zmq_sockets = {}
 
-    def notificar_master_pairEPR(node_info):
+    def get_zmq_socket(addr):
+        """Return a cached PUSH socket or create a new one."""
+        if addr not in zmq_sockets:
+            sock = context.socket(zmq.PUSH)
+            sock.connect(addr)
+            zmq_sockets[addr] = sock
+            print(f"[ZeroMQ] Connected PUSH → {addr}")
+        return zmq_sockets[addr]
+
+    def send_info(addr, payload):
+        """Send a msgpack payload via ZeroMQ PUSH."""
         try:
-            res = requests.post(
-                "http://localhost:8000/master/pairEPR",  # puerto donde corre el master
-                json={node_info["id"]: node_info.get("pairEPR", [])},
-                timeout=2
-
-            )
-            print("[DEBUG] Historial pairEPR enviado al master:", res.status_code)
-            print("[DEBUG] Master recibio esto:", node_info)
+            sock = get_zmq_socket(addr)
+            sock.send(msgpack.packb(payload))
+            print(f"[NODE → MASTER ZMQ] Sent to {addr}")
         except Exception as e:
-            print("[DEBUG] Error notificando al master:", e)
+            print(f"[NODE → MASTER ZMQ ERROR] {e}")
+
+    def notificar_master_pairEPR_zmq(node_info, epr_id):
+        payload = {
+            "route": "master/pairEPR",
+            "payload": { node_info["id"]: node_info.get("pairEPR", []) },
+            "epr_id": epr_id
+        }
+
+        master_zmq_addr = "tcp://localhost:9001"   # ZMQ port of the master
+
+        send_info(master_zmq_addr, payload)
+
+        # Optional timestamp logging
+        log_timestamp(
+            "SENDING TO MASTER (ZMQ)",
+            epr_id,
+            t_start=timestamp_precise()
+        )
+
+    def notificar_master_pairEPR(node_info, epr_id = None):
+        def _send():
+            t_start = timestamp_precise()
+            if(epr_id != None):
+                
+                log_timestamp("SENDING TO MASTER", epr_id, t_start = t_start)
+            try:
+                requests.post(
+                    "http://localhost:8000/master/pairEPR",
+                    json={node_info["id"]: node_info.get("pairEPR", [])},
+                    timeout=2
+                )
+                t_end = timestamp_precise()
+                log_timestamp("RECEIVING FROM MASTER", epr_id, t_start = t_start, t_end = t_end, t_diff = diff_precise(t_start,t_end))
+        
+            except Exception as e:
+                print("[DEBUG] Error notificando al master:", e)
+
+        threading.Thread(target=_send, daemon=True).start()
+
 
     @app.route("/update", methods=["POST"])
     def update():
@@ -530,6 +668,11 @@ def app_open(PUERTO, listener_port):
                 print("[DEBUG] Error notificando al master:", e)
             print(f"Order: {data}")
             return jsonify({"error": str(e)}), 500
+
+
+    threading.Thread(target=zmq_listener, daemon=True).start()
+
+
 
     print(f"[SERVIDOR] Inicializando nodo en el puerto {PUERTO}...")
     app.run(host="127.0.0.1", port=PUERTO, debug=True, use_reloader=False)

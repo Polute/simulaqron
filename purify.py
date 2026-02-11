@@ -228,12 +228,12 @@ def purify(node_info, pur_id, my_port=None, emitter_port=None):
         node_info["parEPR"].append(operation_log)
         try:
             if my_port:
-                requests.post(f"http://localhost:{my_port}/parEPR/recv", json=operation_log, timeout=2)
-                requests.post(f"http://localhost:{my_port}/parEPR/recv", json=upgraded_epr, timeout=2)
+                requests.post(f"http://localhost:{my_port}/pairEPR/recv", json=operation_log, timeout=2)
+                requests.post(f"http://localhost:{my_port}/pairEPR/recv", json=upgraded_epr, timeout=2)
                 monitor_werner(upgraded_epr, my_port+4000)
             if emiter_port:
-                requests.post(f"http://localhost:{emiter_port}/parEPR/recv", json=operation_log, timeout=2)
-                requests.post(f"http://localhost:{my_port}/parEPR/recv", json=upgraded_epr, timeout=2)
+                requests.post(f"http://localhost:{emiter_port}/pairEPR/recv", json=operation_log, timeout=2)
+                requests.post(f"http://localhost:{my_port}/pairEPR/recv", json=upgraded_epr, timeout=2)
                 starting_werner_recalculate_sender(pur_id, upgraded_epr, emiter_port+4000)
         except Exception as e:
             print(f"[PURIFY] Error notificando endpoints: {e}")

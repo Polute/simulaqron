@@ -6,3 +6,5 @@ requests>=2.25
 flask_cors
 pandas
 matplotlib
+zmq
+msgpack

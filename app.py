@@ -19,6 +19,49 @@ import queue
 event_queue = queue.Queue()
 
 import socket
+import threading
+# --------------------------------------------------
+# HIGH PRECISION TIMESTAMPS
+# --------------------------------------------------
+
+def timestamp_precise():
+    """
+    Returns a timestamp in the same style as t_gen/t_recv (MM:SS.xxxxxx)
+    but with microsecond precision.
+    """
+    now = time.time()
+    mmss = time.strftime("%M:%S.", time.localtime(now))
+    usec = int((now % 1) * 1_000_000)
+    return f"{mmss}{usec:06d}"
+
+
+def timestamp_to_seconds(ts):
+    """
+    Convert 'MM:SS.xxxxxx' into float seconds.
+    """
+    mm, rest = ts.split(":")
+    ss, us = rest.split(".")
+    return int(mm)*60 + int(ss) + int(us)/1_000_000
+
+
+def diff_precise(t1, t2):
+    """
+    Compute difference between two precise timestamps.
+    """
+    return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
+
+# --------------------------------------------------
+# TIMESTAMPS DEBUGGER
+# --------------------------------------------------
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_2.txt"
+
+def log_timestamp(event_type, epr_id, **fields):
+    line = f"[{event_type}]  ID={epr_id}"
+    for k, v in fields.items():
+        line += f"  {k}={v}"
+    line += "\n"
+    with open(TIMESTAMP_LOG, "a") as f:
+        f.write(line)
 
 def puerto_activo(host, port):
     try:
@@ -493,7 +536,42 @@ def app_open(ROL, PUERTO):
             for clave, valores in MASTER_PAR_EPR.items()
         }
         return jsonify({"status": "ok", "MASTER_PAR_EPR": state})
+    import zmq 
+    import msgpack
+    def zmq_master_listener():
+        context = zmq.Context()
+        sock = context.socket(zmq.PULL)
+        sock.bind("tcp://*:9001")
 
+        print("[MASTER ZMQ] Listening on tcp://*:9001")
+
+        while True:
+            msg = sock.recv()
+            data = msgpack.unpackb(msg, raw=False)
+
+            if data.get("route") == "master/pairEPR":
+                historial = data["payload"]
+                epr_id = data["epr_id"]
+                t_receive = timestamp_precise()
+                log_timestamp("MASTER RECEIVING (ZMQ)", epr_id, t_start=t_receive)
+
+                # Same logic as the HTTP endpoint
+                for nodo_id, lista in historial.items():
+                    for epr in lista:
+                        neighbor = epr.get("neighbor") if epr.get("neighbor") is not None else "None"
+                        clave = f"{nodo_id}-{neighbor}"
+                        if clave not in MASTER_PAR_EPR:
+                            MASTER_PAR_EPR[clave] = {}
+                        MASTER_PAR_EPR[clave][str(epr["id"])] = epr
+
+                t_end = timestamp_precise()
+                log_timestamp(
+                    "MASTER PROCESSED (ZMQ)",
+                    epr_id,
+                    t_start=t_receive,
+                    t_end=t_end,
+                    t_diff=diff_precise(t_receive, t_end)
+                )
 
     
     @app.route("/master/pairEPR/clear", methods=["POST"])
@@ -1092,6 +1170,8 @@ def app_open(ROL, PUERTO):
                 "counter": counter,
                 "historial": []
             })
+    threading.Thread(target=zmq_master_listener, daemon=True).start()
+
     print(f"[SERVIDOR] Iniciando servidor en el puerto {PUERTO} con rol {ROL}...")
     app.run(host="127.0.0.1", port=PUERTO, debug=True, use_reloader=False) #Quitar debug=True si no estoy en produccion
 

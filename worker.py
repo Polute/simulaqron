@@ -15,6 +15,10 @@ import requests
 from cqc.pythonLib import CQCConnection
 from cqc.pythonLib.util import CQCNoQubitError, CQCTimeoutError
 
+#session = requests.Session()
+
+conn_lock = threading.Lock()
+
 
 # Speed of light in fiber (km/s approximation)
 C = 3e5
@@ -23,18 +27,276 @@ C = 3e5
 epr_store = {}
 nodo_info = {"pairEPR": []}
 
+# ---------------------------
+# CVS & PLOTS
+# ---------------------------
+import csv
+
+
+def export_timestamps_to_csv(log_file="latencies/timestamps_log_afterx2_2.txt",
+                             csv_file="latencies/timestamps_afterx2_2.csv"):
+    rows = []
+
+    with open(log_file, "r") as f:
+        for line in f:
+            parts = line.strip().split()
+            if len(parts) < 3:
+                continue
+
+            # --- FIX: skip any line that does NOT contain an ID= field ---
+            if "ID=" not in parts[1]:
+                continue
+
+            event = parts[0].strip("[]")
+            epr_id = parts[1].split("=")[1]
+
+            entry = {"event": event, "id": epr_id}
+
+            for p in parts[2:]:
+                if "=" in p:
+                    k, v = p.split("=")
+                    entry[k] = v
+
+            rows.append(entry)
+
+    fieldnames = sorted({key for row in rows for key in row.keys()})
+
+    with open(csv_file, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    print(f"[OK] CSV generated: {csv_file}")
+
+
+import matplotlib
+matplotlib.use("Agg")   # backend sin GUI
+import matplotlib.pyplot as plt
+
+
+def plot_latencies(csv_file="latencies/timestamps_afterx2_2.csv"):
+    df = pd.read_csv(csv_file)
+
+    backend = df[df["event"] == "CreateEPR_backend"]["t_diff"].astype(float)
+    notify  = df[df["event"] == "CreateEPR_notify"]["t_diff"].astype(float)
+    total   = df[df["event"] == "CreateEPR_total"]["t_diff"].astype(float)
+    master = df[df["event"] == "MASTER PROCESSED (ZMQ)"]["t_diff"].astype(float)
+
+    plt.close('all')
+    fig = plt.figure(figsize=(10,6))
+    plt.plot(backend.values, label="Backend latency (createEPR)")
+    plt.plot(notify.values, label="Notify latency (HTTP)")
+    plt.plot(master.values, label="Master updates")
+    plt.plot(total.values, label="Total EPR generation latency")
+    
+
+    plt.xlabel("EPR index")
+    plt.ylabel("Tiempo (s)")
+    plt.title("Latencias de generación EPR")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    fig.savefig("latencies/latencias_epr_afterx2_2.png")
+    plt.close(fig)
+    print("[OK] Gráfica guardada en latencies/latencias_epr.png")
+
+import pandas as pd
+
+def compute_latency_stats(csv_file="latencies/timestamps_afterx2_2.csv"):
+
+    df = pd.read_csv(csv_file)
+
+    backend = df[df["event"] == "CreateEPR_backend"]["t_diff"].astype(float)
+    notify  = df[df["event"] == "CreateEPR_notify"]["t_diff"].astype(float)
+    total   = df[df["event"] == "CreateEPR_total"]["t_diff"].astype(float)
+    master = df[df["event"] == "MASTER PROCESSED (ZMQ)"]["t_diff"].astype(float)
+
+    # Compute stats and store them in variables
+    media_create = backend.mean()
+    std_create   = backend.std()
+    min_create   = backend.min()
+    max_create   = backend.max()
+
+    media_notify = notify.mean()
+    std_notify   = notify.std()
+    min_notify   = notify.min()
+    max_notify   = notify.max()
+
+    media_total = total.mean()
+    std_total   = total.std()
+    min_total   = total.min()
+    max_total   = total.max()
+
+    media_master = master.mean()
+    std_master   = master.std()
+    min_master   = master.min()
+    max_master   = master.max()
+    
+
+    # Print to console
+    print("\n===== ESTADÍSTICAS DE LATENCIA =====")
+    print("Backend createEPR:")
+    print("  media:", media_create)
+    print("  std:", std_create)
+    print("  min:", min_create)
+    print("  max:", max_create)
+
+    print("\nNotificación HTTP:")
+    print("  media:", media_notify)
+    print("  std:", std_notify)
+    print("  min:", min_notify)
+    print("  max:", max_notify)
+
+    print("\nTotal generación EPR:")
+    print("  media:", media_total)
+    print("  std:", std_total)
+    print("  min:", min_total)
+    print("  max:", max_total)
+
+
+
+    # Save to TXT
+    with open("latencies/latencias_epr_afterx2_2.txt", "w") as f:
+        f.write("===== ESTADÍSTICAS DE LATENCIA =====\n")
+        f.write("Backend createEPR:\n")
+        f.write(f"  media: {media_create}\n")
+        f.write(f"  std: {std_create}\n")
+        f.write(f"  min: {min_create}\n")
+        f.write(f"  max: {max_create}\n\n")
+
+        f.write("Notificación HTTP:\n")
+        f.write(f"  media: {media_notify}\n")
+        f.write(f"  std: {std_notify}\n")
+        f.write(f"  min: {min_notify}\n")
+        f.write(f"  max: {max_notify}\n\n")
+
+        f.write("Noticicación master zmq:\n")
+        f.write(f"  media: {media_master}\n")
+        f.write(f"  std: {std_master}\n")
+        f.write(f"  min: {min_master}\n")
+        f.write(f"  max: {max_master}\n\n")
+
+        f.write("Total generación EPR:\n")
+        f.write(f"  media: {media_total}\n")
+        f.write(f"  std: {std_total}\n")
+        f.write(f"  min: {min_total}\n")
+        f.write(f"  max: {max_total}\n")
+
+
+    print("[OK] Estadísticas guardadas en latencias_epr.txt")
+
+
+
+
+
+
+
+# --------------------------------------------------
+# HIGH PRECISION TIMESTAMPS
+# --------------------------------------------------
+
+def timestamp_precise():
+    """
+    Returns a timestamp in the same style as t_gen/t_recv (MM:SS.xxxxxx)
+    but with microsecond precision.
+    """
+    now = time.time()
+    mmss = time.strftime("%M:%S.", time.localtime(now))
+    usec = int((now % 1) * 1_000_000)
+    return f"{mmss}{usec:06d}"
+
+
+def timestamp_to_seconds(ts):
+    """
+    Convert 'MM:SS.xxxxxx' into float seconds.
+    """
+    mm, rest = ts.split(":")
+    ss, us = rest.split(".")
+    return int(mm)*60 + int(ss) + int(us)/1_000_000
+
+
+def diff_precise(t1, t2):
+    """
+    Compute difference between two precise timestamps.
+    """
+    return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
+
+# --------------------------------------------------
+# TIMESTAMPS DEBUGGER
+# --------------------------------------------------
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_2.txt"
+
+def log_timestamp(event_type, epr_id, **fields):
+    line = f"[{event_type}]  ID={epr_id}"
+    for k, v in fields.items():
+        line += f"  {k}={v}"
+    line += "\n"
+    with open(TIMESTAMP_LOG, "a") as f:
+        f.write(line)
+
 
 # --------------------------------------------------
 # Utility functions of sender
 # --------------------------------------------------
+import zmq
+import msgpack
+
+# Global ZeroMQ context shared by all sockets.
+context = zmq.Context()
+
+# Cache of PUSH sockets, one per destination address.
+# This avoids reconnecting on every send, which is expensive.
+zmq_sockets = {}
+
+def get_zmq_socket(addr):
+    """
+    Returns a PUSH socket connected to the given ZeroMQ address.
+    If the socket does not exist yet, it is created and cached.
+    This ensures persistent connections and minimal overhead.
+    """
+    if addr not in zmq_sockets:
+        sock = context.socket(zmq.PUSH)
+        sock.connect(addr)  # Establish a persistent connection
+        zmq_sockets[addr] = sock
+        print(f"[ZeroMQ] Connected PUSH → {addr}")
+    return zmq_sockets[addr]
 
 def send_info(url, payload):
-    """Send payload to a node's HTTP endpoint."""
+    """
+    Sends a message using ZeroMQ PUSH.
+    
+    Parameters:
+        url:     A ZeroMQ address, e.g. 'tcp://localhost:5002'
+        payload: A Python dict that will be serialized with msgpack.
+                 Typically includes:
+                 {
+                     "route": "pairEPR/add",
+                     "payload": {...}
+                 }
+
+    This function replaces the old HTTP-based sender while keeping
+    the same signature for compatibility. It is extremely fast because:
+        - No HTTP
+        - No Flask
+        - No reconnections
+        - Binary serialization (msgpack)
+    """
     try:
-        r = requests.post(url, json=payload, timeout=2)
-        print(f"[SENDER] Sent info to {url}, status={r.status_code}")
+        sock = get_zmq_socket(url)
+        sock.send(msgpack.packb(payload))  # Send binary-encoded message
+        print(f"[SENDER] Sent via ZeroMQ to {url}")
     except Exception as e:
-        print(f"[SENDER] Error sending info to {url}: {e}")
+        print(f"[SENDER] ZeroMQ send error: {e}")
+
+
+#def send_info(url, payload):
+ #   """Send payload to a node's HTTP endpoint using a persistent session."""
+  #  try:
+   #     r = session.post(url, json=payload, timeout=2)
+    #    print(f"[SENDER] Sent info to {url}, status={r.status_code}")
+    #except Exception as e:
+     #   print(f"[SENDER] Error sending info to {url}: {e}")
 
 
 def calculate_tdiff(ts1: str, ts2: str) -> float:
@@ -70,62 +332,112 @@ def starting_werner_recalculate_sender(epr_id, result_recv, listener_emiter_port
         print(f"[SOCKET ERROR] Could not connect to {listener_emiter_port}: {e}")
         return None
 
+with conn_lock:
 
-# --------------------------------------------------
-# EPR generation
-# --------------------------------------------------
+    def generar_epr(emisor, receptor, conn, emisor_port, receptor_port,
+                    pgen, epr_id, node_info):
 
-def generar_epr(emisor, receptor, conn, emisor_port, receptor_port,
-                pgen, epr_id, node_info):
-    """Attempt to generate an EPR pair with probabilistic success."""
-    print(f"[SENDER] {emisor} attempting EPR with {receptor} (pgen={pgen})")
+        print(f"[SENDER] {emisor} attempting EPR with {receptor} (pgen={pgen})")
 
-    neighbors = [n["id"] for n in node_info.get("neighbors", [])]
-    if receptor not in neighbors:
-        print(f"[SENDER] {receptor} is not a neighbor of {emisor}")
-        send_info(
-            f"http://localhost:{emisor_port}/pairEPR/add",
-            {"id": epr_id, "neighbor": receptor, "t_gen": "0", "w_gen": "0"}
-        )
-        return
+        neighbors = [n["id"] for n in node_info.get("neighbors", [])]
+        if receptor not in neighbors:
+            send_info(
+                f"tcp://localhost:{emisor_port+1000}",
+                {
+                    "route": "pairEPR/add",
+                    "payload": {
+                        "id": epr_id,
+                        "neighbor": receptor,
+                        "t_gen": "0",
+                        "w_gen": "0"
+                    }
+                }
+            )
+            return
 
-    if random.random() > pgen:
-        print("[SENDER] Probabilistic failure, no EPR created")
+
+        if random.random() > pgen:
+            for port, neighbor in [(emisor_port, receptor), (receptor_port, emisor)]:
+                send_info(
+                    f"tcp://localhost:{port+1000}",
+                    {
+                        "route": "pairEPR/add",
+                        "payload": {
+                            "id": epr_id,
+                            "neighbor": neighbor,
+                            "t_gen": "0",
+                            "w_gen": "0"
+                        }
+                    }
+                )
+            return
+
+
+        # --------------------------------------------------
+        # 1) Total EPR generation timing
+        # --------------------------------------------------
+        t_total_start = timestamp_precise()
+
+        try:
+            print("\n================ SIMULAQRON DEBUG ================")
+            print("[DEBUG] Attempting createEPR")
+            print("[DEBUG] Local node:", conn.name)
+            print("[DEBUG] Target node (raw):", repr(receptor))
+            print("==================================================\n")
+
+            # --------------------------------------------------
+            # 2) Backend createEPR timing
+            # --------------------------------------------------
+            t_start = timestamp_precise()
+            q = conn.createEPR(receptor)
+            t_end = timestamp_precise()
+            t_diff_create = diff_precise(t_start, t_end)
+
+            log_timestamp("CreateEPR_backend",epr_id,t_start=t_start,t_end=t_end,t_diff=f"{t_diff_create:.6f}")
+
+            epr_store[epr_id] = {"q": q, "w_out": 1.0, "other_port": receptor_port}
+
+        except Exception as e:
+            print(f"[SENDER] Unexpected error: {e}")
+            return
+
+        # --------------------------------------------------
+        # 3) Generate t_gen timestamp
+        # --------------------------------------------------
+        t_gen = time.strftime("%M:%S.") + f"{int((time.time() % 1)*1000):03d}"
+
+        # --------------------------------------------------
+        # 4) Classical notification timing
+        # --------------------------------------------------
+        t_notify_start = timestamp_precise()
+
         for port, neighbor in [(emisor_port, receptor), (receptor_port, emisor)]:
             send_info(
-                f"http://localhost:{port}/pairEPR/add",
-                {"id": epr_id, "neighbor": neighbor, "t_gen": "0", "w_gen": "0"}
+                f"tcp://localhost:{port+1000}",
+                {
+                    "route": "pairEPR/add",
+                    "payload": {
+                        "id": epr_id,
+                        "neighbor": neighbor,
+                        "t_gen": t_gen,
+                        "w_gen": 1.0
+                    }
+                }
             )
-        return
-
-    try:
-        print("\n================ SIMULAQRON DEBUG ================")
-        print("[DEBUG] Attempting createEPR")
-        print("[DEBUG] Local node:", conn.name)
-        print("[DEBUG] Target node (raw):", repr(receptor))
-        print("==================================================\n")
 
 
-        q = conn.createEPR(receptor)
-        epr_store[epr_id] = {"q": q, "w_out": 1.0, "other_port": receptor_port}
-    except CQCNoQubitError:
-        print("[SENDER] No quantum memory available")
-        for port, neighbor in [(emisor_port, receptor), (receptor_port, emisor)]:
-            send_info(
-                f"http://localhost:{port}/pairEPR/add",
-                {"id": epr_id, "neighbor": neighbor, "t_gen": "0", "w_gen": "0"}
-            )
-        return
-    except Exception as e:
-        print(f"[SENDER] Unexpected error: {e}")
-        return
+        t_notify_end = timestamp_precise()
+        t_diff_notify = diff_precise(t_notify_start, t_notify_end)
 
-    t_gen = time.strftime("%M:%S.") + f"{int((time.time() % 1)*1000):03d}"
-    for port, neighbor in [(emisor_port, receptor), (receptor_port, emisor)]:
-        send_info(
-            f"http://localhost:{port}/pairEPR/add",
-            {"id": epr_id, "neighbor": neighbor, "t_gen": t_gen, "w_gen": 1.0}
-        )
+        log_timestamp("CreateEPR_notify",epr_id,t_start=t_notify_start,t_end=t_notify_end,t_diff=f"{t_diff_notify:.6f}")
+
+        # --------------------------------------------------
+        # 5) Total EPR generation latency
+        # --------------------------------------------------
+        t_total_end = timestamp_precise()
+        t_diff_total = diff_precise(t_total_start, t_total_end)
+
+        log_timestamp("CreateEPR_total",epr_id,t_start=t_total_start,t_end=t_total_end,t_diff=f"{t_diff_total:.6f}")
 
 
 # --------------------------------------------------
@@ -233,15 +545,15 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
         return result_measure
 
     return None
-
-
-# --------------------------------------------------
-# EPR receiving
-# --------------------------------------------------
-
 def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
+
     epr_id = payload.get("id", 0)
     state = payload.get("state", "fallo")
+    # --- TIMESTAMP: antes de recvEPR ---
+    t_start = timestamp_precise()
+    # --- TIMESTAMP: entrada a la función ---
+    log_timestamp("RECV_ENTER", epr_id, t=timestamp_precise())
+
     resultado_recv = {
         "id": epr_id,
         "neighbor": payload.get("neighbor"),
@@ -258,8 +570,22 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
     if state == "ok":
         try:
-            q = conn.recvEPR()
-            # Store qubit in local memory
+            log_timestamp("RECV_EPR_START", epr_id, t_start=t_start)
+            with conn_lock:
+                q = conn.recvEPR()
+
+            # --- TIMESTAMP: después de recvEPR ---
+            t_end = timestamp_precise()
+            t_diff_recv = diff_precise(t_start, t_end)
+            log_timestamp(
+                "ReceiveEPR",
+                epr_id,
+                t_start=t_start,
+                t_end=t_end,
+                t_diff=f"{t_diff_recv:.6f}"
+            )
+
+            # Store qubit
             epr_store[epr_id] = {
                 "q": q,
                 "other_port": emisor_port
@@ -267,9 +593,9 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
             w_in = float(payload.get("w_gen", 1.0))
 
-            # Time stamps
+            # Precise t_recv
             t_gen_str = payload.get("t_gen", "0")
-            t_recv_str = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
+            t_recv_str = time.strftime("%M:%S.") + f"{int((time.time() % 1)*1000):03d}"
 
             tdif = calculate_tdiff(t_gen_str, t_recv_str)
 
@@ -283,33 +609,37 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             resultado_recv["t_recv"] = t_recv_str
             resultado_recv["t_diff"] = tdif
             resultado_recv["state"] = "active"
-            neighbor = payload["neighbor"]
 
+            neighbor = payload["neighbor"]
             resultado_recv["distancia_nodos"] = next(
                 v["distanceKm"] for v in node_info["neighbors"] if v["id"] == neighbor
             )
 
             resultado_recv["listener_port"] = listener_port
 
-            # Start the background coherence monitor HERE on the receiver side
+            # --- TIMESTAMP: antes de start_monitor ---
+            log_timestamp("RECV_BEFORE_MONITOR", epr_id, t=timestamp_precise())
+
             start_monitor(
                 epr_id,
                 resultado_recv,
                 conn,
                 node_info,
-                role = "receiver",
+                role="receiver",
                 my_port=my_port,
                 other_port=emisor_port
             )
 
-        except CQCTimeoutError:
-            resultado_recv["state"] = "timeout"
         except Exception as e:
             print(f"[RECEIVER] Error : {e}")
             resultado_recv["state"] = "error"
+
     else:
-        print("[RECEIVER] EPR not reveived")
+        print("[RECEIVER] EPR not received")
         resultado_recv["state"] = "EPR not received"
+
+    # --- TIMESTAMP: antes de actualizar memoria ---
+    log_timestamp("RECV_BEFORE_UPDATE", epr_id, t=timestamp_precise())
 
     # Update local memory
     pares = node_info.get("pairEPR", [])
@@ -323,22 +653,57 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
         pares.append(resultado_recv)
     node_info["pairEPR"] = pares
 
-    # Notify endpoints
+    # --- TIMESTAMP: antes de notificar ---
+    log_timestamp("RECV_BEFORE_NOTIFY", epr_id, t=timestamp_precise())
+
     try:
         print("[RECEIVER] Success on receiving the EPR, sending update states to sender and master")
+
+        # --- Send to my_port (the receiver node) ---
         if my_port:
-            requests.post(f"http://localhost:{my_port}/pairEPR/recv", json=resultado_recv, timeout=2)
+            send_info(
+                f"tcp://localhost:{my_port + 1000}",
+                {
+                    "route": "pairEPR/recv",
+                    "payload": resultado_recv
+                }
+            )
+
+        # --- Send to emisor_port (the sender node) ---
         if emisor_port:
-            resultado_recv["neighbor"] = node_info["id"]
-            requests.post(f"http://localhost:{emisor_port}/pairEPR/recv", json=resultado_recv, timeout=2)
+            resultado_recv_sender = dict(resultado_recv)
+            resultado_recv_sender["neighbor"] = node_info["id"]
+
+            send_info(
+                f"tcp://localhost:{emisor_port + 1000}",
+                {
+                    "route": "pairEPR/recv",
+                    "payload": resultado_recv_sender
+                }
+            )
+
+            # Trigger Werner recalculation on sender
             listener_emiter_port = emisor_port + 4000
-            starting_werner_recalculate_sender(epr_id, resultado_recv, listener_emiter_port)
+            starting_werner_recalculate_sender(epr_id, resultado_recv_sender, listener_emiter_port)
 
     except Exception as e:
-        print(f"[RECEIVER] Error notifying endpoints of a receiving with ports: {my_port}, {emisor_port} with this msg: {resultado_recv} and error: {e}")
+        print(f"[RECEIVER] ZeroMQ error notifying endpoints: {e}")
 
+    # --- TIMESTAMP: salida de la función ---
+    t_end_recv = timestamp_precise()
+    t_diff = diff_precise(t_start,t_end_recv)
+    log_timestamp("RECV_TOTAL_no_plots", epr_id, t_start = t_start ,t_end_recv=t_end_recv,t_diff=t_diff)
+    
+
+    export_timestamps_to_csv()
+    compute_latency_stats()
+    plot_latencies()
+    # --- TIMESTAMP: salida de la función ---
+    t_end_recv = timestamp_precise()
+    t_diff = diff_precise(t_start,t_end_recv)
+    log_timestamp("RECV_TOTAL", epr_id, t_start = t_start ,t_end_recv=t_end_recv,t_diff=t_diff)
     return resultado_recv
-
+    
 
 def pick_pair_same_edge_swap(node_info, my_port, dest1, dest2, timeout=5.0, interval=0.01):
     """

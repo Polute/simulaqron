@@ -1,0 +1,16 @@
+ID	Estado	link	w_gen	w_out	t_gen	t_recv	t_diff	Medicion
+
+
+
+
+
+
+
+2yd7sv2t6	ok	node_etsiinf_upm-node_cedint_upm	1.00000		28:34.966					
+4y6ijurcu	ok	node_rectorado_upm-node_cedint_upm	1.00000		28:34.971					
+
+
+
+
+
+
