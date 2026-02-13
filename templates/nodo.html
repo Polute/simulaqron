@@ -548,20 +548,9 @@
                     const anterioresOrdenes = JSON.stringify(ultimasOrdenes);
 
                     if (nuevasOrdenes !== anterioresOrdenes) {
-                        console.log("Órdenes nuevas detectadas, aplicando...");
-                        console.log("Tiene un sleep de 500 ms");
-                        data.forEach((orden, idx) => {
-                            setTimeout(() => {
-                                fetch("/operations", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify(orden)
-                                }).catch(err => console.error("Error aplicando orden:", err));
-                            }, idx * 500); // ⏱ cada orden se retrasa 0.2s respecto a la anterior
-                        });
                         ultimasOrdenes = data;
                     } else {
-                        console.log("Órdenes iguales, no se reenvían");
+                        console.log("Órdenes iguales, dont update");
                     }
                 })
                 .catch(err => {

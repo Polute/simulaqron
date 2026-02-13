@@ -31,36 +31,65 @@ nodo_info = {"pairEPR": []}
 # CVS & PLOTS
 # ---------------------------
 import csv
+import os
 
+def wait_for_csv(csv_file, timeout=2.0):
+    start = time.time()
+    while time.time() - start < timeout:
+        if os.path.exists(csv_file) and os.path.getsize(csv_file) > 10:
+            return True
+        time.sleep(0.001)
+    return False
 
-def export_timestamps_to_csv(log_file="latencies/timestamps_log_afterx2_2.txt",
-                             csv_file="latencies/timestamps_afterx2_2.csv"):
+import csv
+import re
+
+def export_timestamps_to_csv(
+    log_file="latencies/timestamps_log_afterx2_8.txt",
+    csv_file="latencies/timestamps_log_afterx2_8.csv"
+):
     rows = []
+
+    float_re = re.compile(r"[-+]?\d*\.\d+|\d+")
 
     with open(log_file, "r") as f:
         for line in f:
             parts = line.strip().split()
-            if len(parts) < 3:
+            if len(parts) < 2:
                 continue
 
-            # --- FIX: skip any line that does NOT contain an ID= field ---
-            if "ID=" not in parts[1]:
-                continue
-
+            # Event name: [CreateEPR_backend] → CreateEPR_backend
             event = parts[0].strip("[]")
-            epr_id = parts[1].split("=")[1]
+
+            # Extract ID
+            epr_id = None
+            for p in parts:
+                if p.startswith("ID="):
+                    epr_id = p.split("=")[1]
 
             entry = {"event": event, "id": epr_id}
 
-            for p in parts[2:]:
+            # Extract all key=value pairs
+            for p in parts:
                 if "=" in p:
                     k, v = p.split("=")
-                    entry[k] = v
+
+                    # Clean numeric values
+                    m = float_re.search(v)
+                    if m:
+                        try:
+                            entry[k] = float(m.group())
+                        except:
+                            entry[k] = v
+                    else:
+                        entry[k] = v
 
             rows.append(entry)
 
+    # Collect all fields
     fieldnames = sorted({key for row in rows for key in row.keys()})
 
+    # Write CSV
     with open(csv_file, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -69,42 +98,86 @@ def export_timestamps_to_csv(log_file="latencies/timestamps_log_afterx2_2.txt",
     print(f"[OK] CSV generated: {csv_file}")
 
 
+
+
+
 import matplotlib
 matplotlib.use("Agg")   # backend sin GUI
+
+import pandas as pd
 import matplotlib.pyplot as plt
 
-
-def plot_latencies(csv_file="latencies/timestamps_afterx2_2.csv"):
+def plot_latencies(csv_file="latencies/timestamps_log_afterx2_8.csv"):
     df = pd.read_csv(csv_file)
 
-    backend = df[df["event"] == "CreateEPR_backend"]["t_diff"].astype(float)
-    notify  = df[df["event"] == "CreateEPR_notify"]["t_diff"].astype(float)
-    total   = df[df["event"] == "CreateEPR_total"]["t_diff"].astype(float)
-    master = df[df["event"] == "MASTER PROCESSED (ZMQ)"]["t_diff"].astype(float)
+    # Helper: extraer t_diff de un evento como serie
+    def get_series(event):
+        s = df[df["event"] == event]["t_diff"]
+        return s.astype(float).reset_index(drop=True) if not s.empty else None
 
+    # Helper: micro-segmentos a partir de timestamps
+    def get_segment(start_event, end_event):
+        start = df[df["event"] == start_event]["t"]
+        end   = df[df["event"] == end_event]["t"]
+        if start.empty or end.empty:
+            return None
+        start = start.astype(float).reset_index(drop=True)
+        end   = end.astype(float).reset_index(drop=True)
+        return (end - start)
+
+    # -------- GENERACIÓN --------
+    backend = get_series("CreateEPR_backend")
+    notify  = get_series("CreateEPR_notify")
+    total   = get_series("CreateEPR_total")
+
+    # -------- GAP GEN → RECV --------
+    gap = get_series("ORDER_RECV_EXECUTING_AFTER_FOUND")
+
+    # -------- RECEIVER MICRO-SEGMENTS --------
+    s1 = get_segment("RECV_EPR_START", "RECV_BEFORE_MONITOR")
+    s2 = get_segment("RECV_BEFORE_MONITOR", "RECV_BEFORE_UPDATE")
+    s3 = get_segment("RECV_BEFORE_UPDATE", "RECV_BEFORE_NOTIFY")
+
+    recv_total = get_series("RECV_TOTAL_no_plots")
+
+    # -------- TOTAL END-TO-END (GEN + GAP + RECV) --------
+    recv_total_epr_final = get_series("RECV_TOTAL_EPR_FINAL")
+
+    # -------- PLOT --------
     plt.close('all')
-    fig = plt.figure(figsize=(10,6))
-    plt.plot(backend.values, label="Backend latency (createEPR)")
-    plt.plot(notify.values, label="Notify latency (HTTP)")
-    plt.plot(master.values, label="Master updates")
-    plt.plot(total.values, label="Total EPR generation latency")
-    
+    fig = plt.figure(figsize=(12, 7))
+
+    if backend is not None:            plt.plot(backend.values,            label="CreateEPR backend")
+    if notify  is not None:            plt.plot(notify.values,             label="CreateEPR notify")
+    if total   is not None:            plt.plot(total.values,              label="CreateEPR total")
+    if gap     is not None:            plt.plot(gap.values,                label="GEN → RECV gap")
+
+    if s1 is not None:                 plt.plot(s1.values,                 label="start → monitor")
+    if s2 is not None:                 plt.plot(s2.values,                 label="monitor → update")
+    if s3 is not None:                 plt.plot(s3.values,                 label="update → notify")
+
+    if recv_total is not None:         plt.plot(recv_total.values,         label="RECV_TOTAL_no_plots (solo receiver)")
+    if recv_total_epr_final is not None:
+        plt.plot(recv_total_epr_final.values, label="RECV_TOTAL_EPR_FINAL (end-to-end)")
 
     plt.xlabel("EPR index")
     plt.ylabel("Tiempo (s)")
-    plt.title("Latencias de generación EPR")
+    plt.title("Latencias del pipeline EPR (GEN + GAP + RECV + TOTAL)")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
 
-    fig.savefig("latencies/latencias_epr_afterx2_2.png")
+    fig.savefig("latencies/latencias_epr_pipeline.png")
     plt.close(fig)
-    print("[OK] Gráfica guardada en latencies/latencias_epr.png")
+    print("[OK] Gráfica guardada en latencies/latencias_epr_pipeline.png")
+
+
+
 
 import pandas as pd
 
-def compute_latency_stats(csv_file="latencies/timestamps_afterx2_2.csv"):
-
+def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_8.csv"):
+    wait_for_csv(csv_file)
     df = pd.read_csv(csv_file)
 
     backend = df[df["event"] == "CreateEPR_backend"]["t_diff"].astype(float)
@@ -157,7 +230,7 @@ def compute_latency_stats(csv_file="latencies/timestamps_afterx2_2.csv"):
 
 
     # Save to TXT
-    with open("latencies/latencias_epr_afterx2_2.txt", "w") as f:
+    with open("latencies/latencias_epr_afterx2_8.txt", "w") as f:
         f.write("===== ESTADÍSTICAS DE LATENCIA =====\n")
         f.write("Backend createEPR:\n")
         f.write(f"  media: {media_create}\n")
@@ -196,15 +269,33 @@ def compute_latency_stats(csv_file="latencies/timestamps_afterx2_2.csv"):
 # HIGH PRECISION TIMESTAMPS
 # --------------------------------------------------
 
+
+from time import perf_counter_ns
+
 def timestamp_precise():
     """
-    Returns a timestamp in the same style as t_gen/t_recv (MM:SS.xxxxxx)
-    but with microsecond precision.
+    Returns a timestamp in MM:SS.xxxxxx format
+    with real microsecond precision using perf_counter().
     """
-    now = time.time()
-    mmss = time.strftime("%M:%S.", time.localtime(now))
-    usec = int((now % 1) * 1_000_000)
-    return f"{mmss}{usec:06d}"
+    ns = perf_counter_ns()
+    total_sec = ns // 1_000_000_000
+    mm = (total_sec // 60) % 60
+    ss = total_sec % 60
+    usec = (ns % 1_000_000_000) // 1000
+    return f"{mm:02d}:{ss:02d}.{usec:06d}"
+
+
+
+
+
+def timestamp_to_seconds(ts):
+    mm, rest = ts.split(":")
+    ss, us = rest.split(".")
+    return int(mm)*60 + int(ss) + int(us)/1_000_000
+
+
+def diff_precise(t1, t2):
+    return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
 
 
 def timestamp_to_seconds(ts):
@@ -220,21 +311,32 @@ def diff_precise(t1, t2):
     """
     Compute difference between two precise timestamps.
     """
-    return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
+    return abs(timestamp_to_seconds(t2) - timestamp_to_seconds(t1))
 
 # --------------------------------------------------
 # TIMESTAMPS DEBUGGER
 # --------------------------------------------------
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_2.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_8.txt"
+# Evita duplicados: (event_type, epr_id)
+LOGGED_EVENTS = set()
 
 def log_timestamp(event_type, epr_id, **fields):
+    global LOGGED_EVENTS
+
+    # Si ya existe este evento para este ID → no lo escribimos
+    key = (event_type, epr_id)
+    if key in LOGGED_EVENTS:
+        return
+    LOGGED_EVENTS.add(key)
+
+    # Escribir en el log
     line = f"[{event_type}]  ID={epr_id}"
     for k, v in fields.items():
         line += f"  {k}={v}"
     line += "\n"
+
     with open(TIMESTAMP_LOG, "a") as f:
         f.write(line)
-
 
 # --------------------------------------------------
 # Utility functions of sender
@@ -299,21 +401,6 @@ def send_info(url, payload):
      #   print(f"[SENDER] Error sending info to {url}: {e}")
 
 
-def calculate_tdiff(ts1: str, ts2: str) -> float:
-    """
-    Given two timestamp strings in the format 'MM:SS.mmm',
-    compute time difference ts2 - ts1.
-    """
-    def parse_ts(ts: str) -> float:
-        try:
-            minutes, rest = ts.split(":")
-            seconds, millis = rest.split(".")
-            return int(minutes) * 60 + int(seconds) + int(millis) / 1000.0
-        except Exception:
-            return 0.0
-
-    return abs(parse_ts(ts2) - parse_ts(ts1))
-
 
 def starting_werner_recalculate_sender(epr_id, result_recv, listener_emiter_port):
     """
@@ -332,85 +419,32 @@ def starting_werner_recalculate_sender(epr_id, result_recv, listener_emiter_port
         print(f"[SOCKET ERROR] Could not connect to {listener_emiter_port}: {e}")
         return None
 
-with conn_lock:
 
-    def generar_epr(emisor, receptor, conn, emisor_port, receptor_port,
-                    pgen, epr_id, node_info):
 
-        print(f"[SENDER] {emisor} attempting EPR with {receptor} (pgen={pgen})")
+def generar_epr(emisor, receptor, conn, emisor_port, receptor_port,
+                pgen, epr_id, node_info):
 
-        neighbors = [n["id"] for n in node_info.get("neighbors", [])]
-        if receptor not in neighbors:
-            send_info(
-                f"tcp://localhost:{emisor_port+1000}",
-                {
-                    "route": "pairEPR/add",
-                    "payload": {
-                        "id": epr_id,
-                        "neighbor": receptor,
-                        "t_gen": "0",
-                        "w_gen": "0"
-                    }
+    print(f"[SENDER] {emisor} attempting EPR with {receptor} (pgen={pgen})")
+
+    neighbors = [n["id"] for n in node_info.get("neighbors", [])]
+    if receptor not in neighbors:
+        send_info(
+            f"tcp://localhost:{emisor_port+1000}",
+            {
+                "route": "pairEPR/add",
+                "payload": {
+                    "id": epr_id,
+                    "neighbor": receptor,
+                    "t_gen": "0",
+                    "w_gen": "0",
+                    "state": "fail_no_link"
                 }
-            )
-            return
+            }
+        )
+        return
 
 
-        if random.random() > pgen:
-            for port, neighbor in [(emisor_port, receptor), (receptor_port, emisor)]:
-                send_info(
-                    f"tcp://localhost:{port+1000}",
-                    {
-                        "route": "pairEPR/add",
-                        "payload": {
-                            "id": epr_id,
-                            "neighbor": neighbor,
-                            "t_gen": "0",
-                            "w_gen": "0"
-                        }
-                    }
-                )
-            return
-
-
-        # --------------------------------------------------
-        # 1) Total EPR generation timing
-        # --------------------------------------------------
-        t_total_start = timestamp_precise()
-
-        try:
-            print("\n================ SIMULAQRON DEBUG ================")
-            print("[DEBUG] Attempting createEPR")
-            print("[DEBUG] Local node:", conn.name)
-            print("[DEBUG] Target node (raw):", repr(receptor))
-            print("==================================================\n")
-
-            # --------------------------------------------------
-            # 2) Backend createEPR timing
-            # --------------------------------------------------
-            t_start = timestamp_precise()
-            q = conn.createEPR(receptor)
-            t_end = timestamp_precise()
-            t_diff_create = diff_precise(t_start, t_end)
-
-            log_timestamp("CreateEPR_backend",epr_id,t_start=t_start,t_end=t_end,t_diff=f"{t_diff_create:.6f}")
-
-            epr_store[epr_id] = {"q": q, "w_out": 1.0, "other_port": receptor_port}
-
-        except Exception as e:
-            print(f"[SENDER] Unexpected error: {e}")
-            return
-
-        # --------------------------------------------------
-        # 3) Generate t_gen timestamp
-        # --------------------------------------------------
-        t_gen = time.strftime("%M:%S.") + f"{int((time.time() % 1)*1000):03d}"
-
-        # --------------------------------------------------
-        # 4) Classical notification timing
-        # --------------------------------------------------
-        t_notify_start = timestamp_precise()
-
+    if random.random() > pgen:
         for port, neighbor in [(emisor_port, receptor), (receptor_port, emisor)]:
             send_info(
                 f"tcp://localhost:{port+1000}",
@@ -419,25 +453,95 @@ with conn_lock:
                     "payload": {
                         "id": epr_id,
                         "neighbor": neighbor,
-                        "t_gen": t_gen,
-                        "w_gen": 1.0
+                        "t_gen": "0",
+                        "w_gen": "0",
+                        "state": "fail_Pgen"
                     }
                 }
             )
+        return
 
-
-        t_notify_end = timestamp_precise()
-        t_diff_notify = diff_precise(t_notify_start, t_notify_end)
-
-        log_timestamp("CreateEPR_notify",epr_id,t_start=t_notify_start,t_end=t_notify_end,t_diff=f"{t_diff_notify:.6f}")
-
+    # --------------------------------------------------
+    # 1) Total EPR generation timing
+    # --------------------------------------------------
+    t_total_start = timestamp_precise()
+    try:
+        print("\n================ SIMULAQRON DEBUG ================")
+        print("[DEBUG] Attempting createEPR")
+        print("[DEBUG] Local node:", conn.name)
+        print("[DEBUG] Target node (raw):", repr(receptor))
+        print("==================================================\n")
         # --------------------------------------------------
-        # 5) Total EPR generation latency
+        # 2) Backend createEPR timing
         # --------------------------------------------------
-        t_total_end = timestamp_precise()
-        t_diff_total = diff_precise(t_total_start, t_total_end)
+        t_start = timestamp_precise()
+        q = conn.createEPR(receptor)
+        t_end = timestamp_precise()
+        t_diff_create = diff_precise(t_start, t_end)
 
-        log_timestamp("CreateEPR_total",epr_id,t_start=t_total_start,t_end=t_total_end,t_diff=f"{t_diff_total:.6f}")
+        log_timestamp("CreateEPR_backend",epr_id,t_start=t_start,t_end=t_end,t_diff=f"{t_diff_create:.6f}")
+
+        epr_store[epr_id] = {"q": q, "w_out": 1.0, "other_port": receptor_port}
+
+    except Exception as e:
+        print(f"[SENDER] Unexpected error: {e}")
+        return
+
+    # --------------------------------------------------
+    # 3) Generate t_gen timestamp
+    # --------------------------------------------------
+    t_gen = timestamp_precise()
+
+    # --------------------------------------------------
+    # 4) Classical notification timing
+    # --------------------------------------------------
+    t_notify_start = timestamp_precise()
+    # Send pairEPR/add to both nodes
+    for port, neighbor in [(emisor_port, receptor), (receptor_port, emisor)]:
+        send_info(
+            f"tcp://localhost:{port+1000}",
+            {
+                "route": "pairEPR/add",
+                "payload": {
+                    "id": epr_id,
+                    "neighbor": neighbor,
+                    "t_gen": t_gen,
+                    "w_gen": 1.0,
+                    "state": "ok"
+                }
+            }
+        )
+    # Send epr_ready ONLY to the receiver
+    print("Sending to receiver: ",epr_id)
+    send_info(
+        f"tcp://localhost:{receptor_port+1000}",
+        {
+            "route": "sender/epr_ready",
+            "payload": {
+                "id": epr_id,
+                "neighbor": emisor,
+                "t_gen": t_gen,
+                "w_gen": 1.0,
+                "state": "ok"
+            }
+        }
+    )
+
+
+
+
+    t_notify_end = timestamp_precise()
+    t_diff_notify = diff_precise(t_notify_start, t_notify_end)
+
+    log_timestamp("CreateEPR_notify",epr_id,t_start=t_notify_start,t_end=t_notify_end,t_diff=f"{t_diff_notify:.6f}")
+
+    # --------------------------------------------------
+    # 5) Total EPR generation latency
+    # --------------------------------------------------
+    t_total_end = timestamp_precise()
+    t_diff_total = diff_precise(t_total_start, t_total_end)
+
+    log_timestamp("CreateEPR_total",epr_id,t_start=t_total_start,t_end=t_total_end,t_diff=f"{t_diff_total:.6f}")
 
 
 # --------------------------------------------------
@@ -468,8 +572,8 @@ def recalculate_werner(epr_id, result_recv, conn,
             print(f"[MONITOR] EPR {epr_id} protected. Stopping monitor.")
             break
 
-        t_now = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
-        tdif = calculate_tdiff(t_gen, t_now)
+        t_now = timestamp_precise()
+        tdif = diff_precise(t_gen, t_now)
         w_out = w_in * math.exp(-tdif / tcoh)
         # Update local EPR store
         if epr_id in epr_store:
@@ -545,6 +649,11 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
         return result_measure
 
     return None
+def stats_and_plots():
+    export_timestamps_to_csv()
+    compute_latency_stats()
+    plot_latencies()
+
 def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
     epr_id = payload.get("id", 0)
@@ -571,8 +680,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
     if state == "ok":
         try:
             log_timestamp("RECV_EPR_START", epr_id, t_start=t_start)
-            with conn_lock:
-                q = conn.recvEPR()
+            q = conn.recvEPR()
 
             # --- TIMESTAMP: después de recvEPR ---
             t_end = timestamp_precise()
@@ -595,9 +703,9 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
             # Precise t_recv
             t_gen_str = payload.get("t_gen", "0")
-            t_recv_str = time.strftime("%M:%S.") + f"{int((time.time() % 1)*1000):03d}"
+            t_recv_str = timestamp_precise()
 
-            tdif = calculate_tdiff(t_gen_str, t_recv_str)
+            tdif = diff_precise(t_gen_str, t_recv_str)
 
             dist_km = float(node_info.get("distkm", 0.0))
             tcoh = float(node_info.get("tcoh", 10.0))
@@ -632,7 +740,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
         except Exception as e:
             print(f"[RECEIVER] Error : {e}")
-            resultado_recv["state"] = "error"
+            resultado_recv["state"] = "error_receiver"
 
     else:
         print("[RECEIVER] EPR not received")
@@ -693,11 +801,15 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
     t_end_recv = timestamp_precise()
     t_diff = diff_precise(t_start,t_end_recv)
     log_timestamp("RECV_TOTAL_no_plots", epr_id, t_start = t_start ,t_end_recv=t_end_recv,t_diff=t_diff)
+
+
+    log_timestamp("RECV_TOTAL_EPR_FINAL", epr_id, t_start = t_gen_str ,t_end_recv=t_recv_str,t_diff=tdif)
+
     
 
-    export_timestamps_to_csv()
-    compute_latency_stats()
-    plot_latencies()
+    threading.Thread(target=stats_and_plots, daemon=True).start()
+
+
     # --- TIMESTAMP: salida de la función ---
     t_end_recv = timestamp_precise()
     t_diff = diff_precise(t_start,t_end_recv)
@@ -855,10 +967,10 @@ def do_swapping(epr1, epr2, id_swap, node_info, t_gen_swap, conn,
 
     # Derived fields
     tcoh = float(node_info.get("tcoh", 10.0))
-    t_recv_str = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
-    tdiff1 = calculate_tdiff(epr1.get("t_gen"), t_recv_str)
-    tdiff2 = calculate_tdiff(epr2.get("t_gen"), t_recv_str)
-    tdif = calculate_tdiff(t_gen_swap, t_recv_str)
+    t_recv_str = timestamp_precise()
+    tdiff1 = diff_precise(epr1.get("t_gen"), t_recv_str)
+    tdiff2 = diff_precise(epr2.get("t_gen"), t_recv_str)
+    tdif = diff_precise(t_gen_swap, t_recv_str)
     w1 = math.exp(-tdiff1 / tcoh)
     w2 = math.exp(-tdiff2 / tcoh)
 
@@ -955,9 +1067,11 @@ def do_swapping(epr1, epr2, id_swap, node_info, t_gen_swap, conn,
 # --------------------------------------------------
 def handle_client_unified(conn_sock, conn, my_port, emisor_port):
     """Unified handler for ALL socket actions."""
+    log_timestamp("SOCKET_HANDLER_START", "NONE", t=timestamp_precise())
     try:
         conn_sock.settimeout(5.0)
         data = conn_sock.recv(4096)
+        log_timestamp("SOCKET_RECV_DONE", "NONE", t=timestamp_precise())
         if not data:
             return
 
@@ -990,6 +1104,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
         # RECIBE EPR
         # --------------------------------------------------
         elif comand == "receive EPR":
+            log_timestamp("SOCKET_BEFORE_RECV_EPR", payload.get("id"), t=timestamp_precise())
             resultado = recibir_epr(
                 payload.get("epr_obj"),
                 node_info,
@@ -998,7 +1113,10 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
                 payload.get("emisor_port", emisor_port),
                 payload.get("listener_port")
             )
+            log_timestamp("SOCKET_AFTER_RECV_EPR", payload.get("id"), t=timestamp_precise())
+
             conn_sock.send(json.dumps(resultado).encode())
+            log_timestamp("SOCKET_AFTER_SEND_RECV_EPR", payload.get("id"), t=timestamp_precise())
 
         # --------------------------------------------------
         # MEASURE (purified)
@@ -1061,7 +1179,7 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
         # DO SWAPPING
         # --------------------------------------------------
         elif comand == "do swapping":
-            t_gen_swap = time.strftime("%M:%S", time.localtime()) + f".{int((time.time() % 1)*1000):03d}"
+            t_gen_swap = timestamp_precise()
             destinatarios = payload.get("destinatarios", [])
             destinatarios_ports = payload.get("destinatarios_ports", [])
             pswap = float(payload.get("pswap", 1.0))
@@ -1120,6 +1238,7 @@ def socket_listener(conn, port,
     try:
         while True:
             conn_sock, addr = server.accept()
+            log_timestamp("SOCKET_ACCEPT", "NONE", t=timestamp_precise())
             threading.Thread(
                 target=handle_client_unified,
                 args=(conn_sock, conn, my_port, emisor_port),

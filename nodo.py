@@ -14,6 +14,7 @@ import os
 import zmq
 import msgpack
 import threading
+from collections import deque
 # --------------------------------------------------
 # HIGH PRECISION TIMESTAMPS
 # --------------------------------------------------
@@ -46,7 +47,7 @@ def diff_precise(t1, t2):
     """
     return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
 
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_2.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_8.txt"
 
 def log_timestamp(event_type, epr_id, **fields):
     line = f"[{event_type}]  ID={epr_id}"
@@ -87,6 +88,9 @@ def wait_for_listener(port, timeout=5.0, interval=0.01):
 ORDERS = []
 # global flag
 worker_started = False
+epr_ready_queue = deque()
+epr_receive_queue = deque()
+
 
 def app_open(PUERTO, listener_port):
     # Json that contains all the nodes in the network
@@ -170,6 +174,73 @@ def app_open(PUERTO, listener_port):
                 return port
         raise ValueError(f"No se encontró puerto para {node_id}")
     
+    def processing_receive_epr(orden):
+        global worker_started
+        receiver_id = node_info["id"]
+        epr_id = orden["id"]  # EPR id specified in the order
+        epr_obj = None
+        log_timestamp("ORDER_RECV_STARTING",epr_id, t_start = timestamp_precise())
+        print(receiver_id, " will receive EPR with:", orden["source"])
+        print("Waiting for EPR ",epr_id ," via ZMQ starting at ", timestamp_precise())
+        timeout = 5.0
+        start = time()
+
+        while time() - start < timeout:
+            if epr_ready_queue:
+                msg = epr_ready_queue.popleft()
+                # msg es directamente el payload del ZMQ
+                if str(msg["id"]) == str(epr_id):
+                    epr_obj = msg
+                    break
+            sleep(0.001)
+        if epr_obj is None:
+            print(f"[RECEIVER] Timeout waiting for EPR {epr_id}")
+            return
+        
+        my_port = get_port_by_id(node_info["id"])
+        emisor_port = get_port_by_id(orden["source"])
+        print(f"[RECEIVER] Processing EPR {epr_id} between {node_info['id']}:{my_port} "
+            f"and {orden['source']}:{emisor_port}")
+        
+        log_timestamp("ORDER_RECV_EXECUTING_AFTER_FOUND",epr_id, t_start = timestamp_precise())
+        if not worker_started:
+            print("[INFO] Starting worker.py in receiver_init mode for the first time at ",timestamp_precise())
+            subprocess.Popen([
+                "python", "worker.py",
+                "receiver_init",
+                json.dumps(epr_obj),
+                json.dumps(node_info),
+                str(my_port),
+                str(emisor_port),
+                str(listener_port)
+            ])
+            worker_started = True
+        else:
+            print("[INFO] Receiver already running, sending order via socket at ",timestamp_precise())
+            payload = {
+                "comand": "receive EPR",
+                "id": epr_id,
+                "source": orden["source"],
+                "epr_obj": epr_obj,
+                "my_port": my_port,
+                "emisor_port": emisor_port,
+                "listener_port": listener_port
+            }
+            if wait_for_listener(listener_port):
+                # Connect to the receiver listener and send the order
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    print("USING", listener_port, "at", timestamp_precise())
+                    s.connect(("localhost", listener_port))
+                    s.send(json.dumps(payload).encode())
+                    resp = s.recv(4096).decode()
+                    print("[RECEIVER] Response:", resp)
+
+    def epr_receive_worker():
+        while True:
+            if epr_receive_queue:
+                orden = epr_receive_queue.popleft()
+                processing_receive_epr(orden)  # aquí va tu lógica actual
+            sleep(0.001)
 
     def aplicar_orden(orden, node_info):
         global worker_started
@@ -204,7 +275,6 @@ def app_open(PUERTO, listener_port):
 
             if not worker_started:
                 print("[INFO] Starting worker.py in sender_init mode for the first time")
-                print(node_info)
                 subprocess.Popen([
                     "python", "worker.py",
                     "sender_init",
@@ -244,66 +314,8 @@ def app_open(PUERTO, listener_port):
         # Receive EPR (this node receives an EPR created by another node)
         # --------------------------------------------------
         elif comand == "receive EPR":
-            epr_id = orden["id"]  # EPR id specified in the order
-            timeout = 5.0         # max wait time in seconds
-            interval = 0.001        # polling interval
-            start = time()
-            epr_obj = None
-
-            print("Searching for EPR in node_info['pairEPR']...")
-            while time() - start < timeout:
-                epr_obj = next(
-                    (e for e in node_info.get("pairEPR", []) if str(e["id"]) == str(epr_id)),
-                    None
-                )
-                if epr_obj:
-                    print(f"[RECEIVER] EPR {epr_id} found")
-                    break
-                sleep(interval)
-
-            if epr_obj is None:
-                print(f"[RECEIVER] Timeout waiting for EPR {epr_id}")
-                return
-
-            my_port = get_port_by_id(node_info["id"])
-            emisor_port = get_port_by_id(orden["source"])
-
-            print(f"[RECEIVER] Processing EPR {epr_id} between {node_info['id']}:{my_port} "
-                f"and {orden['source']}:{emisor_port}")
-            
-
-            log_timestamp("ORDER_RECV_EXECUTING",epr_id, t_start = timestamp_precise())
-            if not worker_started:
-                print("[INFO] Starting worker.py in receiver_init mode for the first time at ",timestamp_precise())
-                subprocess.Popen([
-                    "python", "worker.py",
-                    "receiver_init",
-                    json.dumps(epr_obj),
-                    json.dumps(node_info),
-                    str(my_port),
-                    str(emisor_port),
-                    str(listener_port)
-                ])
-                worker_started = True
-            else:
-                print("[INFO] Receiver already running, sending order via socket at ",timestamp_precise())
-                payload = {
-                    "comand": "receive EPR",
-                    "id": epr_id,
-                    "source": orden["source"],
-                    "epr_obj": epr_obj,
-                    "my_port": my_port,
-                    "emisor_port": emisor_port,
-                    "listener_port": listener_port
-                }
-                if wait_for_listener(listener_port):
-                    # Connect to the receiver listener and send the order
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                        print("USING", listener_port)
-                        s.connect(("localhost", listener_port))
-                        s.send(json.dumps(payload).encode())
-                        resp = s.recv(4096).decode()
-                        print("[RECEIVER] Response:", resp)
+            epr_receive_queue.append(orden)
+            return
 
         # --------------------------------------------------
         # Purification protocol
@@ -371,19 +383,21 @@ def app_open(PUERTO, listener_port):
         pares = node_info.setdefault("pairEPR", [])
         epr_id = data.get("id") or (max((p["id"] for p in pares), default=0) + 1)
 
-        state = "fallo" if float(data["w_gen"]) == 0.0 else "ok"
 
         nuevo_epr = {
             "id": epr_id,
             "neighbor": data["neighbor"],
             "t_gen": data["t_gen"],
             "w_gen": data["w_gen"],
-            "state": state
+            "state": data["state"]
         }
 
         # actualizar si existe
         for i, epr in enumerate(pares):
             if str(epr["id"]) == str(epr_id):
+                # Because of the timing, dont change the final results
+                if epr.get("state") in ("active", "measure"): 
+                    nuevo_epr["state"] = epr["state"]
                 pares[i].update(nuevo_epr)
                 break
         else:
@@ -413,10 +427,48 @@ def app_open(PUERTO, listener_port):
 
         print("[ZeroMQ] pairEPR received & updated:", data)
 
+    def execute_operation(payload):
+        """
+        Execute an operation sent by the master via ZeroMQ.
+        This mirrors the structure of pairEPR_add, pairEPR_recv, etc.
+        """
+        global ORDERS
+        ORDERS.clear()
+        # 1. Append to ORDERS so the HTML can show it global ORDERS 
+        ORDERS.append(payload) 
+        
+        # 2. Notify the HTML UI (SSE) 
+        event_queue.put("mandate")
+        t_start = timestamp_precise()
+
+        log_timestamp("ORDER_RECEIVE",payload["id"],t_start=t_start)
+        print("[ZeroMQ] Executing operation:", payload, "at ",timestamp_precise())
+
+        # Run aplicar_orden in a background thread (non-blocking)
+        threading.Thread(
+            target=aplicar_orden,
+            args=(payload, node_info),
+            daemon=True
+        ).start()
+        
+        
+        #aplicar_orden(payload, node_info)
+
+
+        
+
+    epr_ready_queue = deque()
+
+    def handle_epr_ready(payload):
+        epr_ready_queue.append(payload)
+
+
     zmq_port = PUERTO + 1000 # Puerto exclusivo para ZeroMQ
     ROUTES = {
         "pairEPR/add": pairEPR_add,
-        "pairEPR/recv": pairEPR_recv
+        "pairEPR/recv": pairEPR_recv,
+        "sender/epr_ready": handle_epr_ready,
+        "operations": execute_operation
     }
 
     def zmq_listener():
@@ -606,27 +658,6 @@ def app_open(PUERTO, listener_port):
         return jsonify({"status": "ok"}), 200, {"Connection": "close"}
 
 
-    @app.route("/mandate", methods=["POST"])
-    def receive_mandate():
-        global ORDERS
-        ORDERS.clear()
-        data = request.get_json()
-
-        if isinstance(data, dict):
-            for nodo_id, instrucciones in data.items():
-                if isinstance(instrucciones, list):
-                    for instr in instrucciones:
-                        ORDERS.append(instr)
-                else:
-                    ORDERS.append(instrucciones)
-        elif isinstance(data, list):
-            for item in data:
-                ORDERS.append(item)
-        else:
-            ORDERS.append(data)
-        event_queue.put("mandate")
-        return jsonify({"status": "ok", "ORDERS": ORDERS}), 200, {"Connection": "close"}
-    
 
     @app.route("/updates/stream")
     def mandate_stream():
@@ -641,9 +672,9 @@ def app_open(PUERTO, listener_port):
         return jsonify(ORDERS), 200, {"Connection": "close"}
 
     @app.route("/operations", methods=["POST"])
-    def operations():
+    def operations_http():
         data = request.get_json()
-        print(">>> Orden recibida en /operations:", data)
+        print(">>> Orden recibida en /operations:", data, "at", timestamp_precise())
 
         if not isinstance(data, dict):
             return jsonify({"error": "Formato inválido"}), 400
@@ -651,7 +682,12 @@ def app_open(PUERTO, listener_port):
             return jsonify({"error": "Falta 'comand'"}), 400
 
         try:
-            aplicar_orden(data, node_info)
+            threading.Thread(
+                target=aplicar_orden,
+                args=(data, node_info),
+                daemon=True
+            ).start()
+
             print(">>> Orden aplicada correctamente")
             return jsonify({"status": "ok", "node_info": node_info})
         except Exception as e:
@@ -671,6 +707,8 @@ def app_open(PUERTO, listener_port):
 
 
     threading.Thread(target=zmq_listener, daemon=True).start()
+    threading.Thread(target=epr_receive_worker, daemon=True).start()
+
 
 
 

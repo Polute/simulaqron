@@ -1,0 +1,3 @@
+ID	Estado	link	w_gen	w_out	t_gen	t_recv	t_diff	Medicion
+
+

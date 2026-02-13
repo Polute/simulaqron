@@ -1,0 +1,24 @@
+===== ESTADÍSTICAS DE LATENCIA =====
+Backend createEPR:
+  media: 0.016344281250000002
+  std: 0.009928285747604603
+  min: 0.006544
+  max: 0.036079
+
+Notificación HTTP:
+  media: 0.00024196875
+  std: 0.00014286480963010157
+  min: 7.9e-05
+  max: 0.000533
+
+Noticicación master zmq:
+  media: nan
+  std: nan
+  min: nan
+  max: nan
+
+Total generación EPR:
+  media: 0.01695621875
+  std: 0.00982021899018148
+  min: 0.006858
+  max: 0.036419

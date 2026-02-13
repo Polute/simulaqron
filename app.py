@@ -53,7 +53,7 @@ def diff_precise(t1, t2):
 # --------------------------------------------------
 # TIMESTAMPS DEBUGGER
 # --------------------------------------------------
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_2.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_7.txt"
 
 def log_timestamp(event_type, epr_id, **fields):
     line = f"[{event_type}]  ID={epr_id}"
@@ -475,34 +475,74 @@ def app_open(ROL, PUERTO):
 
         
         return jsonify({"nodes": nodos, "links": links})
+    
+    # master_zmq.py
+    import zmq
+    import msgpack
 
-    # Endpoint para enviar órdenes a los nodos
+    context = zmq.Context()
+    zmq_sockets = {}
+
+    def get_zmq_socket(addr):
+        """Return a cached PUSH socket or create a new one."""
+        if addr not in zmq_sockets:
+            sock = context.socket(zmq.PUSH)
+            sock.connect(addr)
+            zmq_sockets[addr] = sock
+            print(f"[MASTER ZMQ] Connected PUSH → {addr}")
+        return zmq_sockets[addr]
+
+    def send_info(addr, payload):
+        """Send a msgpack payload via ZeroMQ PUSH."""
+        try:
+            sock = get_zmq_socket(addr)
+            sock.send(msgpack.packb(payload))
+            print(f"[MASTER ZMQ] Sent to {addr}: {payload}")
+        except Exception as e:
+            print(f"[MASTER ZMQ ERROR] {e}")
+
+    def send_instructions_zmq(node_id, payload):
+        """
+        Send an instruction to a node using ZeroMQ.
+        The node will dispatch it using its ROUTES table.
+        """
+
+        # Build the message in the SAME format as your node expects
+        msg = {
+            "route": "operations",
+            "payload": payload
+        }
+
+        # Node ZMQ address
+        ZMQ_port = NODOS_PUERTOS[node_id] + 1000
+        node_zmq_addr = f"tcp://localhost:{ZMQ_port}"
+
+        send_info(node_zmq_addr, msg)
+
+        print(f"[MASTER → NODE ZMQ] Sent to {node_zmq_addr}: {msg}")
+
     @app.route("/mandate", methods=["POST"])
     def send_mandates():
-        data = request.get_json()  # formato esperado: { nodo_id: [ {comand:..., ...}, ... ], ... }
+        data = request.get_json()  # { node_id: [ {comand:...}, ... ] }
+
         if not isinstance(data, dict):
-            return jsonify({"error": "Formato inválido"}), 400
+            return jsonify({"error": "Invalid format"}), 400
 
-        for nodo_id, instrucciones in data.items():
-            print(f"{nodo_id} estará en {NODOS_PUERTOS}")
-
-            if nodo_id not in NODOS_PUERTOS:
-                print(f"No se encontró puerto para nodo {nodo_id}")
+        for node_id, instructions in data.items():
+            if node_id not in NODOS_PUERTOS:
+                print(f"[MASTER] Unknown node {node_id}")
                 continue
 
-            puerto = NODOS_PUERTOS[nodo_id]
-            url = f"http://localhost:{puerto}/mandate"  # apuntamos al POST en el nodo
+            if not isinstance(instructions, list):
+                instructions = [instructions]
 
-            try:
-                res = requests.post(url, json={nodo_id: instrucciones}, timeout=2)
-                if res.status_code == 200:
-                    print(f"Instrucciones enviadas a {nodo_id}: {instrucciones}")
-                else:
-                    print(f"Error enviando instrucciones a {nodo_id}: {res.status_code}")
-            except Exception as e:
-                print(f"Excepción enviando a {nodo_id}: {e}")
+            for instr in instructions:
+                instr["node"] = node_id
+                send_instructions_zmq(node_id, instr)
 
         return jsonify({"status": "ok"})
+
+
     
     MASTER_PAR_EPR = {}
 
@@ -536,8 +576,7 @@ def app_open(ROL, PUERTO):
             for clave, valores in MASTER_PAR_EPR.items()
         }
         return jsonify({"status": "ok", "MASTER_PAR_EPR": state})
-    import zmq 
-    import msgpack
+    
     def zmq_master_listener():
         context = zmq.Context()
         sock = context.socket(zmq.PULL)
@@ -551,9 +590,6 @@ def app_open(ROL, PUERTO):
 
             if data.get("route") == "master/pairEPR":
                 historial = data["payload"]
-                epr_id = data["epr_id"]
-                t_receive = timestamp_precise()
-                log_timestamp("MASTER RECEIVING (ZMQ)", epr_id, t_start=t_receive)
 
                 # Same logic as the HTTP endpoint
                 for nodo_id, lista in historial.items():
@@ -564,14 +600,7 @@ def app_open(ROL, PUERTO):
                             MASTER_PAR_EPR[clave] = {}
                         MASTER_PAR_EPR[clave][str(epr["id"])] = epr
 
-                t_end = timestamp_precise()
-                log_timestamp(
-                    "MASTER PROCESSED (ZMQ)",
-                    epr_id,
-                    t_start=t_receive,
-                    t_end=t_end,
-                    t_diff=diff_precise(t_receive, t_end)
-                )
+
 
     
     @app.route("/master/pairEPR/clear", methods=["POST"])
