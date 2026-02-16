@@ -1,0 +1,1710 @@
+EPR ID: 92nqdjvg4
+  CreateEPR_backend        : 0.019080 s
+  CreateEPR_notify         : 0.000260 s
+  CreateEPR_total          : 0.019788 s
+  RECV_TOTAL_no_plots      : 0.008763 s
+  RECV_TOTAL_EPR_FINAL     : 0.009896 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 89ifdfiml
+  CreateEPR_backend        : 0.009792 s
+  CreateEPR_notify         : 0.000891 s
+  CreateEPR_total          : 0.011184 s
+  RECV_TOTAL_no_plots      : 0.015733 s
+  RECV_TOTAL_EPR_FINAL     : 0.011244 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 21us5aemo
+  CreateEPR_backend        : 0.015795 s
+  CreateEPR_notify         : 0.000216 s
+  CreateEPR_total          : 0.016610 s
+  RECV_TOTAL_no_plots      : 0.009713 s
+  RECV_TOTAL_EPR_FINAL     : 0.016654 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 5m7a9vna3
+  CreateEPR_backend        : 0.017101 s
+  CreateEPR_notify         : 0.009489 s
+  CreateEPR_total          : 0.027099 s
+  RECV_TOTAL_no_plots      : 0.073011 s
+  RECV_TOTAL_EPR_FINAL     : 0.085710 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: d8qqtcu3u
+  CreateEPR_backend        : 0.009030 s
+  CreateEPR_notify         : 0.000166 s
+  CreateEPR_total          : 0.009543 s
+  RECV_TOTAL_no_plots      : 0.008092 s
+  RECV_TOTAL_EPR_FINAL     : 0.009363 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: zxxv589h7
+  CreateEPR_backend        : 0.010325 s
+  CreateEPR_notify         : 0.000144 s
+  CreateEPR_total          : 0.010701 s
+  RECV_TOTAL_no_plots      : 0.048201 s
+  RECV_TOTAL_EPR_FINAL     : 0.059117 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: iyb5s4v2s
+  CreateEPR_backend        : 0.016187 s
+  CreateEPR_notify         : 0.000204 s
+  CreateEPR_total          : 0.016755 s
+  RECV_TOTAL_no_plots      : 0.061689 s
+  RECV_TOTAL_EPR_FINAL     : 0.095051 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: yv2ia753k
+  CreateEPR_backend        : 0.010949 s
+  CreateEPR_notify         : 0.000248 s
+  CreateEPR_total          : 0.011715 s
+  RECV_TOTAL_no_plots      : 0.009179 s
+  RECV_TOTAL_EPR_FINAL     : 0.013219 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: x37cc0dpq
+  CreateEPR_backend        : 0.011206 s
+  CreateEPR_notify         : 0.000300 s
+  CreateEPR_total          : 0.011858 s
+  RECV_TOTAL_no_plots      : 0.071347 s
+  RECV_TOTAL_EPR_FINAL     : 0.077796 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: kao0pzz5z
+  CreateEPR_backend        : 0.014549 s
+  CreateEPR_notify         : 0.000377 s
+  CreateEPR_total          : 0.015361 s
+  RECV_TOTAL_no_plots      : 0.008864 s
+  RECV_TOTAL_EPR_FINAL     : 0.016044 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 24v6g69b4
+  CreateEPR_backend        : 0.011959 s
+  CreateEPR_notify         : 0.000207 s
+  CreateEPR_total          : 0.012490 s
+  RECV_TOTAL_no_plots      : 0.008508 s
+  RECV_TOTAL_EPR_FINAL     : 0.011253 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: rava8e4sm
+  CreateEPR_backend        : 0.010589 s
+  CreateEPR_notify         : 0.000224 s
+  CreateEPR_total          : 0.011119 s
+  RECV_TOTAL_no_plots      : 0.037581 s
+  RECV_TOTAL_EPR_FINAL     : 0.080955 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 0rx7uqvio
+  CreateEPR_backend        : 0.010079 s
+  CreateEPR_notify         : 0.000173 s
+  CreateEPR_total          : 0.010543 s
+  RECV_TOTAL_no_plots      : 0.011569 s
+  RECV_TOTAL_EPR_FINAL     : 0.019461 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: mcmsol4bw
+  CreateEPR_backend        : 0.011103 s
+  CreateEPR_notify         : 0.000149 s
+  CreateEPR_total          : 0.011646 s
+  RECV_TOTAL_no_plots      : 0.076462 s
+  RECV_TOTAL_EPR_FINAL     : 0.099218 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 5999xmbu5
+  CreateEPR_backend        : 0.015141 s
+  CreateEPR_notify         : 0.000164 s
+  CreateEPR_total          : 0.015835 s
+  RECV_TOTAL_no_plots      : 0.046491 s
+  RECV_TOTAL_EPR_FINAL     : 0.043449 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: j8vtlyk3z
+  CreateEPR_backend        : 0.014581 s
+  CreateEPR_notify         : 0.000315 s
+  CreateEPR_total          : 0.015295 s
+  RECV_TOTAL_no_plots      : 0.008429 s
+  RECV_TOTAL_EPR_FINAL     : 0.009618 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: bl88ifc9d
+  CreateEPR_backend        : 0.008863 s
+  CreateEPR_notify         : 0.000206 s
+  CreateEPR_total          : 0.009448 s
+  RECV_TOTAL_no_plots      : 0.007757 s
+  RECV_TOTAL_EPR_FINAL     : 0.013354 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: njcubu3f5
+  CreateEPR_backend        : 0.012276 s
+  CreateEPR_notify         : 0.000219 s
+  CreateEPR_total          : 0.012782 s
+  RECV_TOTAL_no_plots      : 0.025507 s
+  RECV_TOTAL_EPR_FINAL     : 0.048511 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 9qkn07ap8
+  CreateEPR_backend        : 0.028828 s
+  CreateEPR_notify         : 0.000226 s
+  CreateEPR_total          : 0.029476 s
+  RECV_TOTAL_no_plots      : 0.080012 s
+  RECV_TOTAL_EPR_FINAL     : 0.059703 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: hh4uy4lnh
+  CreateEPR_backend        : 0.010001 s
+  CreateEPR_notify         : 0.004745 s
+  CreateEPR_total          : 0.015219 s
+  RECV_TOTAL_no_plots      : 0.011641 s
+  RECV_TOTAL_EPR_FINAL     : 0.025754 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: dd3sewi8o
+  CreateEPR_backend        : 0.016595 s
+  CreateEPR_notify         : 0.000212 s
+  CreateEPR_total          : 0.017170 s
+  RECV_TOTAL_no_plots      : 0.088255 s
+  RECV_TOTAL_EPR_FINAL     : 0.091318 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: yegvozu2a
+  CreateEPR_backend        : 0.021460 s
+  CreateEPR_notify         : 0.000281 s
+  CreateEPR_total          : 0.022206 s
+  RECV_TOTAL_no_plots      : 0.009171 s
+  RECV_TOTAL_EPR_FINAL     : 0.010788 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: i46kp88vt
+  CreateEPR_backend        : 0.010821 s
+  CreateEPR_notify         : 0.000181 s
+  CreateEPR_total          : 0.011336 s
+  RECV_TOTAL_no_plots      : 0.008012 s
+  RECV_TOTAL_EPR_FINAL     : 0.014647 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: u4f99wpxu
+  CreateEPR_backend        : 0.011557 s
+  CreateEPR_notify         : 0.000128 s
+  CreateEPR_total          : 0.011965 s
+  RECV_TOTAL_no_plots      : 0.046990 s
+  RECV_TOTAL_EPR_FINAL     : 0.084304 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: kc8qa8kke
+  CreateEPR_backend        : 0.016604 s
+  CreateEPR_notify         : 0.000160 s
+  CreateEPR_total          : 0.016984 s
+  RECV_TOTAL_no_plots      : 0.010148 s
+  RECV_TOTAL_EPR_FINAL     : 0.017536 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: z789lfp4w
+  CreateEPR_backend        : 0.015185 s
+  CreateEPR_notify         : 0.000196 s
+  CreateEPR_total          : 0.015715 s
+  RECV_TOTAL_no_plots      : 0.024895 s
+  RECV_TOTAL_EPR_FINAL     : 0.066281 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: viarycgqe
+  CreateEPR_backend        : 0.010681 s
+  CreateEPR_notify         : 0.000218 s
+  CreateEPR_total          : 0.011220 s
+  RECV_TOTAL_no_plots      : 0.014109 s
+  RECV_TOTAL_EPR_FINAL     : 0.014947 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: ctuh7agqh
+  CreateEPR_backend        : 0.013602 s
+  CreateEPR_notify         : 0.000200 s
+  CreateEPR_total          : 0.014110 s
+  RECV_TOTAL_no_plots      : 0.031975 s
+  RECV_TOTAL_EPR_FINAL     : 0.062056 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: m3xq2inme
+  CreateEPR_backend        : 0.012479 s
+  CreateEPR_notify         : 0.000130 s
+  CreateEPR_total          : 0.012856 s
+  RECV_TOTAL_no_plots      : 0.024857 s
+  RECV_TOTAL_EPR_FINAL     : 0.012879 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: iuwfibx6l
+  CreateEPR_backend        : 0.011800 s
+  CreateEPR_notify         : 0.000221 s
+  CreateEPR_total          : 0.012386 s
+  RECV_TOTAL_no_plots      : 0.024003 s
+  RECV_TOTAL_EPR_FINAL     : 0.078906 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: tx307nstd
+  CreateEPR_backend        : 0.017012 s
+  CreateEPR_notify         : 0.000249 s
+  CreateEPR_total          : 0.017573 s
+  RECV_TOTAL_no_plots      : 0.020318 s
+  RECV_TOTAL_EPR_FINAL     : 0.017422 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: p6lwn6492
+  CreateEPR_backend        : 0.013531 s
+  CreateEPR_notify         : 0.000165 s
+  CreateEPR_total          : 0.014090 s
+  RECV_TOTAL_no_plots      : 0.020914 s
+  RECV_TOTAL_EPR_FINAL     : 0.086629 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: b7wy3mgec
+  CreateEPR_backend        : 0.020451 s
+  CreateEPR_notify         : 0.000203 s
+  CreateEPR_total          : 0.021052 s
+  RECV_TOTAL_no_plots      : 0.023650 s
+  RECV_TOTAL_EPR_FINAL     : 0.068030 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: cox7ncnu9
+  CreateEPR_backend        : 0.017908 s
+  CreateEPR_notify         : 0.000173 s
+  CreateEPR_total          : 0.018545 s
+  RECV_TOTAL_no_plots      : 0.017442 s
+  RECV_TOTAL_EPR_FINAL     : 0.019765 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: tqhbe2gbf
+  CreateEPR_backend        : 0.010940 s
+  CreateEPR_notify         : 0.000163 s
+  CreateEPR_total          : 0.011562 s
+  RECV_TOTAL_no_plots      : 0.009936 s
+  RECV_TOTAL_EPR_FINAL     : 0.020798 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 1s5ya66qo
+  CreateEPR_backend        : 0.010662 s
+  CreateEPR_notify         : 0.000134 s
+  CreateEPR_total          : 0.011049 s
+  RECV_TOTAL_no_plots      : 0.021249 s
+  RECV_TOTAL_EPR_FINAL     : 0.090902 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: tapi6md5l
+  CreateEPR_backend        : 0.009089 s
+  CreateEPR_notify         : 0.000224 s
+  CreateEPR_total          : 0.009595 s
+  RECV_TOTAL_no_plots      : 0.017741 s
+  RECV_TOTAL_EPR_FINAL     : 0.053214 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: gqrvuos4m
+  CreateEPR_backend        : 0.013105 s
+  CreateEPR_notify         : 0.000170 s
+  CreateEPR_total          : 0.013549 s
+  RECV_TOTAL_no_plots      : 0.008185 s
+  RECV_TOTAL_EPR_FINAL     : 0.010743 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: rcutl7t5x
+  CreateEPR_backend        : 0.010743 s
+  CreateEPR_notify         : 0.000222 s
+  CreateEPR_total          : 0.011335 s
+  RECV_TOTAL_no_plots      : 0.026990 s
+  RECV_TOTAL_EPR_FINAL     : 0.085827 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: yv4g0k6cu
+  CreateEPR_backend        : 0.011267 s
+  CreateEPR_notify         : 0.000117 s
+  CreateEPR_total          : 0.011609 s
+  RECV_TOTAL_no_plots      : 0.026540 s
+  RECV_TOTAL_EPR_FINAL     : 0.011200 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: ybuhx9bg8
+  CreateEPR_backend        : 0.011082 s
+  CreateEPR_notify         : 0.000278 s
+  CreateEPR_total          : 0.011771 s
+  RECV_TOTAL_no_plots      : 0.009959 s
+  RECV_TOTAL_EPR_FINAL     : 0.013145 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 6maan77t3
+  CreateEPR_backend        : 0.019246 s
+  CreateEPR_notify         : 0.000221 s
+  CreateEPR_total          : 0.019785 s
+  RECV_TOTAL_no_plots      : 0.023725 s
+  RECV_TOTAL_EPR_FINAL     : 0.053488 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 0ocecc9ll
+  CreateEPR_backend        : 0.011515 s
+  CreateEPR_notify         : 0.000172 s
+  CreateEPR_total          : 0.012094 s
+  RECV_TOTAL_no_plots      : 0.018938 s
+  RECV_TOTAL_EPR_FINAL     : 0.012693 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 9yqn4ad4w
+  CreateEPR_backend        : 0.016570 s
+  CreateEPR_notify         : 0.000175 s
+  CreateEPR_total          : 0.017177 s
+  RECV_TOTAL_no_plots      : 0.026501 s
+  RECV_TOTAL_EPR_FINAL     : 0.087925 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: v1sgoe6rw
+  CreateEPR_backend        : 0.010890 s
+  CreateEPR_notify         : 0.000246 s
+  CreateEPR_total          : 0.011559 s
+  RECV_TOTAL_no_plots      : 0.033328 s
+  RECV_TOTAL_EPR_FINAL     : 0.081888 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: fulwqz05n
+  CreateEPR_backend        : 0.011198 s
+  CreateEPR_notify         : 0.000158 s
+  CreateEPR_total          : 0.011699 s
+  RECV_TOTAL_no_plots      : 0.009091 s
+  RECV_TOTAL_EPR_FINAL     : 0.011893 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: n32eemr1q
+  CreateEPR_backend        : 0.017738 s
+  CreateEPR_notify         : 0.000253 s
+  CreateEPR_total          : 0.018440 s
+  RECV_TOTAL_no_plots      : 0.017798 s
+  RECV_TOTAL_EPR_FINAL     : 0.012311 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 8s815sybx
+  CreateEPR_backend        : 0.010598 s
+  CreateEPR_notify         : 0.000180 s
+  CreateEPR_total          : 0.011164 s
+  RECV_TOTAL_no_plots      : 0.027130 s
+  RECV_TOTAL_EPR_FINAL     : 0.089084 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: sd9rhc624
+  CreateEPR_backend        : 0.010138 s
+  CreateEPR_notify         : 0.000214 s
+  CreateEPR_total          : 0.010731 s
+  RECV_TOTAL_no_plots      : 0.010403 s
+  RECV_TOTAL_EPR_FINAL     : 0.012968 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: o14tm5smr
+  CreateEPR_backend        : 0.011147 s
+  CreateEPR_notify         : 0.000249 s
+  CreateEPR_total          : 0.011837 s
+  RECV_TOTAL_no_plots      : 0.021142 s
+  RECV_TOTAL_EPR_FINAL     : 0.050275 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 3l4n718w3
+  CreateEPR_backend        : 0.043755 s
+  CreateEPR_notify         : 0.000263 s
+  CreateEPR_total          : 0.044450 s
+  RECV_TOTAL_no_plots      : 0.020583 s
+  RECV_TOTAL_EPR_FINAL     : 0.027902 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: b533nk02i
+  CreateEPR_backend        : 0.026943 s
+  CreateEPR_notify         : 0.000189 s
+  CreateEPR_total          : 0.027521 s
+  RECV_TOTAL_no_plots      : 0.022314 s
+  RECV_TOTAL_EPR_FINAL     : 0.100186 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: dtt2i0jov
+  CreateEPR_backend        : 0.028295 s
+  CreateEPR_notify         : 0.000236 s
+  CreateEPR_total          : 0.028893 s
+  RECV_TOTAL_no_plots      : 0.016041 s
+  RECV_TOTAL_EPR_FINAL     : 0.013757 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: g2tyo6kab
+  CreateEPR_backend        : 0.012820 s
+  CreateEPR_notify         : 0.000174 s
+  CreateEPR_total          : 0.013423 s
+  RECV_TOTAL_no_plots      : 0.021276 s
+  RECV_TOTAL_EPR_FINAL     : 0.086881 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: m19knntze
+  CreateEPR_backend        : 0.013817 s
+  CreateEPR_notify         : 0.000215 s
+  CreateEPR_total          : 0.014336 s
+  RECV_TOTAL_no_plots      : 0.015706 s
+  RECV_TOTAL_EPR_FINAL     : 0.017048 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 46keav5t4
+  CreateEPR_backend        : 0.027042 s
+  CreateEPR_notify         : 0.000241 s
+  CreateEPR_total          : 0.027655 s
+  RECV_TOTAL_no_plots      : 0.028260 s
+  RECV_TOTAL_EPR_FINAL     : 0.067713 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: u17z12q2b
+  CreateEPR_backend        : 0.010517 s
+  CreateEPR_notify         : 0.000132 s
+  CreateEPR_total          : 0.010906 s
+  RECV_TOTAL_no_plots      : 0.021094 s
+  RECV_TOTAL_EPR_FINAL     : 0.010033 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: ey67lnm29
+  CreateEPR_backend        : 0.009646 s
+  CreateEPR_notify         : 0.000141 s
+  CreateEPR_total          : 0.010054 s
+  RECV_TOTAL_no_plots      : 0.028588 s
+  RECV_TOTAL_EPR_FINAL     : 0.072272 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 47ifk80ne
+  CreateEPR_backend        : 0.024317 s
+  CreateEPR_notify         : 0.000254 s
+  CreateEPR_total          : 0.025038 s
+  RECV_TOTAL_no_plots      : 0.019574 s
+  RECV_TOTAL_EPR_FINAL     : 0.012441 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 0dadibj5l
+  CreateEPR_backend        : 0.027837 s
+  CreateEPR_notify         : 0.000146 s
+  CreateEPR_total          : 0.028268 s
+  RECV_TOTAL_no_plots      : 0.026455 s
+  RECV_TOTAL_EPR_FINAL     : 0.071601 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: to7kn7k09
+  CreateEPR_backend        : 0.011206 s
+  CreateEPR_notify         : 0.000248 s
+  CreateEPR_total          : 0.011765 s
+  RECV_TOTAL_no_plots      : 0.014443 s
+  RECV_TOTAL_EPR_FINAL     : 0.014569 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 0ah3jtwo9
+  CreateEPR_backend        : 0.012379 s
+  CreateEPR_notify         : 0.000109 s
+  CreateEPR_total          : 0.012754 s
+  RECV_TOTAL_no_plots      : 0.022362 s
+  RECV_TOTAL_EPR_FINAL     : 0.079556 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: evze14esi
+  CreateEPR_backend        : 0.011487 s
+  CreateEPR_notify         : 0.000288 s
+  CreateEPR_total          : 0.012192 s
+  RECV_TOTAL_no_plots      : 0.032337 s
+  RECV_TOTAL_EPR_FINAL     : 0.129493 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 9k8xymvp4
+  CreateEPR_backend        : 0.022728 s
+  CreateEPR_notify         : 0.000263 s
+  CreateEPR_total          : 0.023377 s
+  RECV_TOTAL_no_plots      : 0.009696 s
+  RECV_TOTAL_EPR_FINAL     : 0.013318 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: he83xcfb7
+  CreateEPR_backend        : 0.022181 s
+  CreateEPR_notify         : 0.000147 s
+  CreateEPR_total          : 0.022689 s
+  RECV_TOTAL_no_plots      : 0.011620 s
+  RECV_TOTAL_EPR_FINAL     : 0.012189 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: leglj34ah
+  CreateEPR_backend        : 0.010174 s
+  CreateEPR_notify         : 0.000250 s
+  CreateEPR_total          : 0.010773 s
+  RECV_TOTAL_no_plots      : 0.201949 s
+  RECV_TOTAL_EPR_FINAL     : 0.085632 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: fn03az98n
+  CreateEPR_backend        : 0.010854 s
+  CreateEPR_notify         : 0.000190 s
+  CreateEPR_total          : 0.011436 s
+  RECV_TOTAL_no_plots      : 0.016188 s
+  RECV_TOTAL_EPR_FINAL     : 0.022308 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: a96m5nzlu
+  CreateEPR_backend        : 0.010861 s
+  CreateEPR_notify         : 0.000174 s
+  CreateEPR_total          : 0.011368 s
+  RECV_TOTAL_no_plots      : 0.024995 s
+  RECV_TOTAL_EPR_FINAL     : 0.094927 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: p5m1agw0j
+  CreateEPR_backend        : 0.011314 s
+  CreateEPR_notify         : 0.000222 s
+  CreateEPR_total          : 0.011919 s
+  RECV_TOTAL_no_plots      : 0.014027 s
+  RECV_TOTAL_EPR_FINAL     : 0.013345 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: nxz20ro5l
+  CreateEPR_backend        : 0.027193 s
+  CreateEPR_notify         : 0.000175 s
+  CreateEPR_total          : 0.027687 s
+  RECV_TOTAL_no_plots      : 0.020943 s
+  RECV_TOTAL_EPR_FINAL     : 0.058144 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 5p8jnad4u
+  CreateEPR_backend        : 0.010934 s
+  CreateEPR_notify         : 0.000161 s
+  CreateEPR_total          : 0.011406 s
+  RECV_TOTAL_no_plots      : 0.018078 s
+  RECV_TOTAL_EPR_FINAL     : 0.012269 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: b6sq3aypm
+  CreateEPR_backend        : 0.025421 s
+  CreateEPR_notify         : 0.000252 s
+  CreateEPR_total          : 0.026052 s
+  RECV_TOTAL_no_plots      : 0.022283 s
+  RECV_TOTAL_EPR_FINAL     : 0.052627 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 6bj06h8uv
+  CreateEPR_backend        : 0.009826 s
+  CreateEPR_notify         : 0.000143 s
+  CreateEPR_total          : 0.010310 s
+  RECV_TOTAL_no_plots      : 0.013872 s
+  RECV_TOTAL_EPR_FINAL     : 0.012664 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: b0n7h7lra
+  CreateEPR_backend        : 0.010244 s
+  CreateEPR_notify         : 0.000131 s
+  CreateEPR_total          : 0.010608 s
+  RECV_TOTAL_no_plots      : 0.019554 s
+  RECV_TOTAL_EPR_FINAL     : 0.076605 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 3v3gi3kkt
+  CreateEPR_backend        : 0.014442 s
+  CreateEPR_notify         : 0.000194 s
+  CreateEPR_total          : 0.014924 s
+  RECV_TOTAL_no_plots      : 0.010900 s
+  RECV_TOTAL_EPR_FINAL     : 0.010282 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: a7bwsqsp9
+  CreateEPR_backend        : 0.011396 s
+  CreateEPR_notify         : 0.000205 s
+  CreateEPR_total          : 0.011918 s
+  RECV_TOTAL_no_plots      : 0.015777 s
+  RECV_TOTAL_EPR_FINAL     : 0.075793 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: ilo8ljs0m
+  CreateEPR_backend        : 0.008724 s
+  CreateEPR_notify         : 0.000142 s
+  CreateEPR_total          : 0.009157 s
+  RECV_TOTAL_no_plots      : 0.020719 s
+  RECV_TOTAL_EPR_FINAL     : 0.011099 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 82c1l318n
+  CreateEPR_backend        : 0.008786 s
+  CreateEPR_notify         : 0.000173 s
+  CreateEPR_total          : 0.009365 s
+  RECV_TOTAL_no_plots      : 0.013610 s
+  RECV_TOTAL_EPR_FINAL     : 0.083739 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: buj9jx7cb
+  CreateEPR_backend        : 0.017410 s
+  CreateEPR_notify         : 0.016472 s
+  CreateEPR_total          : 0.034248 s
+  RECV_TOTAL_no_plots      : 0.009262 s
+  RECV_TOTAL_EPR_FINAL     : 0.027596 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: hxov3pr0j
+  CreateEPR_backend        : 0.009987 s
+  CreateEPR_notify         : 0.000179 s
+  CreateEPR_total          : 0.010507 s
+  RECV_TOTAL_no_plots      : 0.038978 s
+  RECV_TOTAL_EPR_FINAL     : 0.092025 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: g41d01lik
+  CreateEPR_backend        : 0.010275 s
+  CreateEPR_notify         : 0.000129 s
+  CreateEPR_total          : 0.010677 s
+  RECV_TOTAL_no_plots      : 0.008386 s
+  RECV_TOTAL_EPR_FINAL     : 0.011762 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: vhr7mke7j
+  CreateEPR_backend        : 0.016976 s
+  CreateEPR_notify         : 0.000246 s
+  CreateEPR_total          : 0.017555 s
+  RECV_TOTAL_no_plots      : 0.009870 s
+  RECV_TOTAL_EPR_FINAL     : 0.089597 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: ipv66v4a2
+  CreateEPR_backend        : 0.010693 s
+  CreateEPR_notify         : 0.000215 s
+  CreateEPR_total          : 0.011228 s
+  RECV_TOTAL_no_plots      : 0.025806 s
+  RECV_TOTAL_EPR_FINAL     : 0.070858 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 9u8rabgw0
+  CreateEPR_backend        : 0.019056 s
+  CreateEPR_notify         : 0.000282 s
+  CreateEPR_total          : 0.019663 s
+  RECV_TOTAL_no_plots      : 0.008352 s
+  RECV_TOTAL_EPR_FINAL     : 0.011599 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: cupfjnqax
+  CreateEPR_backend        : 0.011061 s
+  CreateEPR_notify         : 0.000129 s
+  CreateEPR_total          : 0.011479 s
+  RECV_TOTAL_no_plots      : 0.009110 s
+  RECV_TOTAL_EPR_FINAL     : 0.011516 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: sz534sif8
+  CreateEPR_backend        : 0.010750 s
+  CreateEPR_notify         : 0.000145 s
+  CreateEPR_total          : 0.011145 s
+  RECV_TOTAL_no_plots      : 0.015645 s
+  RECV_TOTAL_EPR_FINAL     : 0.085912 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: hhxt7h2c9
+  CreateEPR_backend        : 0.028024 s
+  CreateEPR_notify         : 0.000185 s
+  CreateEPR_total          : 0.028556 s
+  RECV_TOTAL_no_plots      : 0.014337 s
+  RECV_TOTAL_EPR_FINAL     : 0.012013 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: i0iyxhzdg
+  CreateEPR_backend        : 0.028666 s
+  CreateEPR_notify         : 0.000106 s
+  CreateEPR_total          : 0.028972 s
+  RECV_TOTAL_no_plots      : 0.020645 s
+  RECV_TOTAL_EPR_FINAL     : 0.070142 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 7ngpewjjr
+  CreateEPR_backend        : 0.010124 s
+  CreateEPR_notify         : 0.000155 s
+  CreateEPR_total          : 0.010582 s
+  RECV_TOTAL_no_plots      : 0.009200 s
+  RECV_TOTAL_EPR_FINAL     : 0.009927 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: hmp0aznfm
+  CreateEPR_backend        : 0.009653 s
+  CreateEPR_notify         : 0.000098 s
+  CreateEPR_total          : 0.009940 s
+  RECV_TOTAL_no_plots      : 0.013005 s
+  RECV_TOTAL_EPR_FINAL     : 0.055321 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 5xtukpefm
+  CreateEPR_backend        : 0.014502 s
+  CreateEPR_notify         : 0.000193 s
+  CreateEPR_total          : 0.015113 s
+  RECV_TOTAL_no_plots      : 0.022260 s
+  RECV_TOTAL_EPR_FINAL     : 0.014477 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: cv08obinp
+  CreateEPR_backend        : 0.016752 s
+  CreateEPR_notify         : 0.000150 s
+  CreateEPR_total          : 0.017177 s
+  RECV_TOTAL_no_plots      : 0.021579 s
+  RECV_TOTAL_EPR_FINAL     : 0.094429 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: uo4k1volp
+  CreateEPR_backend        : 0.019594 s
+  CreateEPR_notify         : 0.000129 s
+  CreateEPR_total          : 0.019961 s
+  RECV_TOTAL_no_plots      : 0.016616 s
+  RECV_TOTAL_EPR_FINAL     : 0.012956 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: taghr2lk0
+  CreateEPR_backend        : 0.015046 s
+  CreateEPR_notify         : 0.000175 s
+  CreateEPR_total          : 0.015512 s
+  RECV_TOTAL_no_plots      : 0.012645 s
+  RECV_TOTAL_EPR_FINAL     : 0.068387 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 9y0eks8wo
+  CreateEPR_backend        : 0.011543 s
+  CreateEPR_notify         : 0.000182 s
+  CreateEPR_total          : 0.012078 s
+  RECV_TOTAL_no_plots      : 0.017020 s
+  RECV_TOTAL_EPR_FINAL     : 0.014161 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 8sq5bnxx6
+  CreateEPR_backend        : 0.026802 s
+  CreateEPR_notify         : 0.000215 s
+  CreateEPR_total          : 0.027330 s
+  RECV_TOTAL_no_plots      : 0.022866 s
+  RECV_TOTAL_EPR_FINAL     : 0.085032 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: wftz60ugy
+  CreateEPR_backend        : 0.010447 s
+  CreateEPR_notify         : 0.008367 s
+  CreateEPR_total          : 0.019355 s
+  RECV_TOTAL_no_plots      : 0.035387 s
+  RECV_TOTAL_EPR_FINAL     : 0.112457 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: bo5tv7nv5
+  CreateEPR_backend        : 0.013267 s
+  CreateEPR_notify         : 0.000613 s
+  CreateEPR_total          : 0.014425 s
+  RECV_TOTAL_no_plots      : 0.012392 s
+  RECV_TOTAL_EPR_FINAL     : 0.015491 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: oid47w5dq
+  CreateEPR_backend        : 0.017259 s
+  CreateEPR_notify         : 0.018834 s
+  CreateEPR_total          : 0.036738 s
+  RECV_TOTAL_no_plots      : 0.012394 s
+  RECV_TOTAL_EPR_FINAL     : 0.045761 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: y9db5s4l8
+  CreateEPR_backend        : 0.015375 s
+  CreateEPR_notify         : 0.017545 s
+  CreateEPR_total          : 0.033287 s
+  RECV_TOTAL_no_plots      : 0.013303 s
+  RECV_TOTAL_EPR_FINAL     : 0.105901 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 1fj0dgj9d
+  CreateEPR_backend        : 0.012082 s
+  CreateEPR_notify         : 0.000189 s
+  CreateEPR_total          : 0.012609 s
+  RECV_TOTAL_no_plots      : 0.023291 s
+  RECV_TOTAL_EPR_FINAL     : 0.021303 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 1sljucmz4
+  CreateEPR_backend        : 0.020199 s
+  CreateEPR_notify         : 0.000158 s
+  CreateEPR_total          : 0.020686 s
+  RECV_TOTAL_no_plots      : 0.010933 s
+  RECV_TOTAL_EPR_FINAL     : 0.093365 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: u6srg1hgd
+  CreateEPR_backend        : 0.014719 s
+  CreateEPR_notify         : 0.002567 s
+  CreateEPR_total          : 0.017775 s
+  RECV_TOTAL_no_plots      : 0.027137 s
+  RECV_TOTAL_EPR_FINAL     : 0.072669 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: u9eft6y3e
+  CreateEPR_backend        : 0.023782 s
+  CreateEPR_notify         : 0.000188 s
+  CreateEPR_total          : 0.024313 s
+  RECV_TOTAL_no_plots      : 0.009312 s
+  RECV_TOTAL_EPR_FINAL     : 0.012658 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 0u9mg26zd
+  CreateEPR_backend        : 0.040301 s
+  CreateEPR_notify         : 0.000208 s
+  CreateEPR_total          : 0.040800 s
+  RECV_TOTAL_no_plots      : 0.010255 s
+  RECV_TOTAL_EPR_FINAL     : 0.014925 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 5vf21bu60
+  CreateEPR_backend        : 0.039357 s
+  CreateEPR_notify         : 0.000107 s
+  CreateEPR_total          : 0.039653 s
+  RECV_TOTAL_no_plots      : 0.011888 s
+  RECV_TOTAL_EPR_FINAL     : 0.057966 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: aza7o1ju6
+  CreateEPR_backend        : 0.011343 s
+  CreateEPR_notify         : 0.000217 s
+  CreateEPR_total          : 0.011884 s
+  RECV_TOTAL_no_plots      : 0.014139 s
+  RECV_TOTAL_EPR_FINAL     : 0.022634 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: uwfep646u
+  CreateEPR_backend        : 0.011536 s
+  CreateEPR_notify         : 0.000145 s
+  CreateEPR_total          : 0.011857 s
+  RECV_TOTAL_no_plots      : 0.013509 s
+  RECV_TOTAL_EPR_FINAL     : 0.065647 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 3flj2tgx3
+  CreateEPR_backend        : 0.009606 s
+  CreateEPR_notify         : 0.000113 s
+  CreateEPR_total          : 0.009926 s
+  RECV_TOTAL_no_plots      : 0.018941 s
+  RECV_TOTAL_EPR_FINAL     : 0.074007 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: fjuxsqk4d
+  CreateEPR_backend        : 0.010356 s
+  CreateEPR_notify         : 0.000138 s
+  CreateEPR_total          : 0.010738 s
+  RECV_TOTAL_no_plots      : 0.019414 s
+  RECV_TOTAL_EPR_FINAL     : 0.013762 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: zquehhpwh
+  CreateEPR_backend        : 0.008280 s
+  CreateEPR_notify         : 0.000206 s
+  CreateEPR_total          : 0.009039 s
+  RECV_TOTAL_no_plots      : 0.009478 s
+  RECV_TOTAL_EPR_FINAL     : 0.025122 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: c7d4ob1o8
+  CreateEPR_backend        : 0.009001 s
+  CreateEPR_notify         : 0.000148 s
+  CreateEPR_total          : 0.009531 s
+  RECV_TOTAL_no_plots      : 0.017676 s
+  RECV_TOTAL_EPR_FINAL     : 0.086943 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 5gun96wlr
+  CreateEPR_backend        : 0.018880 s
+  CreateEPR_notify         : 0.000186 s
+  CreateEPR_total          : 0.019303 s
+  RECV_TOTAL_no_plots      : 0.015738 s
+  RECV_TOTAL_EPR_FINAL     : 0.072238 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: y83oqfakm
+  CreateEPR_backend        : 0.013712 s
+  CreateEPR_notify         : 0.000151 s
+  CreateEPR_total          : 0.014140 s
+  RECV_TOTAL_no_plots      : 0.009792 s
+  RECV_TOTAL_EPR_FINAL     : 0.022321 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 23bygx9kk
+  CreateEPR_backend        : 0.014277 s
+  CreateEPR_notify         : 0.000101 s
+  CreateEPR_total          : 0.014583 s
+  RECV_TOTAL_no_plots      : 0.010683 s
+  RECV_TOTAL_EPR_FINAL     : 0.020858 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: ejuezfzj1
+  CreateEPR_backend        : 0.013631 s
+  CreateEPR_notify         : 0.000170 s
+  CreateEPR_total          : 0.014125 s
+  RECV_TOTAL_no_plots      : 0.029702 s
+  RECV_TOTAL_EPR_FINAL     : 0.084307 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 0j0gtyoy8
+  CreateEPR_backend        : 0.009284 s
+  CreateEPR_notify         : 0.000145 s
+  CreateEPR_total          : 0.009666 s
+  RECV_TOTAL_no_plots      : 0.020125 s
+  RECV_TOTAL_EPR_FINAL     : 0.012312 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: cr8i4o98v
+  CreateEPR_backend        : 0.017643 s
+  CreateEPR_notify         : 0.000165 s
+  CreateEPR_total          : 0.018174 s
+  RECV_TOTAL_no_plots      : 0.022278 s
+  RECV_TOTAL_EPR_FINAL     : 0.083888 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: mdyes53hu
+  CreateEPR_backend        : 0.010431 s
+  CreateEPR_notify         : 0.000188 s
+  CreateEPR_total          : 0.010899 s
+  RECV_TOTAL_no_plots      : 0.009069 s
+  RECV_TOTAL_EPR_FINAL     : 0.011900 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: wpvr0ka9v
+  CreateEPR_backend        : 0.015301 s
+  CreateEPR_notify         : 0.000229 s
+  CreateEPR_total          : 0.015822 s
+  RECV_TOTAL_no_plots      : 0.014953 s
+  RECV_TOTAL_EPR_FINAL     : 0.064518 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: kaut9ro57
+  CreateEPR_backend        : 0.019820 s
+  CreateEPR_notify         : 0.000256 s
+  CreateEPR_total          : 0.020380 s
+  RECV_TOTAL_no_plots      : 0.023113 s
+  RECV_TOTAL_EPR_FINAL     : 0.012279 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 19z1odhcq
+  CreateEPR_backend        : 0.010434 s
+  CreateEPR_notify         : 0.000173 s
+  CreateEPR_total          : 0.010940 s
+  RECV_TOTAL_no_plots      : 0.032843 s
+  RECV_TOTAL_EPR_FINAL     : 0.105423 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: fbmmbug7l
+  CreateEPR_backend        : 0.017327 s
+  CreateEPR_notify         : 0.000160 s
+  CreateEPR_total          : 0.017807 s
+  RECV_TOTAL_no_plots      : 0.016573 s
+  RECV_TOTAL_EPR_FINAL     : 0.019989 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: twrr19bkd
+  CreateEPR_backend        : 0.018737 s
+  CreateEPR_notify         : 0.000138 s
+  CreateEPR_total          : 0.019192 s
+  RECV_TOTAL_no_plots      : 0.024125 s
+  RECV_TOTAL_EPR_FINAL     : 0.072517 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: d4yzx8cfk
+  CreateEPR_backend        : 0.010825 s
+  CreateEPR_notify         : 0.000145 s
+  CreateEPR_total          : 0.011248 s
+  RECV_TOTAL_no_plots      : 0.030754 s
+  RECV_TOTAL_EPR_FINAL     : 0.028038 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: qsvd1cv2k
+  CreateEPR_backend        : 0.021161 s
+  CreateEPR_notify         : 0.000163 s
+  CreateEPR_total          : 0.021585 s
+  RECV_TOTAL_no_plots      : 0.016569 s
+  RECV_TOTAL_EPR_FINAL     : 0.073939 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 4uxfnzxv8
+  CreateEPR_backend        : 0.013144 s
+  CreateEPR_notify         : 0.000217 s
+  CreateEPR_total          : 0.013634 s
+  RECV_TOTAL_no_plots      : 0.008595 s
+  RECV_TOTAL_EPR_FINAL     : 0.019563 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: rkfftoz59
+  CreateEPR_backend        : 0.010750 s
+  CreateEPR_notify         : 0.000140 s
+  CreateEPR_total          : 0.011176 s
+  RECV_TOTAL_no_plots      : 0.015860 s
+  RECV_TOTAL_EPR_FINAL     : 0.075747 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: io5u1p34d
+  CreateEPR_backend        : 0.018122 s
+  CreateEPR_notify         : 0.000209 s
+  CreateEPR_total          : 0.018645 s
+  RECV_TOTAL_no_plots      : 0.014068 s
+  RECV_TOTAL_EPR_FINAL     : 0.024772 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 58cvg4311
+  CreateEPR_backend        : 0.010549 s
+  CreateEPR_notify         : 0.000146 s
+  CreateEPR_total          : 0.010977 s
+  RECV_TOTAL_no_plots      : 0.011775 s
+  RECV_TOTAL_EPR_FINAL     : 0.178160 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 42p6rxx5o
+  CreateEPR_backend        : 0.012684 s
+  CreateEPR_notify         : 0.000151 s
+  CreateEPR_total          : 0.013163 s
+  RECV_TOTAL_no_plots      : 0.013676 s
+  RECV_TOTAL_EPR_FINAL     : 0.049187 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: k7dlcyd3c
+  CreateEPR_backend        : 0.021119 s
+  CreateEPR_notify         : 0.000151 s
+  CreateEPR_total          : 0.021604 s
+  RECV_TOTAL_no_plots      : 0.014718 s
+  RECV_TOTAL_EPR_FINAL     : 0.094470 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: bnv54izzq
+  CreateEPR_backend        : 0.022073 s
+  CreateEPR_notify         : 0.000185 s
+  CreateEPR_total          : 0.022590 s
+  RECV_TOTAL_no_plots      : 0.016898 s
+  RECV_TOTAL_EPR_FINAL     : 0.036196 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 7r8mfrlii
+  CreateEPR_backend        : 0.032015 s
+  CreateEPR_notify         : 0.000167 s
+  CreateEPR_total          : 0.032485 s
+  RECV_TOTAL_no_plots      : 0.018946 s
+  RECV_TOTAL_EPR_FINAL     : 0.099082 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: pnewpsw1t
+  CreateEPR_backend        : 0.009578 s
+  CreateEPR_notify         : 0.000121 s
+  CreateEPR_total          : 0.009936 s
+  RECV_TOTAL_no_plots      : 0.010186 s
+  RECV_TOTAL_EPR_FINAL     : 0.013243 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: xx6e4qdkw
+  CreateEPR_backend        : 0.010079 s
+  CreateEPR_notify         : 0.000113 s
+  CreateEPR_total          : 0.010439 s
+  RECV_TOTAL_no_plots      : 0.017016 s
+  RECV_TOTAL_EPR_FINAL     : 0.078642 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: x4395f16f
+  CreateEPR_backend        : 0.010349 s
+  CreateEPR_notify         : 0.000224 s
+  CreateEPR_total          : 0.010953 s
+  RECV_TOTAL_no_plots      : 0.021194 s
+  RECV_TOTAL_EPR_FINAL     : 0.033039 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: vulc6bo5c
+  CreateEPR_backend        : 0.014352 s
+  CreateEPR_notify         : 0.000258 s
+  CreateEPR_total          : 0.014950 s
+  RECV_TOTAL_no_plots      : 0.013355 s
+  RECV_TOTAL_EPR_FINAL     : 0.109406 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: x1hw41fxd
+  CreateEPR_backend        : 0.009951 s
+  CreateEPR_notify         : 0.000286 s
+  CreateEPR_total          : 0.010503 s
+  RECV_TOTAL_no_plots      : 0.013485 s
+  RECV_TOTAL_EPR_FINAL     : 0.012890 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: tsev1d74r
+  CreateEPR_backend        : 0.008781 s
+  CreateEPR_notify         : 0.000224 s
+  CreateEPR_total          : 0.009194 s
+  RECV_TOTAL_no_plots      : 0.017962 s
+  RECV_TOTAL_EPR_FINAL     : 0.111589 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: cek1np7xt
+  CreateEPR_backend        : 0.010924 s
+  CreateEPR_notify         : 0.000166 s
+  CreateEPR_total          : 0.011354 s
+  RECV_TOTAL_no_plots      : 0.012366 s
+  RECV_TOTAL_EPR_FINAL     : 0.024219 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: k38lmc9ky
+  CreateEPR_backend        : 0.010694 s
+  CreateEPR_notify         : 0.000125 s
+  CreateEPR_total          : 0.011128 s
+  RECV_TOTAL_no_plots      : 0.018360 s
+  RECV_TOTAL_EPR_FINAL     : 0.082509 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 76iyhymmj
+  CreateEPR_backend        : 0.010197 s
+  CreateEPR_notify         : 0.000159 s
+  CreateEPR_total          : 0.010717 s
+  RECV_TOTAL_no_plots      : 0.012440 s
+  RECV_TOTAL_EPR_FINAL     : 0.017123 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: exs0u5g76
+  CreateEPR_backend        : 0.014565 s
+  CreateEPR_notify         : 0.008324 s
+  CreateEPR_total          : 0.023209 s
+  RECV_TOTAL_no_plots      : 0.014902 s
+  RECV_TOTAL_EPR_FINAL     : 0.076784 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: djtcm9m8q
+  CreateEPR_backend        : 0.022123 s
+  CreateEPR_notify         : 0.006169 s
+  CreateEPR_total          : 0.028808 s
+  RECV_TOTAL_no_plots      : 0.011011 s
+  RECV_TOTAL_EPR_FINAL     : 0.078422 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: ap6ib8za0
+  CreateEPR_backend        : 0.012883 s
+  CreateEPR_notify         : 0.000248 s
+  CreateEPR_total          : 0.013503 s
+  RECV_TOTAL_no_plots      : 0.020759 s
+  RECV_TOTAL_EPR_FINAL     : 0.156293 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 8gwy2clz9
+  CreateEPR_backend        : 0.026237 s
+  CreateEPR_notify         : 0.000183 s
+  CreateEPR_total          : 0.026873 s
+  RECV_TOTAL_no_plots      : 0.033178 s
+  RECV_TOTAL_EPR_FINAL     : 0.016875 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: wbwpiyjcu
+  CreateEPR_backend        : 0.017675 s
+  CreateEPR_notify         : 0.000161 s
+  CreateEPR_total          : 0.018132 s
+  RECV_TOTAL_no_plots      : 0.019740 s
+  RECV_TOTAL_EPR_FINAL     : 0.117369 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 5gcyxgj2n
+  CreateEPR_backend        : 0.015655 s
+  CreateEPR_notify         : 0.010594 s
+  CreateEPR_total          : 0.026669 s
+  RECV_TOTAL_no_plots      : 0.014601 s
+  RECV_TOTAL_EPR_FINAL     : 0.062611 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: dvjr8lhj5
+  CreateEPR_backend        : 0.018242 s
+  CreateEPR_notify         : 0.007564 s
+  CreateEPR_total          : 0.026281 s
+  RECV_TOTAL_no_plots      : 0.024294 s
+  RECV_TOTAL_EPR_FINAL     : 0.121078 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 47pty2mrq
+  CreateEPR_backend        : 0.022522 s
+  CreateEPR_notify         : 0.000240 s
+  CreateEPR_total          : 0.023250 s
+  RECV_TOTAL_no_plots      : 0.013169 s
+  RECV_TOTAL_EPR_FINAL     : 0.023739 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 4yc31p32d
+  CreateEPR_backend        : 0.013665 s
+  CreateEPR_notify         : 0.000155 s
+  CreateEPR_total          : 0.014171 s
+  RECV_TOTAL_no_plots      : 0.025266 s
+  RECV_TOTAL_EPR_FINAL     : 0.114611 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 02rvgb4si
+  CreateEPR_backend        : 0.011974 s
+  CreateEPR_notify         : 0.000111 s
+  CreateEPR_total          : 0.012333 s
+  RECV_TOTAL_no_plots      : 0.020482 s
+  RECV_TOTAL_EPR_FINAL     : 0.148674 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 6jk0g8x8v
+  CreateEPR_backend        : 0.036459 s
+  CreateEPR_notify         : 0.000153 s
+  CreateEPR_total          : 0.037006 s
+  RECV_TOTAL_no_plots      : 0.051721 s
+  RECV_TOTAL_EPR_FINAL     : 0.036790 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: z0nz46dhf
+  CreateEPR_backend        : 0.021846 s
+  CreateEPR_notify         : 0.000194 s
+  CreateEPR_total          : 0.022343 s
+  RECV_TOTAL_no_plots      : 0.013195 s
+  RECV_TOTAL_EPR_FINAL     : 0.023345 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: r1hvszivr
+  CreateEPR_backend        : 0.023880 s
+  CreateEPR_notify         : 0.000114 s
+  CreateEPR_total          : 0.024191 s
+  RECV_TOTAL_no_plots      : 0.026519 s
+  RECV_TOTAL_EPR_FINAL     : 0.091207 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: ak5ckjwh0
+  CreateEPR_backend        : 0.013791 s
+  CreateEPR_notify         : 0.000105 s
+  CreateEPR_total          : 0.014133 s
+  RECV_TOTAL_no_plots      : 0.023844 s
+  RECV_TOTAL_EPR_FINAL     : 0.031028 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: iu2xczd8l
+  CreateEPR_backend        : 0.024451 s
+  CreateEPR_notify         : 0.000170 s
+  CreateEPR_total          : 0.024961 s
+  RECV_TOTAL_no_plots      : 0.023010 s
+  RECV_TOTAL_EPR_FINAL     : 0.097613 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: ibx6yyc0p
+  CreateEPR_backend        : 0.029471 s
+  CreateEPR_notify         : 0.000972 s
+  CreateEPR_total          : 0.030885 s
+  RECV_TOTAL_no_plots      : 0.015931 s
+  RECV_TOTAL_EPR_FINAL     : 0.110751 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 7e607x46h
+  CreateEPR_backend        : 0.028956 s
+  CreateEPR_notify         : 0.000126 s
+  CreateEPR_total          : 0.029443 s
+  RECV_TOTAL_no_plots      : 0.008655 s
+  RECV_TOTAL_EPR_FINAL     : 0.062625 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: h312d1i91
+  CreateEPR_backend        : 0.010204 s
+  CreateEPR_notify         : 0.016188 s
+  CreateEPR_total          : 0.026785 s
+  RECV_TOTAL_no_plots      : 0.019575 s
+  RECV_TOTAL_EPR_FINAL     : 0.039757 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: g22djaymt
+  CreateEPR_backend        : 0.010793 s
+  CreateEPR_notify         : 0.000150 s
+  CreateEPR_total          : 0.011291 s
+  RECV_TOTAL_no_plots      : 0.018495 s
+  RECV_TOTAL_EPR_FINAL     : 0.075055 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: k3qser13u
+  CreateEPR_backend        : 0.014761 s
+  CreateEPR_notify         : 0.000177 s
+  CreateEPR_total          : 0.015266 s
+  RECV_TOTAL_no_plots      : 0.011277 s
+  RECV_TOTAL_EPR_FINAL     : 0.017655 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 3i7v3njtn
+  CreateEPR_backend        : 0.012136 s
+  CreateEPR_notify         : 0.000163 s
+  CreateEPR_total          : 0.012632 s
+  RECV_TOTAL_no_plots      : 0.031745 s
+  RECV_TOTAL_EPR_FINAL     : 0.130720 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: vx2qygdba
+  CreateEPR_backend        : 0.035723 s
+  CreateEPR_notify         : 0.000209 s
+  CreateEPR_total          : 0.036245 s
+  RECV_TOTAL_no_plots      : 0.010055 s
+  RECV_TOTAL_EPR_FINAL     : 0.045281 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: x17hq3tj6
+  CreateEPR_backend        : 0.014816 s
+  CreateEPR_notify         : 0.000160 s
+  CreateEPR_total          : 0.015270 s
+  RECV_TOTAL_no_plots      : 0.009433 s
+  RECV_TOTAL_EPR_FINAL     : 0.124802 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: a38mphohz
+  CreateEPR_backend        : 0.014468 s
+  CreateEPR_notify         : 0.000159 s
+  CreateEPR_total          : 0.014895 s
+  RECV_TOTAL_no_plots      : 0.017915 s
+  RECV_TOTAL_EPR_FINAL     : 0.106936 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 84zefd9xa
+  CreateEPR_backend        : 0.019934 s
+  CreateEPR_notify         : 0.000183 s
+  CreateEPR_total          : 0.020404 s
+  RECV_TOTAL_no_plots      : 0.009560 s
+  RECV_TOTAL_EPR_FINAL     : 0.026211 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: k1mri2gd4
+  CreateEPR_backend        : 0.028735 s
+  CreateEPR_notify         : 0.000186 s
+  CreateEPR_total          : 0.029262 s
+  RECV_TOTAL_no_plots      : 0.010594 s
+  RECV_TOTAL_EPR_FINAL     : 0.016468 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: aay57l05q
+  CreateEPR_backend        : 0.019376 s
+  CreateEPR_notify         : 0.000182 s
+  CreateEPR_total          : 0.019853 s
+  RECV_TOTAL_no_plots      : 0.016931 s
+  RECV_TOTAL_EPR_FINAL     : 0.082579 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 5rfappef3
+  CreateEPR_backend        : 0.028071 s
+  CreateEPR_notify         : 0.000186 s
+  CreateEPR_total          : 0.028470 s
+  RECV_TOTAL_no_plots      : 0.020720 s
+  RECV_TOTAL_EPR_FINAL     : 0.014597 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: umdr6rlab
+  CreateEPR_backend        : 0.019392 s
+  CreateEPR_notify         : 0.000130 s
+  CreateEPR_total          : 0.019761 s
+  RECV_TOTAL_no_plots      : 0.019824 s
+  RECV_TOTAL_EPR_FINAL     : 0.092407 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: kert7njb3
+  CreateEPR_backend        : 0.014887 s
+  CreateEPR_notify         : 0.000200 s
+  CreateEPR_total          : 0.015312 s
+  RECV_TOTAL_no_plots      : 0.010841 s
+  RECV_TOTAL_EPR_FINAL     : 0.020816 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: xp2glfw7s
+  CreateEPR_backend        : 0.012141 s
+  CreateEPR_notify         : 0.000172 s
+  CreateEPR_total          : 0.012587 s
+  RECV_TOTAL_no_plots      : 0.016282 s
+  RECV_TOTAL_EPR_FINAL     : 0.104783 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 091a1ywwh
+  CreateEPR_backend        : 0.015405 s
+  CreateEPR_notify         : 0.000137 s
+  CreateEPR_total          : 0.015786 s
+  RECV_TOTAL_no_plots      : 0.031325 s
+  RECV_TOTAL_EPR_FINAL     : 0.016672 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 8kcg30s1e
+  CreateEPR_backend        : 0.014260 s
+  CreateEPR_notify         : 0.000146 s
+  CreateEPR_total          : 0.014673 s
+  RECV_TOTAL_no_plots      : 0.018616 s
+  RECV_TOTAL_EPR_FINAL     : 0.099676 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 11uo2rusy
+  CreateEPR_backend        : 0.033750 s
+  CreateEPR_notify         : 0.000310 s
+  CreateEPR_total          : 0.034570 s
+  RECV_TOTAL_no_plots      : 0.023282 s
+  RECV_TOTAL_EPR_FINAL     : 0.115736 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: c7esl8zu8
+  CreateEPR_backend        : 0.024537 s
+  CreateEPR_notify         : 0.000232 s
+  CreateEPR_total          : 0.025186 s
+  RECV_TOTAL_no_plots      : 0.012198 s
+  RECV_TOTAL_EPR_FINAL     : 0.060222 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: eohel2wlb
+  CreateEPR_backend        : 0.019550 s
+  CreateEPR_notify         : 0.033564 s
+  CreateEPR_total          : 0.053464 s
+  RECV_TOTAL_no_plots      : 0.017470 s
+  RECV_TOTAL_EPR_FINAL     : 0.120292 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: bh9nhsvbg
+  CreateEPR_backend        : 0.018809 s
+  CreateEPR_notify         : 0.011349 s
+  CreateEPR_total          : 0.030552 s
+  RECV_TOTAL_no_plots      : 0.009273 s
+  RECV_TOTAL_EPR_FINAL     : 0.034601 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: n4p61h65w
+  CreateEPR_backend        : 0.021521 s
+  CreateEPR_notify         : 0.000169 s
+  CreateEPR_total          : 0.021959 s
+  RECV_TOTAL_no_plots      : 0.010423 s
+  RECV_TOTAL_EPR_FINAL     : 0.033883 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 5yek6r57c
+  CreateEPR_backend        : 0.012785 s
+  CreateEPR_notify         : 0.000156 s
+  CreateEPR_total          : 0.013150 s
+  RECV_TOTAL_no_plots      : 0.020017 s
+  RECV_TOTAL_EPR_FINAL     : 0.109152 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: xpeajjcnn
+  CreateEPR_backend        : 0.011645 s
+  CreateEPR_notify         : 0.016467 s
+  CreateEPR_total          : 0.028377 s
+  RECV_TOTAL_no_plots      : 0.021250 s
+  RECV_TOTAL_EPR_FINAL     : 0.036339 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: tq05mb7wr
+  CreateEPR_backend        : 0.013564 s
+  CreateEPR_notify         : 0.016151 s
+  CreateEPR_total          : 0.030025 s
+  RECV_TOTAL_no_plots      : 0.011397 s
+  RECV_TOTAL_EPR_FINAL     : 0.107474 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: z7ghwbpxu
+  CreateEPR_backend        : 0.018928 s
+  CreateEPR_notify         : 0.000341 s
+  CreateEPR_total          : 0.019662 s
+  RECV_TOTAL_no_plots      : 0.011298 s
+  RECV_TOTAL_EPR_FINAL     : 0.017264 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 9uvcwc63p
+  CreateEPR_backend        : 0.011020 s
+  CreateEPR_notify         : 0.000138 s
+  CreateEPR_total          : 0.011472 s
+  RECV_TOTAL_no_plots      : 0.021966 s
+  RECV_TOTAL_EPR_FINAL     : 0.089948 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: xrsln957f
+  CreateEPR_backend        : 0.025472 s
+  CreateEPR_notify         : 0.000127 s
+  CreateEPR_total          : 0.025920 s
+  RECV_TOTAL_no_plots      : 0.010560 s
+  RECV_TOTAL_EPR_FINAL     : 0.035300 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 14fbrnb10
+  CreateEPR_backend        : 0.016208 s
+  CreateEPR_notify         : 0.015831 s
+  CreateEPR_total          : 0.032629 s
+  RECV_TOTAL_no_plots      : 0.020402 s
+  RECV_TOTAL_EPR_FINAL     : 0.102477 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: 9ogki8kij
+  CreateEPR_backend        : 0.020855 s
+  CreateEPR_notify         : 0.000150 s
+  CreateEPR_total          : 0.021361 s
+  RECV_TOTAL_no_plots      : 0.027493 s
+  RECV_TOTAL_EPR_FINAL     : 0.029343 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+
+EPR ID: gtyb6nioc
+  CreateEPR_backend        : 0.012106 s
+  CreateEPR_notify         : 0.000125 s
+  CreateEPR_total          : 0.012452 s
+  RECV_TOTAL_no_plots      : 0.026125 s
+  RECV_TOTAL_EPR_FINAL     : 0.107558 s
+  monitor → update         : 0.000000 s
+  update → notify          : 0.000000 s
+

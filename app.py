@@ -497,7 +497,6 @@ def app_open(ROL, PUERTO):
         try:
             sock = get_zmq_socket(addr)
             sock.send(msgpack.packb(payload))
-            print(f"[MASTER ZMQ] Sent to {addr}: {payload}")
         except Exception as e:
             print(f"[MASTER ZMQ ERROR] {e}")
 

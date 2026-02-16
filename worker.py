@@ -45,11 +45,15 @@ import csv
 import re
 
 def export_timestamps_to_csv(
-    log_file="latencies/timestamps_log_afterx2_8.txt",
-    csv_file="latencies/timestamps_log_afterx2_8.csv"
+    log_file="latencies/timestamps_log_afterx2_9.txt",
+    csv_file="latencies/timestamps_log_afterx2_9.csv"
 ):
     rows = []
+    seen = set()   # avoid duplicates (event, id)
 
+    # Regex for timestamps like MM:SS.xxxxxx
+    ts_re = re.compile(r"\d+:\d+\.\d+")
+    # Regex for floats or integers
     float_re = re.compile(r"[-+]?\d*\.\d+|\d+")
 
     with open(log_file, "r") as f:
@@ -58,35 +62,49 @@ def export_timestamps_to_csv(
             if len(parts) < 2:
                 continue
 
-            # Event name: [CreateEPR_backend] → CreateEPR_backend
+            # Extract event name: [CreateEPR_backend] → CreateEPR_backend
             event = parts[0].strip("[]")
 
-            # Extract ID
+            # Extract EPR ID
             epr_id = None
             for p in parts:
                 if p.startswith("ID="):
                     epr_id = p.split("=")[1]
 
+            # Skip duplicates
+            key = (event, epr_id)
+            if key in seen:
+                continue
+            seen.add(key)
+
             entry = {"event": event, "id": epr_id}
 
-            # Extract all key=value pairs
+            # Parse all key=value pairs
             for p in parts:
-                if "=" in p:
-                    k, v = p.split("=")
+                if "=" not in p:
+                    continue
 
-                    # Clean numeric values
-                    m = float_re.search(v)
-                    if m:
-                        try:
-                            entry[k] = float(m.group())
-                        except:
-                            entry[k] = v
-                    else:
+                k, v = p.split("=")
+
+                # Case 1: timestamp in format MM:SS.xxxxxx
+                if ts_re.match(v):
+                    entry[k] = v
+                    continue
+
+                # Case 2: numeric values (floats, ints)
+                if float_re.match(v):
+                    try:
+                        entry[k] = float(v)
+                    except:
                         entry[k] = v
+                    continue
+
+                # Case 3: fallback for any other string
+                entry[k] = v
 
             rows.append(entry)
 
-    # Collect all fields
+    # Collect all fields dynamically
     fieldnames = sorted({key for row in rows for key in row.keys()})
 
     # Write CSV
@@ -98,92 +116,154 @@ def export_timestamps_to_csv(
     print(f"[OK] CSV generated: {csv_file}")
 
 
-
-
-
 import matplotlib
-matplotlib.use("Agg")   # backend sin GUI
+matplotlib.use("Agg")
 
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def plot_latencies(csv_file="latencies/timestamps_log_afterx2_8.csv"):
+def plot_latencies(csv_file="latencies/timestamps_log_afterx2_9.csv"):
     df = pd.read_csv(csv_file)
+    def parse_ts(x):
+        if isinstance(x, str) and ":" in x:
+            try:
+                m, s = x.split(":")
+                return float(m) * 60 + float(s)
+            except:
+                return pd.NA
+        try:
+            return float(x)
+        except:
+            return pd.NA
 
-    # Helper: extraer t_diff de un evento como serie
-    def get_series(event):
-        s = df[df["event"] == event]["t_diff"]
-        return s.astype(float).reset_index(drop=True) if not s.empty else None
+    # Convert all timestamp fields
+    for col in ["t", "t_start", "t_end", "t_end_recv"]:
+        if col in df.columns:
+            df[col] = df[col].apply(parse_ts)
 
-    # Helper: micro-segmentos a partir de timestamps
-    def get_segment(start_event, end_event):
-        start = df[df["event"] == start_event]["t"]
-        end   = df[df["event"] == end_event]["t"]
-        if start.empty or end.empty:
-            return None
-        start = start.astype(float).reset_index(drop=True)
-        end   = end.astype(float).reset_index(drop=True)
-        return (end - start)
 
-    # -------- GENERACIÓN --------
-    backend = get_series("CreateEPR_backend")
-    notify  = get_series("CreateEPR_notify")
-    total   = get_series("CreateEPR_total")
+    # --- Keep only IDs that actually have ORDER_RECEIVE ---
+    valid_ids = df[df["event"] == "ORDER_RECEIVE"]["id"].tolist()
 
-    # -------- GAP GEN → RECV --------
-    gap = get_series("ORDER_RECV_EXECUTING_AFTER_FOUND")
+    # Preserve order of appearance (no sorting)
+    seen = set()
+    ordered_ids = []
+    for x in valid_ids:
+        if x not in seen:
+            seen.add(x)
+            ordered_ids.append(x)
 
-    # -------- RECEIVER MICRO-SEGMENTS --------
-    s1 = get_segment("RECV_EPR_START", "RECV_BEFORE_MONITOR")
-    s2 = get_segment("RECV_BEFORE_MONITOR", "RECV_BEFORE_UPDATE")
-    s3 = get_segment("RECV_BEFORE_UPDATE", "RECV_BEFORE_NOTIFY")
+    # Filter df by ordered IDs
+    df = df[df["id"].isin(ordered_ids)]
 
-    recv_total = get_series("RECV_TOTAL_no_plots")
+    # --- Pivot: one row per ID, one column per event ---
+    pivot = df.pivot_table(
+        index="id",
+        columns="event",
+        values=["t", "t_start", "t_end", "t_end_recv", "t_diff"],
+        aggfunc="first"
+    )
 
-    # -------- TOTAL END-TO-END (GEN + GAP + RECV) --------
-    recv_total_epr_final = get_series("RECV_TOTAL_EPR_FINAL")
+    # Flatten multi-index columns
+    pivot.columns = [f"{a}_{b}" for a, b in pivot.columns]
 
-    # -------- PLOT --------
+    # --- Reorder pivot rows to match original ID order ---
+    pivot = pivot.loc[ordered_ids]
+
+    # --- Sliding window: once >6 IDs, drop first 2 ---
+    if len(pivot) > 6:
+        pivot = pivot.iloc[2:]
+
+    # --- Compute segments ---
+    def seg(a, b):
+        if a in pivot.columns and b in pivot.columns:
+            return pivot[b] - pivot[a]
+        return None
+
+    # GEN END → RECV START
+    pivot["s0_gen_to_recv"] = seg("t_end_CreateEPR_total", "t_RECV_EPR_START")
+
+
+    # Receiver micro-segments
+    pivot["s1_start_to_monitor"] = seg("t_RECV_EPR_START_BEFORE_CALCS", "t_RECV_BEFORE_MONITOR")
+    pivot["s2_monitor_to_update"] = seg("t_RECV_BEFORE_MONITOR", "t_RECV_BEFORE_UPDATE")
+    pivot["s3_update_to_notify"] = seg("t_RECV_BEFORE_UPDATE", "t_RECV_BEFORE_NOTIFY")
+
+    pivot["s4_total_epr"] = seg("t_start_CreateEPR_backend","t_EPR_TOTAL")
+
+    # --- Plot ---
     plt.close('all')
     fig = plt.figure(figsize=(12, 7))
 
-    if backend is not None:            plt.plot(backend.values,            label="CreateEPR backend")
-    if notify  is not None:            plt.plot(notify.values,             label="CreateEPR notify")
-    if total   is not None:            plt.plot(total.values,              label="CreateEPR total")
-    if gap     is not None:            plt.plot(gap.values,                label="GEN → RECV gap")
+    diff_events = [
+        "CreateEPR_backend",
+        "CreateEPR_notify",
+        "CreateEPR_total",
+        "ORDER_RECV_EXECUTING_AFTER_FOUND",
+        "ReceiveEPR",
+        "RECV_TOTAL_EPR_FINAL"
+    ]
 
-    if s1 is not None:                 plt.plot(s1.values,                 label="start → monitor")
-    if s2 is not None:                 plt.plot(s2.values,                 label="monitor → update")
-    if s3 is not None:                 plt.plot(s3.values,                 label="update → notify")
+    for ev in diff_events:
+        col = f"t_diff_{ev}"
+        if col in pivot.columns:
+            plt.plot(pivot.index, pivot[col], label=ev)
 
-    if recv_total is not None:         plt.plot(recv_total.values,         label="RECV_TOTAL_no_plots (solo receiver)")
-    if recv_total_epr_final is not None:
-        plt.plot(recv_total_epr_final.values, label="RECV_TOTAL_EPR_FINAL (end-to-end)")
+    seg_cols = [
+        ("s0_gen_to_recv", "GEN → RECV gap"),
+        ("s1_start_to_monitor", "start → monitor"),
+        ("s2_monitor_to_update", "monitor → update"),
+        ("s3_update_to_notify", "update → notify"),
+        ("s4_total_epr", "TOTAL EPR LATENCY")
+    ]
 
-    plt.xlabel("EPR index")
-    plt.ylabel("Tiempo (s)")
-    plt.title("Latencias del pipeline EPR (GEN + GAP + RECV + TOTAL)")
+    for col, label in seg_cols:
+        if col in pivot.columns:
+            plt.plot(pivot.index, pivot[col], label=label)
+
+    plt.xlabel("EPR ID")
+    plt.ylabel("Time (s)")
+    plt.title("EPR Pipeline Latencies (GEN + GAP + RECV + SEGMENTS + TOTAL)")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
 
-    fig.savefig("latencies/latencias_epr_pipeline.png")
+    fig.savefig("latencies/latencies_epr_pipelinex2_9.png")
     plt.close(fig)
-    print("[OK] Gráfica guardada en latencies/latencias_epr_pipeline.png")
+    print("[OK] Saved: latencies/latencies_epr_pipelinex2_9.png")
+    
+        # --- Export TXT report ---
+    with open("latencies/latencies_epr_pipelinex2_9.txt", "w") as f:
+        for epr_id, row in pivot.iterrows():
+            f.write(f"EPR ID: {epr_id}\n")
+
+            # Write diff events
+            for ev in diff_events:
+                col = f"t_diff_{ev}"
+                if col in pivot.columns and not pd.isna(row[col]):
+                    f.write(f"  {ev:25s}: {row[col]:.6f} s\n")
+
+            # Write segments
+            for col, label in seg_cols:
+                if col in pivot.columns and not pd.isna(row[col]):
+                    f.write(f"  {label:25s}: {row[col]:.6f} s\n")
+
+            f.write("\n")
+
+    print("[OK] Saved TXT report: latencies/latencies_epr_pipelinex2_9.txt")
 
 
 
 
 import pandas as pd
 
-def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_8.csv"):
+def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_9.csv"):
     wait_for_csv(csv_file)
     df = pd.read_csv(csv_file)
 
     backend = df[df["event"] == "CreateEPR_backend"]["t_diff"].astype(float)
     notify  = df[df["event"] == "CreateEPR_notify"]["t_diff"].astype(float)
     total   = df[df["event"] == "CreateEPR_total"]["t_diff"].astype(float)
-    master = df[df["event"] == "MASTER PROCESSED (ZMQ)"]["t_diff"].astype(float)
 
     # Compute stats and store them in variables
     media_create = backend.mean()
@@ -201,10 +281,6 @@ def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_8.csv"):
     min_total   = total.min()
     max_total   = total.max()
 
-    media_master = master.mean()
-    std_master   = master.std()
-    min_master   = master.min()
-    max_master   = master.max()
     
 
     # Print to console
@@ -230,7 +306,7 @@ def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_8.csv"):
 
 
     # Save to TXT
-    with open("latencies/latencias_epr_afterx2_8.txt", "w") as f:
+    with open("latencies/latencias_epr_afterx2_9.txt", "w") as f:
         f.write("===== ESTADÍSTICAS DE LATENCIA =====\n")
         f.write("Backend createEPR:\n")
         f.write(f"  media: {media_create}\n")
@@ -243,12 +319,6 @@ def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_8.csv"):
         f.write(f"  std: {std_notify}\n")
         f.write(f"  min: {min_notify}\n")
         f.write(f"  max: {max_notify}\n\n")
-
-        f.write("Noticicación master zmq:\n")
-        f.write(f"  media: {media_master}\n")
-        f.write(f"  std: {std_master}\n")
-        f.write(f"  min: {min_master}\n")
-        f.write(f"  max: {max_master}\n\n")
 
         f.write("Total generación EPR:\n")
         f.write(f"  media: {media_total}\n")
@@ -316,7 +386,7 @@ def diff_precise(t1, t2):
 # --------------------------------------------------
 # TIMESTAMPS DEBUGGER
 # --------------------------------------------------
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_8.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_9.txt"
 # Evita duplicados: (event_type, epr_id)
 LOGGED_EVENTS = set()
 
@@ -679,7 +749,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
     if state == "ok":
         try:
-            log_timestamp("RECV_EPR_START", epr_id, t_start=t_start)
+            log_timestamp("RECV_EPR_START", epr_id, t=t_start)
             q = conn.recvEPR()
 
             # --- TIMESTAMP: después de recvEPR ---
@@ -692,6 +762,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
                 t_end=t_end,
                 t_diff=f"{t_diff_recv:.6f}"
             )
+            log_timestamp("RECV_EPR_START_BEFORE_CALCS", epr_id, t=timestamp_precise())
 
             # Store qubit
             epr_store[epr_id] = {
@@ -763,6 +834,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
     # --- TIMESTAMP: antes de notificar ---
     log_timestamp("RECV_BEFORE_NOTIFY", epr_id, t=timestamp_precise())
+    log_timestamp("EPR_TOTAL", epr_id, t=timestamp_precise())
 
     try:
         print("[RECEIVER] Success on receiving the EPR, sending update states to sender and master")

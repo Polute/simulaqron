@@ -47,7 +47,7 @@ def diff_precise(t1, t2):
     """
     return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
 
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_8.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_9.txt"
 
 def log_timestamp(event_type, epr_id, **fields):
     line = f"[{event_type}]  ID={epr_id}"
@@ -88,7 +88,8 @@ def wait_for_listener(port, timeout=5.0, interval=0.01):
 ORDERS = []
 # global flag
 worker_started = False
-epr_ready_queue = deque()
+epr_ready = {}   # id → payload
+
 epr_receive_queue = deque()
 
 
@@ -186,15 +187,12 @@ def app_open(PUERTO, listener_port):
         start = time()
 
         while time() - start < timeout:
-            if epr_ready_queue:
-                msg = epr_ready_queue.popleft()
-                # msg es directamente el payload del ZMQ
-                if str(msg["id"]) == str(epr_id):
-                    epr_obj = msg
-                    break
+            if epr_id in epr_ready: 
+                epr_obj = epr_ready.pop(epr_id)
+                break
             sleep(0.001)
         if epr_obj is None:
-            print(f"[RECEIVER] Timeout waiting for EPR {epr_id}")
+            print(f"[RECEIVER] Timeout waiting for EPR {epr_id} at {timestamp_precise()}")
             return
         
         my_port = get_port_by_id(node_info["id"])
@@ -455,12 +453,10 @@ def app_open(PUERTO, listener_port):
         #aplicar_orden(payload, node_info)
 
 
-        
-
-    epr_ready_queue = deque()
 
     def handle_epr_ready(payload):
-        epr_ready_queue.append(payload)
+        epr_ready[payload["id"]] = payload
+
 
 
     zmq_port = PUERTO + 1000 # Puerto exclusivo para ZeroMQ
