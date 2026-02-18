@@ -1,0 +1,72 @@
+EPR ID: z5pv88dn5
+  CreateEPR_backend        : 0.007901 s
+  CreateEPR_notify         : 0.000302 s
+  CreateEPR_total          : 0.008552 s
+  ReceiveEPR               : 0.002381 s
+  RECV_TOTAL_EPR_FINAL     : 0.010853 s
+  GEN → RECV gap           : 0.007901 s
+  start → monitor          : 0.000086 s
+  monitor → update         : 0.000295 s
+  update → notify          : 0.000130 s
+  TOTAL EPR LATENCY        : 0.019512 s
+
+EPR ID: lrze3zlmj
+  CreateEPR_backend        : 0.008221 s
+  CreateEPR_notify         : 0.000219 s
+  CreateEPR_total          : 0.008672 s
+  ReceiveEPR               : 0.049359 s
+  RECV_TOTAL_EPR_FINAL     : 0.109543 s
+  GEN → RECV gap           : 0.059654 s
+  start → monitor          : 0.000094 s
+  monitor → update         : 0.000622 s
+  update → notify          : 0.063261 s
+  TOTAL EPR LATENCY        : 0.209092 s
+
+EPR ID: qhkkqirpx
+  CreateEPR_backend        : 0.012084 s
+  CreateEPR_notify         : 0.000223 s
+  CreateEPR_total          : 0.012631 s
+  ReceiveEPR               : 0.093508 s
+  RECV_TOTAL_EPR_FINAL     : 0.211657 s
+  GEN → RECV gap           : 0.070773 s
+  start → monitor          : 0.000669 s
+  monitor → update         : 0.000528 s
+  update → notify          : 0.001850 s
+  TOTAL EPR LATENCY        : 0.226759 s
+
+EPR ID: keyh66hif
+  CreateEPR_backend        : 0.010695 s
+  CreateEPR_notify         : 0.000211 s
+  CreateEPR_total          : 0.011313 s
+  ReceiveEPR               : 0.002327 s
+  RECV_TOTAL_EPR_FINAL     : 0.011828 s
+  GEN → RECV gap           : 0.008960 s
+  start → monitor          : 0.000087 s
+  monitor → update         : 0.000359 s
+  update → notify          : 0.000104 s
+  TOTAL EPR LATENCY        : 0.023441 s
+
+EPR ID: z0az79g1q
+  CreateEPR_backend        : 0.009832 s
+  CreateEPR_notify         : 0.000251 s
+  CreateEPR_total          : 0.010425 s
+  ReceiveEPR               : 0.001837 s
+  RECV_TOTAL_EPR_FINAL     : 0.012831 s
+  GEN → RECV gap           : 0.010346 s
+  start → monitor          : 0.000098 s
+  monitor → update         : 0.000417 s
+  update → notify          : 0.000097 s
+  TOTAL EPR LATENCY        : 0.023409 s
+
+EPR ID: fr56tf061
+  CreateEPR_backend        : 0.008501 s
+  CreateEPR_notify         : 0.000208 s
+  CreateEPR_total          : 0.009744 s
+  ReceiveEPR               : 0.134453 s
+  RECV_TOTAL_EPR_FINAL     : 0.250835 s
+  GEN → RECV gap           : 0.109959 s
+  start → monitor          : 0.002169 s
+  monitor → update         : 0.000613 s
+  update → notify          : 0.000349 s
+  TOTAL EPR LATENCY        : 0.260659 s
+

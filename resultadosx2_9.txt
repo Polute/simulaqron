@@ -1,0 +1,68 @@
+=== RESULTADOS ===
+
+CreateEPR_backend:
+  min  = 0.005219 s
+  max  = 0.021453 s
+  mean = 0.009512 s
+  std  = 0.003109 s
+
+CreateEPR_notify:
+  min  = 0.000069 s
+  max  = 0.001121 s
+  mean = 0.000198 s
+  std  = 0.000168 s
+
+CreateEPR_total:
+  min  = 0.005468 s
+  max  = 0.021685 s
+  mean = 0.010058 s
+  std  = 0.003143 s
+
+ReceiveEPR:
+  min  = 0.001128 s
+  max  = 0.104708 s
+  mean = 0.004089 s
+  std  = 0.009473 s
+
+RECV_TOTAL_EPR_FINAL:
+  min  = 0.006159 s
+  max  = 0.202762 s
+  mean = 0.046960 s
+  std  = 0.039273 s
+
+GEN → RECV gap:
+  min  = 0.004614 s
+  max  = 0.190367 s
+  mean = 0.039105 s
+  std  = 0.033296 s
+
+start → monitor:
+  min  = 0.000032 s
+  max  = 0.089460 s
+  mean = 0.001811 s
+  std  = 0.008104 s
+
+monitor → update:
+  min  = 0.000156 s
+  max  = 0.018895 s
+  mean = 0.001593 s
+  std  = 0.002984 s
+
+update → notify:
+  min  = 0.000057 s
+  max  = 0.014655 s
+  mean = 0.001088 s
+  std  = 0.002193 s
+
+TOTAL EPR LATENCY:
+  min  = 0.013594 s
+  max  = 0.212560 s
+  mean = 0.060128 s
+  std  = 0.042489 s
+
+EPR ID:
+  min  = 1.000000 s
+  max  = 1.000000 s
+  mean = 1.000000 s
+  std  = 0.000000 s
+

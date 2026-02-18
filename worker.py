@@ -26,6 +26,7 @@ C = 3e5
 # Local EPR memory
 epr_store = {}
 nodo_info = {"pairEPR": []}
+log_file_epr = None # global
 
 # ---------------------------
 # CVS & PLOTS
@@ -45,8 +46,8 @@ import csv
 import re
 
 def export_timestamps_to_csv(
-    log_file="latencies/timestamps_log_afterx2_9.txt",
-    csv_file="latencies/timestamps_log_afterx2_9.csv"
+    log_file="latencies/timestamps_log_afterx2_10.txt",
+    csv_file="latencies/timestamps_log_afterx2_10.csv"
 ):
     rows = []
     seen = set()   # avoid duplicates (event, id)
@@ -122,7 +123,7 @@ matplotlib.use("Agg")
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def plot_latencies(csv_file="latencies/timestamps_log_afterx2_9.csv"):
+def plot_latencies(csv_file="latencies/timestamps_log_afterx2_10.csv"):
     df = pd.read_csv(csv_file)
     def parse_ts(x):
         if isinstance(x, str) and ":" in x:
@@ -228,12 +229,12 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_9.csv"):
     plt.legend()
     plt.tight_layout()
 
-    fig.savefig("latencies/latencies_epr_pipelinex2_9.png")
+    fig.savefig("latencies/latencies_epr_pipelinex2_10.png")
     plt.close(fig)
-    print("[OK] Saved: latencies/latencies_epr_pipelinex2_9.png")
+    print("[OK] Saved: latencies/latencies_epr_pipelinex2_10.png")
     
         # --- Export TXT report ---
-    with open("latencies/latencies_epr_pipelinex2_9.txt", "w") as f:
+    with open("latencies/latencies_epr_pipelinex2_10.txt", "w") as f:
         for epr_id, row in pivot.iterrows():
             f.write(f"EPR ID: {epr_id}\n")
 
@@ -250,14 +251,14 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_9.csv"):
 
             f.write("\n")
 
-    print("[OK] Saved TXT report: latencies/latencies_epr_pipelinex2_9.txt")
+    print("[OK] Saved TXT report: latencies/latencies_epr_pipelinex2_10.txt")
 
 
 
 
 import pandas as pd
 
-def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_9.csv"):
+def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_10.csv"):
     wait_for_csv(csv_file)
     df = pd.read_csv(csv_file)
 
@@ -306,7 +307,7 @@ def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_9.csv"):
 
 
     # Save to TXT
-    with open("latencies/latencias_epr_afterx2_9.txt", "w") as f:
+    with open("latencies/latencias_epr_afterx2_10.txt", "w") as f:
         f.write("===== ESTADÍSTICAS DE LATENCIA =====\n")
         f.write("Backend createEPR:\n")
         f.write(f"  media: {media_create}\n")
@@ -365,19 +366,6 @@ def timestamp_to_seconds(ts):
 
 
 def diff_precise(t1, t2):
-    return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
-
-
-def timestamp_to_seconds(ts):
-    """
-    Convert 'MM:SS.xxxxxx' into float seconds.
-    """
-    mm, rest = ts.split(":")
-    ss, us = rest.split(".")
-    return int(mm)*60 + int(ss) + int(us)/1_000_000
-
-
-def diff_precise(t1, t2):
     """
     Compute difference between two precise timestamps.
     """
@@ -386,7 +374,7 @@ def diff_precise(t1, t2):
 # --------------------------------------------------
 # TIMESTAMPS DEBUGGER
 # --------------------------------------------------
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_9.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_10.txt"
 # Evita duplicados: (event_type, epr_id)
 LOGGED_EVENTS = set()
 
@@ -407,6 +395,28 @@ def log_timestamp(event_type, epr_id, **fields):
 
     with open(TIMESTAMP_LOG, "a") as f:
         f.write(line)
+    
+
+
+def make_tracer():
+    def trace_calls(frame, event, arg):
+        if event != "call":
+            return trace_calls
+    
+
+        filename = frame.f_code.co_filename
+        lineno = frame.f_lineno
+        funcname = frame.f_code.co_name
+
+        # SOLO CQC y SIMULAQRON
+        if "/home/giicc/QuantumSimulation/simulaqron/simulaqron_env/lib/python3.10/site-packages/cqc/" in filename or "/home/giicc/QuantumSimulation/simulaqron/simulaqron_env/lib/python3.10/site-packages/simulaqron" in filename:
+            log_file_epr.write(
+            f"{timestamp_precise()} [CALL] {filename}:{lineno} # {funcname}\n"
+            )
+
+        return trace_calls
+
+    return trace_calls
 
 # --------------------------------------------------
 # Utility functions of sender
@@ -1343,6 +1353,12 @@ if __name__ == "__main__":
         node_info     = json.loads(sys.argv[8])
         listener_port = int(sys.argv[9])
 
+        log_file_epr = open(f"trace_epr_{epr_id}.txt", "w") 
+        # 2) activar tracer 
+        tracer = make_tracer() 
+        sys.settrace(tracer) 
+        threading.settrace(tracer)
+
         print(f"[SENDER INIT] {emisor}")
         with CQCConnection(emisor) as conn:
             print("Running in sender mode")
@@ -1368,7 +1384,11 @@ if __name__ == "__main__":
         my_port       = int(sys.argv[4])
         emisor_port   = int(sys.argv[5])
         listener_port = int(sys.argv[6])
-
+        log_file_epr = open(f"trace_epr_{node_info['id']}.txt", "w") 
+        # 2) activar tracer 
+        tracer = make_tracer() 
+        sys.settrace(tracer) 
+        threading.settrace(tracer)
         print(f"[RECEIVER INIT] {node_info['id']}")
         with CQCConnection(node_info["id"]) as conn:
             resultado = recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port)
