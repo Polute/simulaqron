@@ -1,4 +1,6 @@
 # --- Standard Library ---
+from collections import defaultdict, deque
+
 import sys
 import time
 import math
@@ -18,7 +20,7 @@ from cqc.pythonLib.util import CQCNoQubitError, CQCTimeoutError
 #session = requests.Session()
 
 conn_lock = threading.Lock()
-
+epr_buffers = defaultdict(deque)
 
 # Speed of light in fiber (km/s approximation)
 C = 3e5
@@ -46,8 +48,8 @@ import csv
 import re
 
 def export_timestamps_to_csv(
-    log_file="latencies/timestamps_log_afterx2_10.txt",
-    csv_file="latencies/timestamps_log_afterx2_10.csv"
+    log_file="latencies/timestamps_log_afterx2_11.txt",
+    csv_file="latencies/timestamps_log_afterx2_11.csv"
 ):
     rows = []
     seen = set()   # avoid duplicates (event, id)
@@ -116,15 +118,16 @@ def export_timestamps_to_csv(
 
     print(f"[OK] CSV generated: {csv_file}")
 
-
 import matplotlib
 matplotlib.use("Agg")
 
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_latencies(csv_file="latencies/timestamps_log_afterx2_10.csv"):
+def plot_latencies(csv_file="latencies/timestamps_log_afterx2_11.csv"):
     df = pd.read_csv(csv_file)
+
     def parse_ts(x):
         if isinstance(x, str) and ":" in x:
             try:
@@ -141,7 +144,6 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_10.csv"):
     for col in ["t", "t_start", "t_end", "t_end_recv"]:
         if col in df.columns:
             df[col] = df[col].apply(parse_ts)
-
 
     # --- Keep only IDs that actually have ORDER_RECEIVE ---
     valid_ids = df[df["event"] == "ORDER_RECEIVE"]["id"].tolist()
@@ -184,31 +186,22 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_10.csv"):
     # GEN END → RECV START
     pivot["s0_gen_to_recv"] = seg("t_end_CreateEPR_total", "t_RECV_EPR_START")
 
-
     # Receiver micro-segments
     pivot["s1_start_to_monitor"] = seg("t_RECV_EPR_START_BEFORE_CALCS", "t_RECV_BEFORE_MONITOR")
     pivot["s2_monitor_to_update"] = seg("t_RECV_BEFORE_MONITOR", "t_RECV_BEFORE_UPDATE")
     pivot["s3_update_to_notify"] = seg("t_RECV_BEFORE_UPDATE", "t_RECV_BEFORE_NOTIFY")
 
-    pivot["s4_total_epr"] = seg("t_start_CreateEPR_backend","t_EPR_TOTAL")
+    # Total EPR latency
+    pivot["s4_total_epr"] = seg("t_start_CreateEPR_backend", "t_EPR_TOTAL")
 
-    # --- Plot ---
-    plt.close('all')
-    fig = plt.figure(figsize=(12, 7))
-
+    # --- Lists for TXT export ---
     diff_events = [
         "CreateEPR_backend",
         "CreateEPR_notify",
         "CreateEPR_total",
-        "ORDER_RECV_EXECUTING_AFTER_FOUND",
         "ReceiveEPR",
         "RECV_TOTAL_EPR_FINAL"
     ]
-
-    for ev in diff_events:
-        col = f"t_diff_{ev}"
-        if col in pivot.columns:
-            plt.plot(pivot.index, pivot[col], label=ev)
 
     seg_cols = [
         ("s0_gen_to_recv", "GEN → RECV gap"),
@@ -217,24 +210,101 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_10.csv"):
         ("s3_update_to_notify", "update → notify"),
         ("s4_total_epr", "TOTAL EPR LATENCY")
     ]
+    # --- Filtrar EPR con latencia total > 1 segundo ---
+    if "s4_total_epr" in pivot.columns:
+        pivot = pivot[pivot["s4_total_epr"] < 1.0]
 
-    for col, label in seg_cols:
+
+    # --- Plot GEN apilado + RECV apilado + TOTAL techo ---
+    plt.close('all')
+    fig, ax = plt.subplots(figsize=(14, 7))
+
+    # ============================
+    # 1. GEN correctamente apilado
+    # ============================
+
+    gen_backend = pivot["t_diff_CreateEPR_backend"].fillna(0).values
+    gen_notify  = pivot["t_diff_CreateEPR_notify"].fillna(0).values
+    gen_total   = pivot["t_diff_CreateEPR_total"].fillna(0).values
+
+    # GEN backend (desde 0)
+    ax.bar(
+        pivot.index,
+        gen_backend,
+        label="GEN backend",
+        color="#4daf4a",
+        alpha=0.8
+    )
+
+    # GEN notify (desde backend)
+    ax.bar(
+        pivot.index,
+        gen_notify,
+        bottom=gen_backend,
+        label="GEN notify",
+        color="#eb1414",
+        alpha=0.8
+    )
+
+    # GEN total (solo la franja extra)
+    ax.bar(
+        pivot.index,
+        gen_total - gen_notify,
+        bottom=gen_notify,
+        label="GEN total (extra)",
+        color="#377eb8",
+        alpha=0.35
+    )
+
+    # ============================
+    # 2. RECV + GAP apilados
+    # ============================
+
+    bottom = gen_total.copy()  # RECV empieza donde acaba GEN total
+
+    for col, label in seg_cols[:-1]:  # todos menos TOTAL EPR
         if col in pivot.columns:
-            plt.plot(pivot.index, pivot[col], label=label)
+            values = pivot[col].fillna(0).values
+            ax.bar(
+                pivot.index,
+                values,
+                bottom=bottom,
+                label=label,
+                alpha=0.85
+            )
+            bottom += values
 
-    plt.xlabel("EPR ID")
-    plt.ylabel("Time (s)")
-    plt.title("EPR Pipeline Latencies (GEN + GAP + RECV + SEGMENTS + TOTAL)")
-    plt.grid(True)
-    plt.legend()
+    # ============================
+    # 3. TOTAL EPR LATENCY (techo)
+    # ============================
+
+    total_epr = pivot["s4_total_epr"].fillna(0).values
+
+    ax.bar(
+        pivot.index,
+        total_epr - gen_total,
+        bottom=gen_total,
+        label="TOTAL EPR LATENCY",
+        color="gray",
+        alpha=0.4
+    )
+
+    # ============================
+    # Decoración
+    # ============================
+    ax.set_xlabel("EPR ID")
+    ax.set_ylabel("Time (s)")
+    ax.set_title("EPR Pipeline Latencies (GEN apilado + RECV apilado + TOTAL techo)")
+    ax.legend()
+    ax.grid(axis="y", linestyle="--", alpha=0.5)
     plt.tight_layout()
 
-    fig.savefig("latencies/latencies_epr_pipelinex2_10.png")
+    fig.savefig("latencies/latencies_epr_pipelinex2_11.png")
     plt.close(fig)
-    print("[OK] Saved: latencies/latencies_epr_pipelinex2_10.png")
-    
-        # --- Export TXT report ---
-    with open("latencies/latencies_epr_pipelinex2_10.txt", "w") as f:
+    print("[OK] Saved: latencies/latencies_epr_pipelinex2_11.png")
+
+    # --- Export TXT report ---
+    with open("latencies/latencies_epr_pipelinex2_11.txt", "w") as f:
         for epr_id, row in pivot.iterrows():
             f.write(f"EPR ID: {epr_id}\n")
 
@@ -251,14 +321,14 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_10.csv"):
 
             f.write("\n")
 
-    print("[OK] Saved TXT report: latencies/latencies_epr_pipelinex2_10.txt")
+    print("[OK] Saved TXT report: latencies/latencies_epr_pipelinex2_11.txt")
 
 
 
 
 import pandas as pd
 
-def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_10.csv"):
+def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_11.csv"):
     wait_for_csv(csv_file)
     df = pd.read_csv(csv_file)
 
@@ -307,7 +377,7 @@ def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_10.csv"):
 
 
     # Save to TXT
-    with open("latencies/latencias_epr_afterx2_10.txt", "w") as f:
+    with open("latencies/latencias_epr_afterx2_11.txt", "w") as f:
         f.write("===== ESTADÍSTICAS DE LATENCIA =====\n")
         f.write("Backend createEPR:\n")
         f.write(f"  media: {media_create}\n")
@@ -374,7 +444,7 @@ def diff_precise(t1, t2):
 # --------------------------------------------------
 # TIMESTAMPS DEBUGGER
 # --------------------------------------------------
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_10.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_11.txt"
 # Evita duplicados: (event_type, epr_id)
 LOGGED_EVENTS = set()
 
@@ -704,6 +774,9 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
         # Only skip measurement if truly marked as 'swapped' OR 'consumed'
         if order not in ("swapped", "consumed", "no_kill"):
             try:
+                while not epr_buffers[epr_id]:
+                        time.sleep(0.0005)
+                q = epr_buffers[epr_id].popleft()
                 m = q.measure()
             except Exception as e:
                 print(f"[MEASURE] Could not measure {epr_id}: {e}")
@@ -760,7 +833,9 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
     if state == "ok":
         try:
             log_timestamp("RECV_EPR_START", epr_id, t=t_start)
-            q = conn.recvEPR()
+            with conn_lock:
+                q = conn.recvEPR()
+            epr_buffers[epr_id].append(q)
 
             # --- TIMESTAMP: después de recvEPR ---
             t_end = timestamp_precise()
@@ -1128,14 +1203,10 @@ def do_swapping(epr1, epr2, id_swap, node_info, t_gen_swap, conn,
 
         print(f"Mando el watch a estos puertos: {ports_involved}")
 
-        print("AAAAAAAAAAAAAAAAAAAAAAAAAA")
         print(monitor_msg_A)
         sending_monitor(monitor_msg_A, str(ports_involved[0]))
-        print("AAAAAAAAAAAAAAAAAAAAAAAAAA")
-        print("BBBBBBBBBBBBBBBBBBBBBBBBBB")
         print(monitor_msg_B)
         sending_monitor(monitor_msg_B, str(ports_involved[1]))
-        print("BBBBBBBBBBBBBBBBBBBBBBBBBB")
 
     except Exception as e:
         print(f"[SWAP] Error notifying endpoints: {e}")
@@ -1353,7 +1424,7 @@ if __name__ == "__main__":
         node_info     = json.loads(sys.argv[8])
         listener_port = int(sys.argv[9])
 
-        log_file_epr = open(f"trace_epr_{epr_id}.txt", "w") 
+        log_file_epr = open(f"trace_epr_{node_info['id']}.txt", "w") 
         # 2) activar tracer 
         tracer = make_tracer() 
         sys.settrace(tracer) 

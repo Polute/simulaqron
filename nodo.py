@@ -47,7 +47,7 @@ def diff_precise(t1, t2):
     """
     return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
 
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_10.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_11.txt"
 
 def log_timestamp(event_type, epr_id, **fields):
     line = f"[{event_type}]  ID={epr_id}"
@@ -233,12 +233,28 @@ def app_open(PUERTO, listener_port):
                     resp = s.recv(4096).decode()
                     print("[RECEIVER] Response:", resp)
 
+    from threading import Thread, Lock
+
+    queue_lock = Lock()
+
     def epr_receive_worker():
         while True:
-            if epr_receive_queue:
-                orden = epr_receive_queue.popleft()
-                processing_receive_epr(orden)  # aquí va tu lógica actual
-            sleep(0.001)
+            orden = None
+
+            # Extraer de la cola de forma segura
+            with queue_lock:
+                if epr_receive_queue:
+                    orden = epr_receive_queue.popleft()
+
+            if orden is not None:
+                processing_receive_epr(orden)
+            else:
+                sleep(0.001)
+
+    # Lanzar el hilo worker
+    worker_thread = Thread(target=epr_receive_worker, daemon=True)
+    worker_thread.start()
+
 
     def aplicar_orden(orden, node_info):
         global worker_started
@@ -312,8 +328,10 @@ def app_open(PUERTO, listener_port):
         # Receive EPR (this node receives an EPR created by another node)
         # --------------------------------------------------
         elif comand == "receive EPR":
-            epr_receive_queue.append(orden)
+            with queue_lock:
+                epr_receive_queue.append(orden)
             return
+
 
         # --------------------------------------------------
         # Purification protocol
