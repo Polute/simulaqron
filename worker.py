@@ -19,7 +19,9 @@ from cqc.pythonLib.util import CQCNoQubitError, CQCTimeoutError
 
 #session = requests.Session()
 
-conn_lock = threading.Lock()
+# Serialize all CQC traffic on a shared CQCConnection.
+# CQCConnection is not thread-safe when several threads interleave commands.
+conn_lock = threading.RLock()
 epr_buffers = defaultdict(deque)
 
 # Speed of light in fiber (km/s approximation)
@@ -48,8 +50,8 @@ import csv
 import re
 
 def export_timestamps_to_csv(
-    log_file="latencies/timestamps_log_afterx2_11.txt",
-    csv_file="latencies/timestamps_log_afterx2_11.csv"
+    log_file="latencies/timestamps_log_afterx2_12.txt",
+    csv_file="latencies/timestamps_log_afterx2_12.csv"
 ):
     rows = []
     seen = set()   # avoid duplicates (event, id)
@@ -125,7 +127,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_latencies(csv_file="latencies/timestamps_log_afterx2_11.csv"):
+def plot_latencies(csv_file="latencies/timestamps_log_afterx2_12.csv"):
     df = pd.read_csv(csv_file)
 
     def parse_ts(x):
@@ -177,22 +179,40 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_11.csv"):
     if len(pivot) > 6:
         pivot = pivot.iloc[2:]
 
-    # --- Compute segments ---
-    def seg(a, b):
-        if a in pivot.columns and b in pivot.columns:
-            return pivot[b] - pivot[a]
+    # --- Filter out obvious outliers ---
+    if "t_diff_RECV_TOTAL_EPR_FINAL" in pivot.columns:
+        pivot = pivot[pivot["t_diff_RECV_TOTAL_EPR_FINAL"] < 1.0]
+
+    # --- Compute segments with per-ID relative time baseline ---
+    # Baseline requested: t_start of CreateEPR_backend = 0 for each EPR.
+    base_col = "t_start_CreateEPR_backend"
+    if base_col not in pivot.columns:
+        print("[WARN] Missing t_start_CreateEPR_backend; skipping plot_latencies")
+        return
+
+    base = pivot[base_col]
+
+    def rel_to_base(series):
+        rel = series - base
+        # Handle minute wraparound when timestamps are SS.xxxxxx.
+        rel = rel.where(rel >= 0, rel + 60.0)
+        return rel
+
+    def seg(start_col, end_col):
+        if start_col in pivot.columns and end_col in pivot.columns:
+            start_rel = rel_to_base(pivot[start_col])
+            end_rel = rel_to_base(pivot[end_col])
+            return (end_rel - start_rel).clip(lower=0)
         return None
 
-    # GEN END → RECV START
-    pivot["s0_gen_to_recv"] = seg("t_end_CreateEPR_total", "t_RECV_EPR_START")
+    # Gap from end of notify to just before receive handling starts
+    pivot["s0_notify_to_before_recv"] = seg("t_end_CreateEPR_notify", "t_start_ReceiveEPR")
 
-    # Receiver micro-segments
-    pivot["s1_start_to_monitor"] = seg("t_RECV_EPR_START_BEFORE_CALCS", "t_RECV_BEFORE_MONITOR")
-    pivot["s2_monitor_to_update"] = seg("t_RECV_BEFORE_MONITOR", "t_RECV_BEFORE_UPDATE")
-    pivot["s3_update_to_notify"] = seg("t_RECV_BEFORE_UPDATE", "t_RECV_BEFORE_NOTIFY")
+    # Time spent inside recvEPR itself
+    pivot["s1_receive_epr"] = seg("t_start_ReceiveEPR", "t_end_ReceiveEPR")
 
-    # Total EPR latency
-    pivot["s4_total_epr"] = seg("t_start_CreateEPR_backend", "t_EPR_TOTAL")
+    # Processing after recvEPR until monitor starts
+    pivot["s2_after_recv_to_monitor"] = seg("t_end_ReceiveEPR", "t_RECV_BEFORE_MONITOR")
 
     # --- Lists for TXT export ---
     diff_events = [
@@ -204,107 +224,63 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_11.csv"):
     ]
 
     seg_cols = [
-        ("s0_gen_to_recv", "GEN → RECV gap"),
-        ("s1_start_to_monitor", "start → monitor"),
-        ("s2_monitor_to_update", "monitor → update"),
-        ("s3_update_to_notify", "update → notify"),
-        ("s4_total_epr", "TOTAL EPR LATENCY")
+        ("s0_notify_to_before_recv", "notify -> before recv"),
+        ("s1_receive_epr", "ReceiveEPR"),
+        ("s2_after_recv_to_monitor", "recv end -> before monitor"),
     ]
-    # --- Filtrar EPR con latencia total > 1 segundo ---
-    if "s4_total_epr" in pivot.columns:
-        pivot = pivot[pivot["s4_total_epr"] < 1.0]
 
 
-    # --- Plot GEN apilado + RECV apilado + TOTAL techo ---
+    # --- Plot: same visual blocks, but positioned by real relative timestamps ---
     plt.close('all')
     fig, ax = plt.subplots(figsize=(14, 7))
 
-    # ============================
-    # 1. GEN correctamente apilado
-    # ============================
+    # Relative starts
+    z = pd.Series(0.0, index=pivot.index)
+    start_backend = z
+    start_notify = rel_to_base(pivot["t_start_CreateEPR_notify"]) if "t_start_CreateEPR_notify" in pivot.columns else z
+    start_gap = rel_to_base(pivot["t_end_CreateEPR_notify"]) if "t_end_CreateEPR_notify" in pivot.columns else z
+    start_recv = rel_to_base(pivot["t_start_ReceiveEPR"]) if "t_start_ReceiveEPR" in pivot.columns else z
+    start_after_recv = rel_to_base(pivot["t_end_ReceiveEPR"]) if "t_end_ReceiveEPR" in pivot.columns else z
 
-    gen_backend = pivot["t_diff_CreateEPR_backend"].fillna(0).values
-    gen_notify  = pivot["t_diff_CreateEPR_notify"].fillna(0).values
-    gen_total   = pivot["t_diff_CreateEPR_total"].fillna(0).values
+    # Durations from timestamp pairs
+    dur_backend = seg("t_start_CreateEPR_backend", "t_end_CreateEPR_backend")
+    dur_notify = seg("t_start_CreateEPR_notify", "t_end_CreateEPR_notify")
+    dur_total_extra = seg("t_end_CreateEPR_notify", "t_end_CreateEPR_total")
+    dur_gap = pivot["s0_notify_to_before_recv"]
+    dur_recv = pivot["s1_receive_epr"]
+    dur_after_recv = pivot["s2_after_recv_to_monitor"]
 
-    # GEN backend (desde 0)
-    ax.bar(
-        pivot.index,
-        gen_backend,
-        label="GEN backend",
-        color="#4daf4a",
-        alpha=0.8
-    )
+    def bar_if(label, start_series, dur_series, color, alpha=0.85):
+        if dur_series is None:
+            return
+        vals = dur_series.reindex(pivot.index).fillna(0).values
+        bottoms = start_series.reindex(pivot.index).fillna(0).values
+        vals = np.clip(vals, a_min=0, a_max=None)
+        ax.bar(pivot.index, vals, bottom=bottoms, label=label, color=color, alpha=alpha)
 
-    # GEN notify (desde backend)
-    ax.bar(
-        pivot.index,
-        gen_notify,
-        bottom=gen_backend,
-        label="GEN notify",
-        color="#eb1414",
-        alpha=0.8
-    )
-
-    # GEN total (solo la franja extra)
-    ax.bar(
-        pivot.index,
-        gen_total - gen_notify,
-        bottom=gen_notify,
-        label="GEN total (extra)",
-        color="#377eb8",
-        alpha=0.35
-    )
-
-    # ============================
-    # 2. RECV + GAP apilados
-    # ============================
-
-    bottom = gen_total.copy()  # RECV empieza donde acaba GEN total
-
-    for col, label in seg_cols[:-1]:  # todos menos TOTAL EPR
-        if col in pivot.columns:
-            values = pivot[col].fillna(0).values
-            ax.bar(
-                pivot.index,
-                values,
-                bottom=bottom,
-                label=label,
-                alpha=0.85
-            )
-            bottom += values
-
-    # ============================
-    # 3. TOTAL EPR LATENCY (techo)
-    # ============================
-
-    total_epr = pivot["s4_total_epr"].fillna(0).values
-
-    ax.bar(
-        pivot.index,
-        total_epr - gen_total,
-        bottom=gen_total,
-        label="TOTAL EPR LATENCY",
-        color="gray",
-        alpha=0.4
-    )
+    bar_if("GEN backend", start_backend, dur_backend, "#4daf4a", 0.85)
+    bar_if("GEN notify", start_notify, dur_notify, "#eb1414", 0.85)
+    bar_if("GEN total (extra)", start_gap, dur_total_extra, "#377eb8", 0.35)
+    bar_if("notify -> before recv", start_gap, dur_gap, "#ff7f00", 0.80)
+    bar_if("ReceiveEPR", start_recv, dur_recv, "#984ea3", 0.85)
+    bar_if("recv end -> before monitor", start_after_recv, dur_after_recv, "#a65628", 0.85)
 
     # ============================
     # Decoración
     # ============================
     ax.set_xlabel("EPR ID")
     ax.set_ylabel("Time (s)")
-    ax.set_title("EPR Pipeline Latencies (GEN apilado + RECV apilado + TOTAL techo)")
+    ax.set_title("EPR Pipeline Latencies (relative to CreateEPR_backend start = 0)")
     ax.legend()
     ax.grid(axis="y", linestyle="--", alpha=0.5)
     plt.tight_layout()
 
-    fig.savefig("latencies/latencies_epr_pipelinex2_11.png")
+    fig.savefig("latencies/latencies_epr_pipelinex2_12.png")
     plt.close(fig)
-    print("[OK] Saved: latencies/latencies_epr_pipelinex2_11.png")
+    print("[OK] Saved: latencies/latencies_epr_pipelinex2_12.png")
 
     # --- Export TXT report ---
-    with open("latencies/latencies_epr_pipelinex2_11.txt", "w") as f:
+    with open("latencies/latencies_epr_pipelinex2_12.txt", "w") as f:
         for epr_id, row in pivot.iterrows():
             f.write(f"EPR ID: {epr_id}\n")
 
@@ -321,14 +297,14 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_11.csv"):
 
             f.write("\n")
 
-    print("[OK] Saved TXT report: latencies/latencies_epr_pipelinex2_11.txt")
+    print("[OK] Saved TXT report: latencies/latencies_epr_pipelinex2_12.txt")
 
 
 
 
 import pandas as pd
 
-def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_11.csv"):
+def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_12.csv"):
     wait_for_csv(csv_file)
     df = pd.read_csv(csv_file)
 
@@ -377,7 +353,7 @@ def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_11.csv"):
 
 
     # Save to TXT
-    with open("latencies/latencias_epr_afterx2_11.txt", "w") as f:
+    with open("latencies/latencias_epr_afterx2_12.txt", "w") as f:
         f.write("===== ESTADÍSTICAS DE LATENCIA =====\n")
         f.write("Backend createEPR:\n")
         f.write(f"  media: {media_create}\n")
@@ -411,40 +387,41 @@ def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_11.csv"):
 # --------------------------------------------------
 
 
-from time import perf_counter_ns
+from time import perf_counter
 
 def timestamp_precise():
     """
-    Returns a timestamp in MM:SS.xxxxxx format
-    with real microsecond precision using perf_counter().
+    Returns a timestamp with microsecond precision in SS.xxxxxx format.
+    This avoids large absolute values (e.g., 3031.xxxxxx) in logs/results.
     """
-    ns = perf_counter_ns()
-    total_sec = ns // 1_000_000_000
-    mm = (total_sec // 60) % 60
-    ss = total_sec % 60
-    usec = (ns % 1_000_000_000) // 1000
-    return f"{mm:02d}:{ss:02d}.{usec:06d}"
+    return f"{(perf_counter() % 60):.6f}"
 
 
 
 
 
 def timestamp_to_seconds(ts):
-    mm, rest = ts.split(":")
-    ss, us = rest.split(".")
-    return int(mm)*60 + int(ss) + int(us)/1_000_000
+    if ":" in ts:
+        mm, rest = ts.split(":")
+        ss, us = rest.split(".")
+        return int(mm) * 60 + int(ss) + int(us) / 1_000_000
+    return float(ts)
 
 
 def diff_precise(t1, t2):
     """
     Compute difference between two precise timestamps.
     """
-    return abs(timestamp_to_seconds(t2) - timestamp_to_seconds(t1))
+    d = timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
+    # Handle wraparound when using SS.xxxxxx (crossing minute boundary)
+    if d < 0:
+        d += 60.0
+    return d
 
 # --------------------------------------------------
 # TIMESTAMPS DEBUGGER
 # --------------------------------------------------
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_11.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_12.txt"
 # Evita duplicados: (event_type, epr_id)
 LOGGED_EVENTS = set()
 
@@ -479,7 +456,7 @@ def make_tracer():
         funcname = frame.f_code.co_name
 
         # SOLO CQC y SIMULAQRON
-        if "/home/giicc/QuantumSimulation/simulaqron/simulaqron_env/lib/python3.10/site-packages/cqc/" in filename or "/home/giicc/QuantumSimulation/simulaqron/simulaqron_env/lib/python3.10/site-packages/simulaqron" in filename:
+        if "simulaqron_env/lib/python3.10/site-packages/cqc/" in filename or "simulaqron_env/lib/python3.10/site-packages/simulaqron/" in filename:
             log_file_epr.write(
             f"{timestamp_precise()} [CALL] {filename}:{lineno} # {funcname}\n"
             )
@@ -625,7 +602,8 @@ def generar_epr(emisor, receptor, conn, emisor_port, receptor_port,
         # 2) Backend createEPR timing
         # --------------------------------------------------
         t_start = timestamp_precise()
-        q = conn.createEPR(receptor)
+        with conn_lock:
+            q = conn.createEPR(receptor)
         t_end = timestamp_precise()
         t_diff_create = diff_precise(t_start, t_end)
 
@@ -777,7 +755,8 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
                 while not epr_buffers[epr_id]:
                         time.sleep(0.0005)
                 q = epr_buffers[epr_id].popleft()
-                m = q.measure()
+                with conn_lock:
+                    m = q.measure()
             except Exception as e:
                 print(f"[MEASURE] Could not measure {epr_id}: {e}")
                 m = None
@@ -811,6 +790,9 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
     epr_id = payload.get("id", 0)
     state = payload.get("state", "fallo")
+    t_gen_str = payload.get("t_gen", "0")
+    t_recv_str = None
+    tdif = None
     # --- TIMESTAMP: antes de recvEPR ---
     t_start = timestamp_precise()
     # --- TIMESTAMP: entrada a la función ---
@@ -858,8 +840,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
             w_in = float(payload.get("w_gen", 1.0))
 
             # Precise t_recv
-            t_gen_str = payload.get("t_gen", "0")
-            t_recv_str = timestamp_precise()
+            t_recv_str= timestamp_precise()
 
             tdif = diff_precise(t_gen_str, t_recv_str)
 
@@ -1083,8 +1064,9 @@ def do_swapping(epr1, epr2, id_swap, node_info, t_gen_swap, conn,
     q2 = entry2["q"]
 
     # Bell measurement: CNOT + Hadamard
-    q1.cnot(q2)
-    q1.H()
+    with conn_lock:
+        q1.cnot(q2)
+        q1.H()
 
     order = "swapped"
     # Consume original EPRs

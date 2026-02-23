@@ -4,7 +4,7 @@ import json
 import sys
 from multiprocessing import Process
 from flask_cors import CORS
-from time import time, sleep
+from time import time, sleep, perf_counter
 import subprocess
 import requests
 import queue
@@ -19,26 +19,23 @@ from collections import deque
 # HIGH PRECISION TIMESTAMPS
 # --------------------------------------------------
 
-import time as _t  # módulo real
-
 def timestamp_precise():
     """
-    Returns a timestamp in the same style as t_gen/t_recv (MM:SS.xxxxxx)
-    but with microsecond precision.
+    Returns a monotonic timestamp in seconds with microsecond precision
+    using the format SS.xxxxxx.
     """
-    now = time()
-    mmss = _t.strftime("%M:%S.", _t.localtime(now))
-    usec = int((now % 1) * 1_000_000)
-    return f"{mmss}{usec:06d}"
+    return f"{perf_counter():.6f}"
 
 
 def timestamp_to_seconds(ts):
     """
-    Convert 'MM:SS.xxxxxx' into float seconds.
+    Convert 'SS.xxxxxx' or legacy 'MM:SS.xxxxxx' into float seconds.
     """
-    mm, rest = ts.split(":")
-    ss, us = rest.split(".")
-    return int(mm)*60 + int(ss) + int(us)/1_000_000
+    if ":" in ts:
+        mm, rest = ts.split(":")
+        ss, us = rest.split(".")
+        return int(mm) * 60 + int(ss) + int(us) / 1_000_000
+    return float(ts)
 
 
 def diff_precise(t1, t2):
@@ -47,7 +44,7 @@ def diff_precise(t1, t2):
     """
     return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
 
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_11.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_12.txt"
 
 def log_timestamp(event_type, epr_id, **fields):
     line = f"[{event_type}]  ID={epr_id}"
@@ -204,7 +201,7 @@ def app_open(PUERTO, listener_port):
         if not worker_started:
             print("[INFO] Starting worker.py in receiver_init mode for the first time at ",timestamp_precise())
             subprocess.Popen([
-                "python", "worker.py",
+                sys.executable, "worker.py",
                 "receiver_init",
                 json.dumps(epr_obj),
                 json.dumps(node_info),
@@ -275,8 +272,12 @@ def app_open(PUERTO, listener_port):
         # --------------------------------------------------
         if comand in ["generate EPR", "generar"]:
             target_id = orden["target"]
-            source_port = get_port_by_id(source_id)
-            target_port = get_port_by_id(target_id)
+            try:
+                source_port = get_port_by_id(source_id)
+                target_port = get_port_by_id(target_id)
+            except ValueError as exc:
+                print(f"[ERROR] Invalid node id in generate EPR order: {exc}")
+                return
 
             # Find pgen of the neighbor whose id matches target_id
             pgen_source = None
@@ -285,12 +286,31 @@ def app_open(PUERTO, listener_port):
                     pgen_source = str(neighbor["pgen"])
                     break
 
+            # Fallback: if source->target is missing, try target->source link data.
+            if pgen_source is None:
+                target_info = next(
+                    (info for info in PORT_NODE_MAP.values() if info.get("id") == target_id),
+                    None
+                )
+                if target_info:
+                    for neighbor in target_info.get("neighbors", []):
+                        if neighbor.get("id") == source_id:
+                            pgen_source = str(neighbor.get("pgen"))
+                            break
+
+            if pgen_source is None:
+                print(
+                    f"[ERROR] Missing pgen for link {source_id} -> {target_id}. "
+                    "Cannot launch worker.py."
+                )
+                return
+
             print(source_id, "will generate EPR with:", target_id)
 
             if not worker_started:
                 print("[INFO] Starting worker.py in sender_init mode for the first time")
                 subprocess.Popen([
-                    "python", "worker.py",
+                    sys.executable, "worker.py",
                     "sender_init",
                     source_id,             # emitter id
                     target_id,             # receiver id

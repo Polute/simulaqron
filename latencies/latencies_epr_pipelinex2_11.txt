@@ -1,72 +1,40 @@
-EPR ID: m7os659q7
-  CreateEPR_backend        : 0.018421 s
-  CreateEPR_notify         : 0.000432 s
-  CreateEPR_total          : 0.019577 s
-  ReceiveEPR               : 0.004300 s
-  RECV_TOTAL_EPR_FINAL     : 0.029053 s
-  GEN → RECV gap           : 0.000023 s
-  start → monitor          : 0.000001 s
-  monitor → update         : 0.000001 s
-  update → notify          : 0.000001 s
-  TOTAL EPR LATENCY        : 0.000049 s
+EPR ID: 0ceybcvej
+  CreateEPR_backend        : 0.015155 s
+  CreateEPR_notify         : 0.000375 s
+  CreateEPR_total          : 0.016331 s
+  ReceiveEPR               : 0.001060 s
+  RECV_TOTAL_EPR_FINAL     : 0.026180 s
+  notify -> before recv    : 0.022250 s
+  ReceiveEPR               : 0.001060 s
+  recv end -> before monitor: 0.002553 s
 
-EPR ID: 1zt6lapp2
-  CreateEPR_backend        : 0.018080 s
-  CreateEPR_notify         : 0.000216 s
-  CreateEPR_total          : 0.018792 s
-  ReceiveEPR               : 0.003351 s
-  RECV_TOTAL_EPR_FINAL     : 0.026450 s
-  GEN → RECV gap           : 0.000022 s
-  start → monitor          : 0.000000 s
-  monitor → update         : 0.000000 s
-  update → notify          : 0.000000 s
-  TOTAL EPR LATENCY        : 0.000046 s
+EPR ID: 72f09eo5u
+  CreateEPR_backend        : 0.013706 s
+  CreateEPR_notify         : 0.000468 s
+  CreateEPR_total          : 0.014938 s
+  ReceiveEPR               : 0.001346 s
+  RECV_TOTAL_EPR_FINAL     : 0.024971 s
+  notify -> before recv    : 0.021394 s
+  ReceiveEPR               : 0.001346 s
+  recv end -> before monitor: 0.001858 s
 
-EPR ID: aiipy7u2o
-  CreateEPR_backend        : 0.015512 s
-  CreateEPR_notify         : 0.000565 s
-  CreateEPR_total          : 0.016996 s
-  ReceiveEPR               : 0.004999 s
-  RECV_TOTAL_EPR_FINAL     : 0.028998 s
-  GEN → RECV gap           : 0.000022 s
-  start → monitor          : 0.000000 s
-  monitor → update         : 0.000001 s
-  update → notify          : 0.000001 s
-  TOTAL EPR LATENCY        : 0.000047 s
+EPR ID: fobyclplg
+  CreateEPR_backend        : 0.013732 s
+  CreateEPR_notify         : 0.000397 s
+  CreateEPR_total          : 0.014717 s
+  ReceiveEPR               : 0.004159 s
+  RECV_TOTAL_EPR_FINAL     : 0.028230 s
+  notify -> before recv    : 0.023374 s
+  ReceiveEPR               : 0.004159 s
+  recv end -> before monitor: 0.000391 s
 
-EPR ID: krd00pigl
-  CreateEPR_backend        : 0.014569 s
-  CreateEPR_notify         : 0.000442 s
-  CreateEPR_total          : 0.015606 s
-  ReceiveEPR               : 0.003025 s
-  RECV_TOTAL_EPR_FINAL     : 0.026485 s
-  GEN → RECV gap           : 0.000022 s
-  start → monitor          : 0.000000 s
-  monitor → update         : 0.000000 s
-  update → notify          : 0.000000 s
-  TOTAL EPR LATENCY        : 0.000042 s
-
-EPR ID: soodi64ke
-  CreateEPR_backend        : 0.013341 s
-  CreateEPR_notify         : 0.000583 s
-  CreateEPR_total          : 0.014515 s
-  ReceiveEPR               : 0.005909 s
-  RECV_TOTAL_EPR_FINAL     : 0.030438 s
-  GEN → RECV gap           : 0.000023 s
-  start → monitor          : 0.000000 s
-  monitor → update         : 0.000001 s
-  update → notify          : 0.000000 s
-  TOTAL EPR LATENCY        : 0.000046 s
-
-EPR ID: 7iz5uzoe9
-  CreateEPR_backend        : 0.012906 s
-  CreateEPR_notify         : 0.000450 s
-  CreateEPR_total          : 0.013924 s
-  ReceiveEPR               : 0.003233 s
-  RECV_TOTAL_EPR_FINAL     : 0.032476 s
-  GEN → RECV gap           : 0.000027 s
-  start → monitor          : 0.000000 s
-  monitor → update         : 0.000001 s
-  update → notify          : 0.000002 s
-  TOTAL EPR LATENCY        : 0.000049 s
+EPR ID: he08p60rf
+  CreateEPR_backend        : 0.021163 s
+  CreateEPR_notify         : 0.000304 s
+  CreateEPR_total          : 0.021954 s
+  ReceiveEPR               : 0.000997 s
+  RECV_TOTAL_EPR_FINAL     : 0.023538 s
+  notify -> before recv    : 0.021692 s
+  ReceiveEPR               : 0.000997 s
+  recv end -> before monitor: 0.000605 s
 

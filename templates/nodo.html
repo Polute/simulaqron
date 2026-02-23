@@ -199,6 +199,7 @@
             color: #eee;
         }
 
+
     </style>
 </head>
 <body>
@@ -206,7 +207,7 @@
     <div class="columna">
         <h2>
             Node map {{ node_info.name }}
-            <button class="button"o nclick="window.open('/info', '_blank')">Watch JSON of the node</button>
+            <button class="button"o onclick="window.open('/info', '_blank')">Watch JSON of the node</button>
             <button id="resetView" class="button">📍</button>
             <!-- Interactive icon for day/night -->
             <span id="toggleIcon">🌞</span>
@@ -277,7 +278,7 @@
     icon.addEventListener("click", () => {
         body.classList.toggle("day");
         body.classList.toggle("night");
-        icon.textContent = body.classList.contains("day") ? "🌞" : "🌙";
+        icon.textContent = body.classList.contains("day") ? "🌙" : "🌞";
     });
     window.onload = function () {
         // Parse node_info from backend
