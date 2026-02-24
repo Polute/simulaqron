@@ -8,6 +8,7 @@ import json
 import random
 import socket
 import threading
+import queue
 from itertools import combinations
 
 # --- Third‑party / External ---
@@ -31,12 +32,64 @@ C = 3e5
 epr_store = {}
 nodo_info = {"pairEPR": []}
 log_file_epr = None # global
+trace_write_lock = threading.Lock()
+
+TRACE_EXCLUDED_FUNCS = {
+    "__init__",
+    "__str__",
+    "setVals",
+    "_setVals",
+    "_check_vals",
+    "pack",
+    "_pack",
+    "unpack",
+    "_unpack",
+    "printable",
+    "_printable",
+    "check_error",
+    "_errorHandler",
+    "readMessage",
+    "print_CQC_msg",
+    "pend_messages",
+    "_set_active",
+    "__enter__",
+    "__exit__",
+    "_setup_logging",
+    "_setup_network_data",
+    "_get_net_configs",
+    "_setup_socket",
+    "updated_func",
+    "_get_setting",
+    "_get_new_app_id",
+    "set_pending",
+    "read_config",
+    "read_from_file",
+    "cqc_node_id",
+    "cqc_node_id_from_addrinfo",
+    "active",
+    "check_active",
+    "_set_entanglement_info",
+    "measure",
+    "return_meas_outcome",
+    "<listcomp>",
+}
+
+TRACE_EXCLUDED_PATH_PARTS = (
+    "/site-packages/cqc/cqcHeader.py",
+    "/site-packages/cqc/entInfoHeader.py",
+    "/site-packages/cqc/hostConfig.py",
+    "/site-packages/simulaqron/settings.py",
+    "/site-packages/simulaqron/general/hostConfig.py",
+    "/site-packages/simulaqron/toolbox/manage_nodes.py",
+)
 
 # ---------------------------
 # CVS & PLOTS
 # ---------------------------
 import csv
 import os
+import fcntl
+import tempfile
 
 def wait_for_csv(csv_file, timeout=2.0):
     start = time.time()
@@ -46,12 +99,18 @@ def wait_for_csv(csv_file, timeout=2.0):
         time.sleep(0.001)
     return False
 
+
+LATENCIES_LOCK_FILE = "latencies/.stats_plot.lock"
+STATS_PLOTS_MIN_INTERVAL = 0.75
+_last_stats_plots_ts = 0.0
+_stats_plots_throttle_lock = threading.Lock()
+
 import csv
 import re
 
 def export_timestamps_to_csv(
-    log_file="latencies/timestamps_log_afterx2_12.txt",
-    csv_file="latencies/timestamps_log_afterx2_12.csv"
+    log_file="latencies/timestamps_log_afterx2_14.txt",
+    csv_file="latencies/timestamps_log_afterx2_14.csv"
 ):
     rows = []
     seen = set()   # avoid duplicates (event, id)
@@ -113,10 +172,12 @@ def export_timestamps_to_csv(
     fieldnames = sorted({key for row in rows for key in row.keys()})
 
     # Write CSV
-    with open(csv_file, "w", newline="") as f:
+    tmp_fd, tmp_path = tempfile.mkstemp(prefix="timestamps_", suffix=".csv", dir="latencies")
+    with os.fdopen(tmp_fd, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+    os.replace(tmp_path, csv_file)
 
     print(f"[OK] CSV generated: {csv_file}")
 
@@ -127,7 +188,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_latencies(csv_file="latencies/timestamps_log_afterx2_12.csv"):
+def plot_latencies(csv_file="latencies/timestamps_log_afterx2_14.csv"):
     df = pd.read_csv(csv_file)
 
     def parse_ts(x):
@@ -275,12 +336,16 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_12.csv"):
     ax.grid(axis="y", linestyle="--", alpha=0.5)
     plt.tight_layout()
 
-    fig.savefig("latencies/latencies_epr_pipelinex2_12.png")
+    tmp_fd, tmp_png = tempfile.mkstemp(prefix="latencies_", suffix=".png", dir="latencies")
+    os.close(tmp_fd)
+    fig.savefig(tmp_png)
+    os.replace(tmp_png, "latencies/latencies_epr_pipelinex2_14.png")
     plt.close(fig)
-    print("[OK] Saved: latencies/latencies_epr_pipelinex2_12.png")
+    print("[OK] Saved: latencies/latencies_epr_pipelinex2_14.png")
 
     # --- Export TXT report ---
-    with open("latencies/latencies_epr_pipelinex2_12.txt", "w") as f:
+    tmp_fd, tmp_txt = tempfile.mkstemp(prefix="latencies_pipeline_", suffix=".txt", dir="latencies")
+    with os.fdopen(tmp_fd, "w") as f:
         for epr_id, row in pivot.iterrows():
             f.write(f"EPR ID: {epr_id}\n")
 
@@ -296,15 +361,16 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_12.csv"):
                     f.write(f"  {label:25s}: {row[col]:.6f} s\n")
 
             f.write("\n")
+    os.replace(tmp_txt, "latencies/latencies_epr_pipelinex2_14.txt")
 
-    print("[OK] Saved TXT report: latencies/latencies_epr_pipelinex2_12.txt")
+    print("[OK] Saved TXT report: latencies/latencies_epr_pipelinex2_14.txt")
 
 
 
 
 import pandas as pd
 
-def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_12.csv"):
+def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_14.csv"):
     wait_for_csv(csv_file)
     df = pd.read_csv(csv_file)
 
@@ -353,7 +419,8 @@ def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_12.csv"):
 
 
     # Save to TXT
-    with open("latencies/latencias_epr_afterx2_12.txt", "w") as f:
+    tmp_fd, tmp_stats = tempfile.mkstemp(prefix="latency_stats_", suffix=".txt", dir="latencies")
+    with os.fdopen(tmp_fd, "w") as f:
         f.write("===== ESTADÍSTICAS DE LATENCIA =====\n")
         f.write("Backend createEPR:\n")
         f.write(f"  media: {media_create}\n")
@@ -372,6 +439,7 @@ def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_12.csv"):
         f.write(f"  std: {std_total}\n")
         f.write(f"  min: {min_total}\n")
         f.write(f"  max: {max_total}\n")
+    os.replace(tmp_stats, "latencies/latencias_epr_afterx2_14.txt")
 
 
     print("[OK] Estadísticas guardadas en latencias_epr.txt")
@@ -421,7 +489,7 @@ def diff_precise(t1, t2):
 # --------------------------------------------------
 # TIMESTAMPS DEBUGGER
 # --------------------------------------------------
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_12.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_14.txt"
 # Evita duplicados: (event_type, epr_id)
 LOGGED_EVENTS = set()
 
@@ -455,11 +523,23 @@ def make_tracer():
         lineno = frame.f_lineno
         funcname = frame.f_code.co_name
 
-        # SOLO CQC y SIMULAQRON
-        if "simulaqron_env/lib/python3.10/site-packages/cqc/" in filename or "simulaqron_env/lib/python3.10/site-packages/simulaqron/" in filename:
-            log_file_epr.write(
-            f"{timestamp_precise()} [CALL] {filename}:{lineno} # {funcname}\n"
+        if log_file_epr is None:
+            return trace_calls
+
+        # SOLO CQC y SIMULAQRON, quitando funciones de ruido.
+        if (
+            (
+                "simulaqron_env/lib/python3.10/site-packages/cqc/" in filename
+                or "simulaqron_env/lib/python3.10/site-packages/simulaqron/" in filename
             )
+            and funcname not in TRACE_EXCLUDED_FUNCS
+            and not any(part in filename for part in TRACE_EXCLUDED_PATH_PARTS)
+        ):
+            with trace_write_lock:
+                log_file_epr.write(
+                    f"{timestamp_precise()} [CALL] {filename}:{lineno} # {funcname}\n"
+                )
+                log_file_epr.flush()
 
         return trace_calls
 
@@ -782,9 +862,129 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
 
     return None
 def stats_and_plots():
-    export_timestamps_to_csv()
-    compute_latency_stats()
-    plot_latencies()
+    global _last_stats_plots_ts
+    now = time.monotonic()
+    with _stats_plots_throttle_lock:
+        if (now - _last_stats_plots_ts) < STATS_PLOTS_MIN_INTERVAL:
+            return
+        _last_stats_plots_ts = now
+
+    os.makedirs("latencies", exist_ok=True)
+    with open(LATENCIES_LOCK_FILE, "a+") as lock_f:
+        try:
+            # Skip this run if another process/thread is already generating stats and plots.
+            fcntl.flock(lock_f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return
+        try:
+            export_timestamps_to_csv()
+            compute_latency_stats()
+            plot_latencies()
+        finally:
+            fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)
+
+
+def _refresh_node_info(my_port, fallback_node_info):
+    if my_port is None:
+        return fallback_node_info
+    try:
+        return requests.get(f"http://localhost:{my_port}/info", timeout=2).json()
+    except Exception:
+        return fallback_node_info
+
+
+def _handle_zmq_worker_command(route, payload, conn, my_port, emisor_port, fallback_node_info):
+    node_info_local = _refresh_node_info(my_port, fallback_node_info)
+
+    if route == "worker/generate_epr":
+        generar_epr(
+            payload["source"],
+            payload["target"],
+            conn,
+            int(payload["source_port"]),
+            int(payload["target_port"]),
+            float(payload.get("pgen", 1.0)),
+            payload["id"],
+            node_info_local,
+        )
+    elif route == "worker/receive_epr":
+        recibir_epr(
+            payload.get("epr_obj"),
+            node_info_local,
+            conn,
+            int(payload.get("my_port", my_port)),
+            int(payload.get("emisor_port", emisor_port)),
+            int(payload.get("listener_port")),
+        )
+    else:
+        print(f"[ZMQ CMD] Unknown route: {route}")
+
+
+def zmq_command_listener(conn, cmd_port, my_port=None, emisor_port=None, fallback_node_info=None):
+    """
+    Internal fast path for node->worker commands using ZeroMQ.
+    Only handles generate/receive EPR to reduce per-order TCP overhead.
+    """
+    pull_sock = context.socket(zmq.PULL)
+    pull_sock.bind(f"tcp://*:{cmd_port}")
+    print(f"[ZMQ CMD] Listening on tcp://*:{cmd_port}")
+
+    generate_queue = queue.Queue()
+    recv_state_lock = threading.Lock()
+    recv_state_cv = threading.Condition(recv_state_lock)
+    recv_state = {"active": 0}
+
+    def run_receive(payload):
+        try:
+            _handle_zmq_worker_command(
+                "worker/receive_epr",
+                payload,
+                conn,
+                my_port,
+                emisor_port,
+                fallback_node_info,
+            )
+        finally:
+            with recv_state_cv:
+                recv_state["active"] = max(0, recv_state["active"] - 1)
+                recv_state_cv.notify_all()
+
+    def generate_worker():
+        while True:
+            payload = generate_queue.get()
+            with recv_state_cv:
+                while recv_state["active"] > 0:
+                    recv_state_cv.wait(timeout=0.05)
+            _handle_zmq_worker_command(
+                "worker/generate_epr",
+                payload,
+                conn,
+                my_port,
+                emisor_port,
+                fallback_node_info,
+            )
+
+    threading.Thread(target=generate_worker, daemon=True).start()
+
+    while True:
+        try:
+            data = msgpack.unpackb(pull_sock.recv(), raw=False)
+            route = data.get("route")
+            payload = data.get("payload", {})
+
+            if route == "worker/receive_epr":
+                with recv_state_cv:
+                    recv_state["active"] += 1
+                # Receive commands have priority over generate commands.
+                threading.Thread(target=run_receive, args=(payload,), daemon=True).start()
+            elif route == "worker/generate_epr":
+                # Delay generate until no receive command is actively running.
+                generate_queue.put(payload)
+            else:
+                print(f"[ZMQ CMD] Unknown route: {route}")
+
+        except Exception as e:
+            print(f"[ZMQ CMD ERROR] {e}")
 
 def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
@@ -1406,27 +1606,38 @@ if __name__ == "__main__":
         node_info     = json.loads(sys.argv[8])
         listener_port = int(sys.argv[9])
 
-        log_file_epr = open(f"trace_epr_{node_info['id']}.txt", "w") 
-        # 2) activar tracer 
-        tracer = make_tracer() 
-        sys.settrace(tracer) 
+        log_file_epr = open(f"trace_epr_{node_info['id']}.txt", "w")
+        tracer = make_tracer()
+        sys.settrace(tracer)
         threading.settrace(tracer)
 
         print(f"[SENDER INIT] {emisor}")
-        with CQCConnection(emisor) as conn:
-            print("Running in sender mode")
-            generar_epr(
-                emisor, receptor, conn,
-                my_port, target_port,
-                pgen, epr_id, node_info
-            )
+        try:
+            with CQCConnection(emisor) as conn:
+                print("Running in sender mode")
+                generar_epr(
+                    emisor, receptor, conn,
+                    my_port, target_port,
+                    pgen, epr_id, node_info
+                )
 
-            socket_listener(
-                conn,
-                port=listener_port,
-                my_port=my_port,
-                emisor_port=target_port
-            )
+                threading.Thread(
+                    target=zmq_command_listener,
+                    args=(conn, listener_port + 2000, my_port, target_port, node_info),
+                    daemon=True,
+                ).start()
+
+                socket_listener(
+                    conn,
+                    port=listener_port,
+                    my_port=my_port,
+                    emisor_port=target_port
+                )
+        finally:
+            sys.settrace(None)
+            threading.settrace(None)
+            if log_file_epr:
+                log_file_epr.close()
 
     # -----------------------------------------
     # MODE: start as RECEIVER
@@ -1437,21 +1648,33 @@ if __name__ == "__main__":
         my_port       = int(sys.argv[4])
         emisor_port   = int(sys.argv[5])
         listener_port = int(sys.argv[6])
-        log_file_epr = open(f"trace_epr_{node_info['id']}.txt", "w") 
-        # 2) activar tracer 
-        tracer = make_tracer() 
-        sys.settrace(tracer) 
+        log_file_epr = open(f"trace_epr_{node_info['id']}.txt", "w")
+        tracer = make_tracer()
+        sys.settrace(tracer)
         threading.settrace(tracer)
         print(f"[RECEIVER INIT] {node_info['id']}")
-        with CQCConnection(node_info["id"]) as conn:
-            resultado = recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port)
-            print(f"[RECEIVER] Initial synchronization result: {resultado}")
-            socket_listener(
-                conn,
-                port=listener_port,
-                my_port=my_port,
-                emisor_port=emisor_port
-            )
+        try:
+            with CQCConnection(node_info["id"]) as conn:
+                resultado = recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port)
+                print(f"[RECEIVER] Initial synchronization result: {resultado}")
+
+                threading.Thread(
+                    target=zmq_command_listener,
+                    args=(conn, listener_port + 2000, my_port, emisor_port, node_info),
+                    daemon=True,
+                ).start()
+
+                socket_listener(
+                    conn,
+                    port=listener_port,
+                    my_port=my_port,
+                    emisor_port=emisor_port
+                )
+        finally:
+            sys.settrace(None)
+            threading.settrace(None)
+            if log_file_epr:
+                log_file_epr.close()
 
     else:
         raise ValueError(f"Unknown mode in worker.py: {mode}")

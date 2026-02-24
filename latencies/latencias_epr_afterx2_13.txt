@@ -1,0 +1,18 @@
+===== ESTADÍSTICAS DE LATENCIA =====
+Backend createEPR:
+  media: 0.012706636363636364
+  std: 0.002084619354833264
+  min: 0.009078
+  max: 0.016507
+
+Notificación HTTP:
+  media: 0.0005460909090909092
+  std: 0.00035271190922492383
+  min: 0.000328
+  max: 0.001514
+
+Total generación EPR:
+  media: 0.013708363636363637
+  std: 0.0019147727422713782
+  min: 0.011268
+  max: 0.017393

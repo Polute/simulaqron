@@ -14,7 +14,6 @@ import os
 import zmq
 import msgpack
 import threading
-from collections import deque
 # --------------------------------------------------
 # HIGH PRECISION TIMESTAMPS
 # --------------------------------------------------
@@ -44,7 +43,7 @@ def diff_precise(t1, t2):
     """
     return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
 
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_12.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_14.txt"
 
 def log_timestamp(event_type, epr_id, **fields):
     line = f"[{event_type}]  ID={epr_id}"
@@ -86,8 +85,10 @@ ORDERS = []
 # global flag
 worker_started = False
 epr_ready = {}   # id → payload
-
-epr_receive_queue = deque()
+epr_ready_cv = threading.Condition()
+receive_dispatch_lock = threading.Lock()
+pending_receive_orders = {}  # id -> orden
+inflight_receive_ids = set()
 
 
 def app_open(PUERTO, listener_port):
@@ -171,86 +172,106 @@ def app_open(PUERTO, listener_port):
             if info["id"] == node_id:
                 return port
         raise ValueError(f"No se encontró puerto para {node_id}")
+
+    worker_state_lock = threading.Lock()
     
-    def processing_receive_epr(orden):
+    def processing_receive_epr(orden, epr_obj=None):
         global worker_started
-        receiver_id = node_info["id"]
         epr_id = orden["id"]  # EPR id specified in the order
-        epr_obj = None
-        log_timestamp("ORDER_RECV_STARTING",epr_id, t_start = timestamp_precise())
-        print(receiver_id, " will receive EPR with:", orden["source"])
-        print("Waiting for EPR ",epr_id ," via ZMQ starting at ", timestamp_precise())
-        timeout = 5.0
-        start = time()
+        try:
+            receiver_id = node_info["id"]
+            log_timestamp("ORDER_RECV_STARTING",epr_id, t_start = timestamp_precise())
+            print(receiver_id, " will receive EPR with:", orden["source"])
+            if epr_obj is None:
+                print("Waiting for EPR ",epr_id ," via ZMQ starting at ", timestamp_precise())
+                timeout = 5.0
 
-        while time() - start < timeout:
-            if epr_id in epr_ready: 
-                epr_obj = epr_ready.pop(epr_id)
-                break
-            sleep(0.001)
-        if epr_obj is None:
-            print(f"[RECEIVER] Timeout waiting for EPR {epr_id} at {timestamp_precise()}")
-            return
-        
-        my_port = get_port_by_id(node_info["id"])
-        emisor_port = get_port_by_id(orden["source"])
-        print(f"[RECEIVER] Processing EPR {epr_id} between {node_info['id']}:{my_port} "
-            f"and {orden['source']}:{emisor_port}")
-        
-        log_timestamp("ORDER_RECV_EXECUTING_AFTER_FOUND",epr_id, t_start = timestamp_precise())
-        if not worker_started:
-            print("[INFO] Starting worker.py in receiver_init mode for the first time at ",timestamp_precise())
-            subprocess.Popen([
-                sys.executable, "worker.py",
-                "receiver_init",
-                json.dumps(epr_obj),
-                json.dumps(node_info),
-                str(my_port),
-                str(emisor_port),
-                str(listener_port)
-            ])
-            worker_started = True
-        else:
-            print("[INFO] Receiver already running, sending order via socket at ",timestamp_precise())
-            payload = {
-                "comand": "receive EPR",
-                "id": epr_id,
-                "source": orden["source"],
-                "epr_obj": epr_obj,
-                "my_port": my_port,
-                "emisor_port": emisor_port,
-                "listener_port": listener_port
-            }
-            if wait_for_listener(listener_port):
-                # Connect to the receiver listener and send the order
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    print("USING", listener_port, "at", timestamp_precise())
-                    s.connect(("localhost", listener_port))
-                    s.send(json.dumps(payload).encode())
-                    resp = s.recv(4096).decode()
-                    print("[RECEIVER] Response:", resp)
+                # Wait for this EPR id without busy-waiting.
+                deadline = perf_counter() + timeout
+                with epr_ready_cv:
+                    while epr_obj is None:
+                        epr_obj = epr_ready.pop(epr_id, None)
+                        if epr_obj is not None:
+                            break
 
-    from threading import Thread, Lock
+                        remaining = deadline - perf_counter()
+                        if remaining <= 0:
+                            break
+                        epr_ready_cv.wait(timeout=remaining)
 
-    queue_lock = Lock()
+            if epr_obj is None:
+                print(f"[RECEIVER] Timeout waiting for EPR {epr_id} at {timestamp_precise()}")
+                return
+            
+            my_port = get_port_by_id(node_info["id"])
+            emisor_port = get_port_by_id(orden["source"])
+            print(f"[RECEIVER] Processing EPR {epr_id} between {node_info['id']}:{my_port} "
+                f"and {orden['source']}:{emisor_port}")
+            
+            log_timestamp("ORDER_RECV_EXECUTING_AFTER_FOUND",epr_id, t_start = timestamp_precise())
+            with worker_state_lock:
+                need_init = not worker_started
+                if need_init:
+                    print("[INFO] Starting worker.py in receiver_init mode for the first time at ", timestamp_precise())
+                    subprocess.Popen([
+                        sys.executable, "worker.py",
+                        "receiver_init",
+                        json.dumps(epr_obj),
+                        json.dumps(node_info),
+                        str(my_port),
+                        str(emisor_port),
+                        str(listener_port)
+                    ])
+                    worker_started = True
+                    # Warm up internal fast command channel to reduce first-send latency.
+                    get_zmq_socket(f"tcp://localhost:{listener_port + 2000}")
 
-    def epr_receive_worker():
-        while True:
-            orden = None
+            if not need_init:
+                print("[INFO] Receiver already running, sending order via ZMQ at ", timestamp_precise())
+                payload = {
+                    "comand": "receive EPR",
+                    "id": epr_id,
+                    "source": orden["source"],
+                    "epr_obj": epr_obj,
+                    "my_port": my_port,
+                    "emisor_port": emisor_port,
+                    "listener_port": listener_port
+                }
+                cmd_addr = f"tcp://localhost:{listener_port + 2000}"
+                send_info(
+                    cmd_addr,
+                    {
+                        "route": "worker/receive_epr",
+                        "payload": payload
+                    }
+                )
+        finally:
+            with receive_dispatch_lock:
+                inflight_receive_ids.discard(epr_id)
 
-            # Extraer de la cola de forma segura
-            with queue_lock:
-                if epr_receive_queue:
-                    orden = epr_receive_queue.popleft()
+    def _maybe_dispatch_receive(epr_id):
+        with receive_dispatch_lock:
+            if epr_id in inflight_receive_ids:
+                return
 
-            if orden is not None:
-                processing_receive_epr(orden)
-            else:
-                sleep(0.001)
+            orden = pending_receive_orders.get(epr_id)
+            with epr_ready_cv:
+                epr_obj = epr_ready.pop(epr_id, None)
+            if orden is None or epr_obj is None:
+                if epr_obj is not None:
+                    # Put it back if the order has not arrived yet.
+                    with epr_ready_cv:
+                        epr_ready[epr_id] = epr_obj
+                return
 
-    # Lanzar el hilo worker
-    worker_thread = Thread(target=epr_receive_worker, daemon=True)
-    worker_thread.start()
+            pending_receive_orders.pop(epr_id, None)
+            inflight_receive_ids.add(epr_id)
+
+        threading.Thread(
+            target=processing_receive_epr,
+            args=(orden, epr_obj),
+            daemon=True
+        ).start()
 
 
     def aplicar_orden(orden, node_info):
@@ -322,8 +343,10 @@ def app_open(PUERTO, listener_port):
                     str(listener_port)
                 ])
                 worker_started = True
+                # Warm up internal fast command channel to reduce first-send latency.
+                get_zmq_socket(f"tcp://localhost:{listener_port + 2000}")
             else:
-                print("[INFO] Sender already running, sending order via socket")
+                print("[INFO] Sender already running, sending order via ZMQ")
                 print(f"Using this listener_port {listener_port}")
 
                 payload = {
@@ -336,20 +359,23 @@ def app_open(PUERTO, listener_port):
                     "pgen": pgen_source,
                     "listener_port": listener_port
                 }
-                if wait_for_listener(listener_port):
-                    # Connect to the sender listener and send the order
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                        s.connect(("localhost", listener_port))
-                        s.send(json.dumps(payload).encode())
-                        resp = s.recv(4096).decode()
-                        print("[SENDER] Response:", resp)
+                cmd_addr = f"tcp://localhost:{listener_port + 2000}"
+                send_info(
+                    cmd_addr,
+                    {
+                        "route": "worker/generate_epr",
+                        "payload": payload
+                    }
+                )
 
         # --------------------------------------------------
         # Receive EPR (this node receives an EPR created by another node)
         # --------------------------------------------------
         elif comand == "receive EPR":
-            with queue_lock:
-                epr_receive_queue.append(orden)
+            epr_id = orden["id"]
+            with receive_dispatch_lock:
+                pending_receive_orders[epr_id] = orden
+            _maybe_dispatch_receive(epr_id)
             return
 
 
@@ -493,7 +519,11 @@ def app_open(PUERTO, listener_port):
 
 
     def handle_epr_ready(payload):
-        epr_ready[payload["id"]] = payload
+        epr_id = payload["id"]
+        with epr_ready_cv:
+            epr_ready[epr_id] = payload
+            epr_ready_cv.notify_all()
+        _maybe_dispatch_receive(epr_id)
 
 
 
@@ -741,7 +771,6 @@ def app_open(PUERTO, listener_port):
 
 
     threading.Thread(target=zmq_listener, daemon=True).start()
-    threading.Thread(target=epr_receive_worker, daemon=True).start()
 
 
 
