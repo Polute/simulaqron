@@ -43,7 +43,7 @@ def diff_precise(t1, t2):
     """
     return timestamp_to_seconds(t2) - timestamp_to_seconds(t1)
 
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_14.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_15.txt"
 
 def log_timestamp(event_type, epr_id, **fields):
     line = f"[{event_type}]  ID={epr_id}"

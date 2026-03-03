@@ -109,8 +109,8 @@ import csv
 import re
 
 def export_timestamps_to_csv(
-    log_file="latencies/timestamps_log_afterx2_14.txt",
-    csv_file="latencies/timestamps_log_afterx2_14.csv"
+    log_file="latencies/timestamps_log_afterx2_15.txt",
+    csv_file="latencies/timestamps_log_afterx2_15.csv"
 ):
     rows = []
     seen = set()   # avoid duplicates (event, id)
@@ -188,7 +188,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_latencies(csv_file="latencies/timestamps_log_afterx2_14.csv"):
+def plot_latencies(csv_file="latencies/timestamps_log_afterx2_15.csv"):
     df = pd.read_csv(csv_file)
 
     def parse_ts(x):
@@ -339,9 +339,9 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_14.csv"):
     tmp_fd, tmp_png = tempfile.mkstemp(prefix="latencies_", suffix=".png", dir="latencies")
     os.close(tmp_fd)
     fig.savefig(tmp_png)
-    os.replace(tmp_png, "latencies/latencies_epr_pipelinex2_14.png")
+    os.replace(tmp_png, "latencies/latencies_epr_pipelinex2_15.png")
     plt.close(fig)
-    print("[OK] Saved: latencies/latencies_epr_pipelinex2_14.png")
+    print("[OK] Saved: latencies/latencies_epr_pipelinex2_15.png")
 
     # --- Export TXT report ---
     tmp_fd, tmp_txt = tempfile.mkstemp(prefix="latencies_pipeline_", suffix=".txt", dir="latencies")
@@ -361,16 +361,16 @@ def plot_latencies(csv_file="latencies/timestamps_log_afterx2_14.csv"):
                     f.write(f"  {label:25s}: {row[col]:.6f} s\n")
 
             f.write("\n")
-    os.replace(tmp_txt, "latencies/latencies_epr_pipelinex2_14.txt")
+    os.replace(tmp_txt, "latencies/latencies_epr_pipelinex2_15.txt")
 
-    print("[OK] Saved TXT report: latencies/latencies_epr_pipelinex2_14.txt")
+    print("[OK] Saved TXT report: latencies/latencies_epr_pipelinex2_15.txt")
 
 
 
 
 import pandas as pd
 
-def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_14.csv"):
+def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_15.csv"):
     wait_for_csv(csv_file)
     df = pd.read_csv(csv_file)
 
@@ -439,7 +439,7 @@ def compute_latency_stats(csv_file="latencies/timestamps_log_afterx2_14.csv"):
         f.write(f"  std: {std_total}\n")
         f.write(f"  min: {min_total}\n")
         f.write(f"  max: {max_total}\n")
-    os.replace(tmp_stats, "latencies/latencias_epr_afterx2_14.txt")
+    os.replace(tmp_stats, "latencies/latencias_epr_afterx2_15.txt")
 
 
     print("[OK] Estadísticas guardadas en latencias_epr.txt")
@@ -489,7 +489,7 @@ def diff_precise(t1, t2):
 # --------------------------------------------------
 # TIMESTAMPS DEBUGGER
 # --------------------------------------------------
-TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_14.txt"
+TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_15.txt"
 # Evita duplicados: (event_type, epr_id)
 LOGGED_EVENTS = set()
 
@@ -1606,10 +1606,10 @@ if __name__ == "__main__":
         node_info     = json.loads(sys.argv[8])
         listener_port = int(sys.argv[9])
 
-        log_file_epr = open(f"trace_epr_{node_info['id']}.txt", "w")
-        tracer = make_tracer()
-        sys.settrace(tracer)
-        threading.settrace(tracer)
+        #log_file_epr = open(f"trace_epr_{node_info['id']}.txt", "w")
+        #tracer = make_tracer()
+       # sys.settrace(tracer)
+        #threading.settrace(tracer)
 
         print(f"[SENDER INIT] {emisor}")
         try:
@@ -1634,10 +1634,11 @@ if __name__ == "__main__":
                     emisor_port=target_port
                 )
         finally:
-            sys.settrace(None)
-            threading.settrace(None)
-            if log_file_epr:
-                log_file_epr.close()
+            print("a")
+           # sys.settrace(None)
+            #threading.settrace(None)
+           # if log_file_epr:
+             #   log_file_epr.close()
 
     # -----------------------------------------
     # MODE: start as RECEIVER
@@ -1648,10 +1649,10 @@ if __name__ == "__main__":
         my_port       = int(sys.argv[4])
         emisor_port   = int(sys.argv[5])
         listener_port = int(sys.argv[6])
-        log_file_epr = open(f"trace_epr_{node_info['id']}.txt", "w")
-        tracer = make_tracer()
-        sys.settrace(tracer)
-        threading.settrace(tracer)
+        #log_file_epr = open(f"trace_epr_{node_info['id']}.txt", "w")
+        #tracer = make_tracer()
+        #sys.settrace(tracer)
+        #threading.settrace(tracer)
         print(f"[RECEIVER INIT] {node_info['id']}")
         try:
             with CQCConnection(node_info["id"]) as conn:
@@ -1671,10 +1672,11 @@ if __name__ == "__main__":
                     emisor_port=emisor_port
                 )
         finally:
-            sys.settrace(None)
-            threading.settrace(None)
-            if log_file_epr:
-                log_file_epr.close()
+            print("a")
+            #sys.settrace(None)
+            #threading.settrace(None)
+            #if log_file_epr:
+             #   log_file_epr.close()
 
     else:
         raise ValueError(f"Unknown mode in worker.py: {mode}")
