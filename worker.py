@@ -494,6 +494,7 @@ TIMESTAMP_LOG = "latencies/timestamps_log_afterx2_15.txt"
 LOGGED_EVENTS = set()
 
 def log_timestamp(event_type, epr_id, **fields):
+    '''
     global LOGGED_EVENTS
 
     # Si ya existe este evento para este ID → no lo escribimos
@@ -510,6 +511,7 @@ def log_timestamp(event_type, epr_id, **fields):
 
     with open(TIMESTAMP_LOG, "a") as f:
         f.write(line)
+    '''
     
 
 
@@ -796,7 +798,7 @@ def recalculate_werner(epr_id, result_recv, conn,
                 print(f"Measuring {epr_id}")
                 measure_epr(epr_id, node_info, conn, my_port, order="measure")
             elif role == "no_kill":
-                print(f"Changing state{epr_id}")
+                print(f"Changing state {epr_id}")
             break
 
         time.sleep(interval)
@@ -832,9 +834,17 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
         # Only skip measurement if truly marked as 'swapped' OR 'consumed'
         if order not in ("swapped", "consumed", "no_kill"):
             try:
-                while not epr_buffers[epr_id]:
-                        time.sleep(0.0005)
-                q = epr_buffers[epr_id].popleft()
+                # In swapped/watch_over flows the qubit may exist in epr_store
+                # while epr_buffers[new_id] is still empty. Avoid infinite wait.
+                wait_deadline = time.time() + 1.0
+                while not epr_buffers[epr_id] and time.time() < wait_deadline:
+                    time.sleep(0.0005)
+
+                if epr_buffers[epr_id]:
+                    q = epr_buffers[epr_id].popleft()
+                elif q is None:
+                    raise RuntimeError(f"No qubit available for {epr_id}")
+
                 with conn_lock:
                     m = q.measure()
             except Exception as e:
@@ -849,7 +859,7 @@ def measure_epr(epr_id, node_info, conn, my_port=None, order=None):
 
         del epr_store[epr_id]
         result_measure = {"id": epr_id, "medicion": m, "state": order}
-
+        print(f"[MEASURE] Result for {epr_id}: {result_measure}")
         try:
             if my_port:
                 requests.post(f"http://localhost:{my_port}/pairEPR/recv", json=result_measure, timeout=2)
@@ -1145,7 +1155,7 @@ def recibir_epr(payload, node_info, conn, my_port, emisor_port, listener_port):
 
     
 
-    threading.Thread(target=stats_and_plots, daemon=True).start()
+    #threading.Thread(target=stats_and_plots, daemon=True).start()
 
 
     # --- TIMESTAMP: salida de la función ---
@@ -1497,6 +1507,9 @@ def handle_client_unified(conn_sock, conn, my_port, emisor_port):
                     "q": epr_store[old_id]["q"],
                     "other_port": other_port
                 }
+                # Keep buffer/id mapping consistent for later measure_epr calls.
+                if epr_store[payload["id"]]["q"] is not None and not epr_buffers[payload["id"]]:
+                    epr_buffers[payload["id"]].append(epr_store[payload["id"]]["q"])
             start_monitor(
                 payload["id"],              # new swapped EPR id
                 payload.get("EPR_pair"),    # metadata of the new EPR
